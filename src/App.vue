@@ -1,20 +1,22 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+<h1>GetBible</h1>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import UIkit from 'uikit';
+import Icons from 'uikit/dist/js/uikit-icons';
 
+UIkit.use(Icons);
+ 
 export default {
   name: 'App',
   components: {
-    HelloWorld
   }
 }
 </script>
 
-<style>
+<style lang="less">
+@import "../node_modules/uikit/src/less/uikit.less";
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

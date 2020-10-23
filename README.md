@@ -1,24 +1,32 @@
 # getbible
 
-## Project setup
+# install dependencies
 ```
-yarn install
+npm install
 ```
-
-### Compiles and hot-reloads for development
+# run electron server
 ```
-yarn serve
+npm run electron:serve
 ```
-
-### Compiles and minifies for production
+# serve with hot reload at localhost:8080
 ```
-yarn build
+npm run dev
 ```
-
-### Lints and fixes files
+# build for production with minification
 ```
-yarn lint
+npm run build
 ```
-
+# build for production and view the bundle analyzer report
+```
+npm run build --report
+```
+# run unit tests
+```
+npm run unit
+```
+# run all tests
+```
+npm test
+```
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).

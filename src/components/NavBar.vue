@@ -25,9 +25,9 @@
 
                                         <div class="uk-margin">
                                             <div class="uk-button-group">
-                                                <button class="uk-button uk-button-default">All</button>
-                                                <button class="uk-button uk-button-default">Any</button>
-                                                <button class="uk-button uk-button-default">Phrase</button>
+                                                <button class="uk-button uk-button-default uk-button-small">All</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Any</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Phrase</button>
                                             </div>
                                         </div>
                                          <div class="uk-margin">

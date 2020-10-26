@@ -37,4 +37,11 @@ export default {
   color: #2c3e50;
   // margin-top: 60px;
 }
+.disabled {
+  cursor: not-allowed;
+  color: gray
+}
+.disabled:hover {
+  color:gray 
+}
 </style>

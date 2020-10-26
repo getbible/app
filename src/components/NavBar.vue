@@ -15,3 +15,32 @@
             </div>
         </nav>
 </template>
+<script>
+export default {
+    data: () => {
+        return {
+            translations: {},
+            
+        }
+    },
+    async created(){
+                let config = {
+                    headers: {'Access-Control-Allow-Origin': '*'}
+                };
+                let response =fetch(`https://getbible.net/v2/translations.json`,config)
+                    .catch(function(err) { this.translations = err });
+
+                if(!response)
+                    return;
+                    
+                let data = response.json().catch(err => {console.log(err);})
+
+                if(!data) 
+                    return;
+
+                this.translations = data
+
+                
+            }
+}
+</script>

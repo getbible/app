@@ -25,15 +25,9 @@
 
                                         <div class="uk-margin">
                                             <div class="uk-button-group">
-<<<<<<< HEAD
                                                 <button class="uk-button uk-button-default uk-button-small">ALL WORDS</button>
                                                 <button class="uk-button uk-button-default uk-button-small">ANY WORDS</button>
                                                 <button class="uk-button uk-button-default uk-button-small">PHRASE</button>
-=======
-                                                <button class="uk-button uk-button-default uk-button-small">All</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Any</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Phrase</button>
->>>>>>> e59f24b414f547443bab3d9f17b2a4df4d12cfdb
                                             </div>
                                         </div>
                                          <div class="uk-margin">

@@ -28,24 +28,29 @@
                              <h3>Saved Translations</h3>
                               <div>
                                     <ul class="uk-list uk-list-large uk-list-divider">
-                                        <li>List item 1 <span class="uk-position-center-right" uk-icon="icon: minus-circle;"></span> </li> 
-                                        <li>List item 2</li>
-                                        <li>List item 3</li>
+                                        <li
+                                        v-for="(tr,i) in Object.keys(savedTranslations)" 
+                                        :key="i"
+                                        ><div><span>{{savedTranslations[tr]["language"]?`(${savedTranslations[tr]["language"]})`:null}} {{savedTranslations[tr]['translation']}}</span> <a class="uk-position-center-right uk-position-relative"><span   uk-icon="icon: minus-circle;"></span></a>
+                                        </div> </li> 
+                                        
                                         <li>
                                             <div uk-form-custom="target: > * > span:first-child">
                                 <select>
                                     <option value="">Add Translation...</option>
-                                    <option value="1">Option 01</option>
-                                    <option value="2">Option 02</option>
-                                    <option value="3">Option 03</option>
-                                    <option value="4">Option 04</option>
+                                    <option 
+                                    v-for="(tr,i) in Object.keys(translations)" 
+                                    :key="i"
+                                    :value="tr"
+                                    >{{translations[tr]["language"]?`(${translations[tr]["language"]})`:null}} {{translations[tr]['translation']}}
+                                    </option>
                                 </select>
                                 <button class="uk-button uk-button-default" type="button" tabindex="-1">
                                     <span></span>
                                     <span uk-icon="icon: chevron-down"></span>
                                 </button>
                             </div>
-                            <span  uk-icon="icon: plus-circle; ratio:2"></span>
+                            <a><span  uk-icon="icon: plus-circle; ratio:2"></span></a>
                                         </li>
                                     </ul>
                                     
@@ -56,9 +61,10 @@
                     <div class="uk-modal-footer uk-text-right">
                         <button class="uk-button uk-button-default uk-modal-close" type="button">Cancel</button>
                         <button class="uk-button uk-button-primary" type="button">Save</button>
-                    </div>
+                    </div>  
                 </div>
             </div>
+            
         </nav>
 </template>
 <script>
@@ -69,17 +75,32 @@ export default {
             
         }
     },
+    computed: {
+        savedTranslations() {
+            let o = {}
+            let counter = 0
+            for(const tr in this.translations){
+                if(counter>2)
+                break;
+                o = {...o, [tr]:this.translations[tr]}
+                counter +=1
+                // Object.assign({}, o,{[tr]: this.translations[tr]})
+            }
+            console.log(o);
+            return o
+        }
+    },
     async created(){
                 let config = {
                     headers: {'Access-Control-Allow-Origin': '*'}
                 };
-                let response =fetch(`https://getbible.net/v2/translations.json`,config)
+                let response = await fetch(`https://getbible.net/v2/translations.json`,config)
                     .catch(function(err) { this.translations = err });
 
                 if(!response)
                     return;
                     
-                let data = response.json().catch(err => {console.log(err);})
+                let data = await response.json().catch(err => {console.log(err);})
 
                 if(!data) 
                     return;

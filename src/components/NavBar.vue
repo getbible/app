@@ -4,7 +4,7 @@
         
                 <a class="uk-navbar-item uk-logo" href="#">GetBible</a>
         
-               <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: search; ratio:2"></span></a>
+               <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: search; ratio:2"></span>Search</a>
 
                     <div id="offcanvas-slide" uk-offcanvas>
                         <div class="uk-offcanvas-bar">
@@ -25,29 +25,29 @@
 
                                         <div class="uk-margin">
                                             <div class="uk-button-group">
-                                                <button class="uk-button uk-button-default">All</button>
-                                                <button class="uk-button uk-button-default">Any</button>
-                                                <button class="uk-button uk-button-default">Phrase</button>
+                                                <button class="uk-button uk-button-default uk-button-small">ALL WORDS</button>
+                                                <button class="uk-button uk-button-default uk-button-small">ANY WORDS</button>
+                                                <button class="uk-button uk-button-default uk-button-small">PHRASE</button>
                                             </div>
                                         </div>
                                          <div class="uk-margin">
                                             <div class="uk-button-group">
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">BIBLE</button>
+                                                <button class="uk-button uk-button-default uk-button-small">OT</button>
+                                                <button class="uk-button uk-button-default uk-button-small">NT</button>
+                                                <button class="uk-button uk-button-default uk-button-small">CHAPTER</button>
                                             </div>
                                         </div>
                                          <div class="uk-margin">
                                             <div class="uk-button-group">
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">EXACT MATCH</button>
+                                                <button class="uk-button uk-button-default uk-button-small">PARTIAL MATCH</button>
                                             </div>
                                         </div>
                                          <div class="uk-margin">
                                             <div class="uk-button-group">
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
-                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">CASE INSENSITIVE</button>
+                                                <button class="uk-button uk-button-default uk-button-small">CASE SENSITIVE</button>
                                                 <!-- <button class="uk-button uk-button-default">Button</button> -->
                                             </div>
                                         </div>
@@ -58,6 +58,7 @@
                     </div>
                     
                 <!-- <span class="uk-label uk-label-primary"><span class="uk-badge uk-badge-danger">{{ num_of_tr}} </span>Translations Available</span> -->
+                <a class="uk-navbar-item" href="#" uk-toggle><span  uk-icon="icon: history; ratio:2"></span>History</a>
         
             </div>
             <a class="uk-navbar-item uk-position-center-right" href="#modal-sections" uk-toggle><span  uk-icon="icon: cog; ratio:2"></span></a>

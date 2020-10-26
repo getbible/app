@@ -8,10 +8,10 @@
                 <select @change="update_bk()" v-model="translation" class="uk-select" id="inputGroupSelect01">
                     <!-- <option selected value="1">Choose...</option> -->
                     <option 
-                    class="uk-animation-slide-bottom uk-animation-15" v-for="(tr,i) in Object.keys(translations)" 
+                    class="uk-animation-slide-bottom uk-animation-15" v-for="(tr,i) in translations" 
                     :key="i"
-                    :value="tr"
-                    >{{translations[tr]["language"]?`(${translations[tr]["language"]})`:null}} {{translations[tr]['translation']}}
+                    :value="tr.abbreviation"
+                    >{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}
                     </option>
                     
                 </select>
@@ -47,8 +47,8 @@
             </div>
         </div>
         <verses
-        v-if="books[book] "
-        :dir="translations[translation].direction.toLowerCase()"
+        v-if="translations.length && books[book]"
+        :dir="t(translation).direction.toLowerCase()"
         :book_name="books[book].name"
         :chapter="fchapters"
         />
@@ -65,7 +65,7 @@ export default {
   data: function(){
                 return {
                 translation: 'akjv',
-                translations: {},
+                // translations: {},
                 chapter: 1,
                 chapter_num: 1,
                 chapters:{},
@@ -78,6 +78,10 @@ export default {
                 message: 'Loading...'
             }},
             computed: {
+                translations(){
+                    return this.$store.state.settings.savedTr;
+                },
+                
                 fchapters: function (){
                     if(!this.search)
                     return this.chapter.verses
@@ -92,7 +96,10 @@ export default {
                     },
             },
             methods:{
-                update_chapter() {
+                t(i){
+                    return this.translations.find(t =>  t.abbreviation === i)
+                },
+                async update_chapter() {
                     // this.loading = true
                     this.progress = 95
                     let config = {
@@ -101,7 +108,7 @@ export default {
             
                     let url =  `https://getbible.net/v2/${this.translation}/${this.book}/${this.chapter_num}.json`
                     
-                    let response = fetch(url, config).catch(function(err) {
+                    let response = await fetch(url, config).catch(function(err) {
                             this.chapter = err
                             this.loading =false
                             this.message = 'Error'
@@ -111,7 +118,7 @@ export default {
                     if (!response) return;
 
                     this.progress = 99
-                    let data = response.json().catch(err => {
+                    let data = await response.json().catch(err => {
                                                     this.chapter = err
                                                     this.loading =false
                                                     this.message = 'Error'
@@ -171,11 +178,11 @@ export default {
                 let config = {
                     headers: {'Access-Control-Allow-Origin': '*'}
                 };
-                fetch(`https://getbible.net/v2/translations.json`,config)
-                .then(response => response.json())
-                .then(data => {
-                    // console.log(data)
-                    this.translations = data
+                // fetch(`https://getbible.net/v2/translations.json`,config)
+                // .then(response => response.json())
+                // .then(data => {
+                //     // console.log(data)
+                //     this.translations = data
 
                     fetch(`https://getbible.net/v2/${this.translation}/books.json`, config)
                     .then(response => response.json())
@@ -187,18 +194,18 @@ export default {
                     }).catch(function(err) {
                         this.chapter = err
                     });
-                }).catch(function(err) {
-                    this.chapter = err
-                });
+                // }).catch(function(err) {
+                //     this.chapter = err
+                // });
 
-                fetch(`https://getbible.net/v2/kjv/${this.book}/${this.chapter_num}.json`,config)
-                .then(response => response.json())
-                .then(data => {
-                    console.log(data)
-                    this.chapter = data
-                }).catch(function(err) {
-                    this.chapter = err
-                });
+                // fetch(`https://getbible.net/v2/kjv/${this.book}/${this.chapter_num}.json`,config)
+                // .then(response => response.json())
+                // .then(data => {
+                //     console.log(data)
+                //     this.chapter = data
+                // }).catch(function(err) {
+                //     this.chapter = err
+                // });
             }
 }
 </script>

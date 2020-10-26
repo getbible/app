@@ -84,11 +84,11 @@ export default {
                     return this.filteredChapters
                 },
                 filteredChapters() {
-                    return _.orderBy(this.chapter.verses.filter((item) => item.verse.toString().toLowerCase()
-                        .includes(this.search.toLowerCase())
-                                    || item.chapter.toString().toLowerCase().includes(this.search.toLowerCase())
-                                    || item.name.toString().toLowerCase().includes(this.search.toLowerCase())
-                                    || item.text.toLowerCase().includes(this.search.toLowerCase())), 'verse');
+                    return _.orderBy(this.chapter.verses.filter((item) => 
+                            item.verse.toString().toLowerCase().includes(this.search.toLowerCase())
+                        || item.chapter.toString().toLowerCase().includes(this.search.toLowerCase())
+                        || item.name.toString().toLowerCase().includes(this.search.toLowerCase())
+                        || item.text.toLowerCase().includes(this.search.toLowerCase())), 'verse');
                     },
             },
             methods:{
@@ -97,24 +97,32 @@ export default {
                     this.progress = 95
                     let config = {
                     headers: {'Access-Control-Allow-Origin': '*'}
-                };
+                                };
             
-                fetch(`https://getbible.net/v2/${this.translation}/${this.book}/${this.chapter_num}.json`, config)
-                .then(response => {
-                    this.progress = 99
-                    return response.json()})
-                .then(data => {
-                    this.loading =false
+                    let url =  `https://getbible.net/v2/${this.translation}/${this.book}/${this.chapter_num}.json`
                     
-                    // console.log(data)
+                    let response = fetch(url, config).catch(function(err) {
+                            this.chapter = err
+                            this.loading =false
+                            this.message = 'Error'
+                            
+                        });
+
+                    if (!response) return;
+
+                    this.progress = 99
+                    let data = response.json().catch(err => {
+                                                    this.chapter = err
+                                                    this.loading =false
+                                                    this.message = 'Error'
+                                                })
+                    this.loading =false
+                        
+                    if (!data) return;
+
                     this.chapter = data
                     this.progress =0
-                }).catch(function(err) {
-                    this.chapter = err
-                    this.loading =false
-                    this.message = 'Error'
-                    
-                });
+
                 },
                 async update_tr(){
 
@@ -126,7 +134,8 @@ export default {
                     this.loading =true
                     this.progress =25
                     this.message = 'Loading...'
-                    fetch(`https://getbible.net/v2/${this.translation}/books.json`,config)
+                    let url = `https://getbible.net/v2/${this.translation}/books.json`
+                    fetch(url,config)
                     .then(response => response.json())
                     .then(data => {
                         // console.log(data)

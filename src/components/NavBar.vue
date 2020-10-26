@@ -29,15 +29,17 @@
                               <div>
                                     <ul class="uk-list uk-list-large uk-list-divider">
                                         <li
-                                        v-for="(tr,i) in Object.keys(savedTranslations)" 
+                                        v-for="(tr,i) in savedTranslations" 
                                         :key="i"
-                                        ><div><span>{{savedTranslations[tr]["language"]?`(${savedTranslations[tr]["language"]})`:null}} {{savedTranslations[tr]['translation']}}</span> <a class="uk-position-center-right uk-position-relative"><span   uk-icon="icon: minus-circle;"></span></a>
+                                        ><div><span>{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</span> 
+                                        {{" "}}<a @click="remove(tr.abbreviation)" class="uk-position-center-right uk-position-relative"><span   uk-icon="icon: minus-circle;"></span></a>
                                         </div> </li> 
+                                        <li v-if="!savedTranslations.length">No saved translation</li>
                                         
-                                        <li>
+                                        <li>Add
                                             <div uk-form-custom="target: > * > span:first-child">
-                                <select>
-                                    <option value="">Add Translation...</option>
+                                <select v-model="translation">
+                                    <option selected value="Add Translation...">Add Translation...</option>
                                     <option 
                                     v-for="(tr,i) in Object.keys(translations)" 
                                     :key="i"
@@ -50,7 +52,7 @@
                                     <span uk-icon="icon: chevron-down"></span>
                                 </button>
                             </div>
-                            <a><span  uk-icon="icon: plus-circle; ratio:2"></span></a>
+                            <a @click="add(translations[translation])" :class="{disabled:!translations[translation]}"><span  uk-icon="icon: plus-circle; ratio:2"></span></a>
                                         </li>
                                     </ul>
                                     
@@ -71,23 +73,33 @@
 export default {
     data: () => {
         return {
+            translation: 'Add Translation...',
             translations: {},
             
         }
     },
     computed: {
         savedTranslations() {
-            let o = {}
-            let counter = 0
-            for(const tr in this.translations){
-                if(counter>2)
-                break;
-                o = {...o, [tr]:this.translations[tr]}
-                counter +=1
-                // Object.assign({}, o,{[tr]: this.translations[tr]})
-            }
-            console.log(o);
-            return o
+            // let o = {}
+            // let counter = 0
+            // for(const tr in this.translations){
+            //     if(counter>2)
+            //     break;
+            //     o = {...o, [tr]:this.translations[tr]}
+            //     counter +=1
+            //     // Object.assign({}, o,{[tr]: this.translations[tr]})
+            // }
+            // console.log(o);
+            return this.$store.state.settings.savedTr;
+        }
+    },
+    methods: {
+        add(tr){
+            if(!tr) return;
+            this.$store.dispatch('add', tr)
+        },
+        remove(tr){
+            this.$store.dispatch('remove', tr)
         }
     },
     async created(){

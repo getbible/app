@@ -4,13 +4,58 @@
         
                 <a class="uk-navbar-item uk-logo" href="#">GetBible</a>
         
-                <div class="uk-navbar-item">
-                    <form class="uk-search uk-search-default" action="javascript:void(0)">
-                        <span uk-search-icon></span>
-                        <input class="uk-search-input" v-model="search" type="search" placeholder="Search Chapter...">
-                    </form>
+               <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: search; ratio:2"></span></a>
 
-                </div>
+                    <div id="offcanvas-slide" uk-offcanvas>
+                        <div class="uk-offcanvas-bar">
+
+                            <div class="uk-nav uk-nav-default"> 
+                                    <div class="uk-margin">
+                                        <form class="uk-search uk-search-default" action="javascript:void(0)">
+                                                <!-- <span uk-search-icon></span> -->
+                                                <input class="uk-search-input" v-model="search" type="search" placeholder="Search Words...">
+                                                <div class="uk-margin">
+                                                    <button class="uk-button uk-button-default uk-button-small">Search</button>
+                                                </div>
+                                        </form>
+
+                                    </div>
+                                    
+                                    <div class="uk-margin">
+
+                                        <div class="uk-margin">
+                                            <div class="uk-button-group">
+                                                <button class="uk-button uk-button-default">All</button>
+                                                <button class="uk-button uk-button-default">Any</button>
+                                                <button class="uk-button uk-button-default">Phrase</button>
+                                            </div>
+                                        </div>
+                                         <div class="uk-margin">
+                                            <div class="uk-button-group">
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                            </div>
+                                        </div>
+                                         <div class="uk-margin">
+                                            <div class="uk-button-group">
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                            </div>
+                                        </div>
+                                         <div class="uk-margin">
+                                            <div class="uk-button-group">
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <button class="uk-button uk-button-default uk-button-small">Button</button>
+                                                <!-- <button class="uk-button uk-button-default">Button</button> -->
+                                            </div>
+                                        </div>
+                                    </div>
+                            </div>
+
+                        </div>
+                    </div>
                     
                 <!-- <span class="uk-label uk-label-primary"><span class="uk-badge uk-badge-danger">{{ num_of_tr}} </span>Translations Available</span> -->
         

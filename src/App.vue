@@ -24,6 +24,15 @@ export default {
     navbar,
     options
   },
+  created(){
+     const userSettings = localStorage.getItem('settings');
+    
+    if (userSettings) {
+      const settings = JSON.parse(userSettings);
+      this.$store.commit('set_settings', settings);
+    }
+   
+  }
 }
 </script>
 

@@ -85,11 +85,11 @@
                                             v-for="(tr,i) in savedTranslations" 
                                             :key="i"
                                             ><div><span>{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</span> 
-                                            {{" "}}<a @click="remove(tr.abbreviation)" class="uk-position-center-right uk-position-relative"><span   uk-icon="icon: minus-circle;"></span></a>
+                                            {{" "}}<a @click="remove(tr.abbreviation)" class="uk-position-center-right uk-position-relative"><span  class="uk-button uk-button-danger uk-button-small" uk-icon="icon: close;"></span></a>
                                             </div> </li> 
                                             <li v-if="!savedTranslations.length">No saved translation</li>
                                             
-                                            <li>Add
+                                            <li><b>Add: </b>
                                                 <div uk-form-custom="target: > * > span:first-child">
                                     <select v-model="translation">
                                         <option selected value="Add Translation...">Add Translation...</option>
@@ -105,7 +105,7 @@
                                         <span uk-icon="icon: chevron-down"></span>
                                     </button>
                                 </div>
-                                <a @click="add(translations[translation])" :class="{disabled:!translations[translation]}"><span  uk-icon="icon: plus-circle; ratio:2"></span></a>
+                                <a @click="add(translations[translation])" :class="{disabled:!translations[translation]}"><span class="uk-button uk-button-primary" uk-icon="icon: plus;"></span></a>
                                             </li>
                                         </ul>
                                         

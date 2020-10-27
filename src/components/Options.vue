@@ -98,7 +98,7 @@ export default {
             methods:{
                 t(i){
                     return this.translations.find(t =>  t.abbreviation === i)
-                },
+                },  
                 async update_chapter() {
                     // this.loading = true
                     this.progress = 95

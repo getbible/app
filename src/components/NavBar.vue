@@ -107,7 +107,7 @@
                     </div>
                     <div class="uk-modal-footer uk-text-right">
                         <button class="uk-button uk-button-default uk-modal-close" type="button">Cancel</button>
-                        <button class="uk-button uk-button-primary" type="button">Save</button>
+                        <button class="uk-button uk-button-primary" @click="saveSettings()" type="button">Save</button>
                     </div>  
                 </div>
             </div>
@@ -115,6 +115,8 @@
         </nav>
 </template>
 <script>
+import UIkit from 'uikit';
+
 export default {
     data: () => {
         return {
@@ -145,6 +147,10 @@ export default {
         },
         remove(tr){
             this.$store.dispatch('remove', tr)
+        },
+        saveSettings(){
+            this.$store.commit('set_settings', this.$store.state.settings)
+            UIkit.modal('#modal-sections').hide()
         }
     },
     async created(){

@@ -4,12 +4,12 @@
         <li  v-for="(verse, i) in chapter" :key="i" 
         :class="`uk-animation-slide-bottom uk-animation-15 uk-animation-hover`">
             
-            <h4  class="btn btn-primary">
-                {{book_name}}  
+            <h5  class=" uk-primary">
+              <span class="uk-heading-bullet">  {{book_name}}  </span>
                 <span class="uk-badge badge-light">
                     {{verse.chapter}}:{{verse.verse}}
                 </span>
-            </h4>
+            </h5>
             {{verse.text}} <br/>
             <p></p>
         </li>

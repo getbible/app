@@ -1,7 +1,7 @@
 <template>
     <ul :dir="dir" 
      class="uk-margin-medium-top uk-list uk-list-divider uk-animation-hover">
-        <li  v-for="(verse, i) in chapter" :key="i" 
+        <li  v-for="(verse, i) in verses" :key="i" 
         :class="`uk-animation-slide-bottom uk-animation-15 uk-animation-hover`">
             
             <h5  class=" uk-primary">
@@ -17,17 +17,22 @@
 </template>
 <script>
 export default {
-    props: {
-        dir: {
-            type:String,
-            required:true},
-        book_name: {
-            type:String,
-            required: true,
+    data: () => {
+        return {
+        // dir: ''
+        // book_name: ''
+        // chapter:''
+        }
+    },
+    computed: {
+        verses(){
+            return this.$store.getters.verses;
         },
-        chapter:{
-            type: Object,
-            required: true,
+        dir(){
+            return this.$store.getters.dir;
+        },
+        book_name(){
+            return this.$store.getters.book_name;
         }
     }
 }

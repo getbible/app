@@ -1,16 +1,12 @@
 <template>
-    <div class="uk-margin uk-container">
-        <div class="uk-margin uk-align-right">
-
-                <a href="https://github.com/getbible" class="uk-icon-button uk-margin-small-left" uk-icon="github"></a>
-                <a href="https://www.facebook.com/TheHolyScriptures" class="uk-icon-button  uk-margin-small-left" uk-icon="facebook"></a>
-                <a href="https://truechristian.church/whybible" class="uk-icon-button uk-margin-small-left" uk-icon="world"></a>
-        </div>
     
-        <nav class="uk-navbar-container uk-navbar-transparent uk-margin" uk-navbar>
+            <div uk-sticky="sel-target: .uk-navbar-container; cls-active: uk-navbar-sticky">
+   
+        <nav class="uk-navbar-container uk-na
+        vbar-transparent uk-margin-small" uk-navbar>
                 <div class="uk-navbar-left">
             
-                    <a class="uk-navbar-item uk-logo" href="#">GetBible</a>
+                    <!-- <a class="uk-navbar-item uk-logo" href="#">GetBible</a> -->
             
                 <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: search; ratio:2"></span>Search</a>
 
@@ -82,12 +78,12 @@
                                 <div>
                                         <ul class="uk-list uk-list-large uk-list-divider">
                                             <li
-                                            v-for="(tr,i) in savedTranslations" 
+                                            v-for="(tr,i) in saved_translations" 
                                             :key="i"
                                             ><div><span>{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</span> 
                                             {{" "}}<a @click="remove(tr.abbreviation)" class="uk-position-center-right uk-position-relative"><span  class="uk-button uk-button-danger uk-button-small" uk-icon="icon: close;"></span></a>
                                             </div> </li> 
-                                            <li v-if="!savedTranslations.length">No saved translation</li>
+                                            <li v-if="!saved_translations.length">No saved translation</li>
                                             
                                             <li><b>Add: </b>
                                                 <div uk-form-custom="target: > * > span:first-child">
@@ -121,52 +117,73 @@
                 </div>
                 
             </nav>
+        <div class="uk-position-fixed uk-position-bottom-left">
+            <ul class="uk-list">
+                <li>
+                <a href="https://github.com/getbible" class="uk-icon-button uk-margin-small-left" uk-icon="github"></a>
+                </li>
+                <li>
+                <a href="https://www.facebook.com/TheHolyScriptures" class="uk-icon-button  uk-margin-small-left" uk-icon="facebook"></a>
+                </li>
+                <li>
+                <a href="https://truechristian.church/whybible" class="uk-icon-button uk-margin-small-left" uk-icon="world"></a>
+                </li>
+            </ul>
+        </div>
         </div>
 </template>
 <script>
 import UIkit from 'uikit';
+import getbible from '../api/getbible_v2_api'
 
 export default {
     data: () => {
         return {
             translation: 'Add Translation...',
-            translations: {},
-            
+            translations:{}
         }
     },
     computed: {
-        savedTranslations() {
-            // let o = {}
-            // let counter = 0
-            // for(const tr in this.translations){
-            //     if(counter>2)
-            //     break;
-            //     o = {...o, [tr]:this.translations[tr]}
-            //     counter +=1
-            //     // Object.assign({}, o,{[tr]: this.translations[tr]})
-            // }
-            // console.log(o);
-            return this.$store.state.settings.savedTr;
-        }
+        saved_translations() {
+            console.log(this.$store.state.saved_translations[0]);
+            return this.$store.state.saved_translations;
+        },
+       
+        
     },
     methods: {
         add(tr){
             if(!tr) return;
-            this.$store.dispatch('add', tr)
+            let payload = {
+                abbreviation: tr.abbreviation,
+                saved_translations: {
+                    name: 'saved_translations',
+                    putObj: tr
+                }
+            }
+            this.$store.dispatch('add', payload)
         },
-        remove(tr){
-            this.$store.dispatch('remove', tr)
+        remove(abbr){
+           let payload = {
+            translation:{
+                name: 'translations',
+                keyPath: abbr
+            },
+            saved_translations:{
+                name: 'saved_translations',
+                keyPath: abbr
+            }
+        }
+            this.$store.dispatch('remove', payload)
         },
         saveSettings(){
-            this.$store.commit('set_settings', this.$store.state.settings)
+            this.$store.commit('save_settings', this.$store.state.saved_translations)
             UIkit.modal('#modal-sections').hide()
         }
     },
     async created(){
-                let config = {
-                    headers: {'Access-Control-Allow-Origin': '*'}
-                };
-                let response = await fetch(`https://getbible.net/v2/translations.json`,config)
+               
+                let response = await getbible.get_translations()
                     .catch(function(err) { this.translations = err });
 
                 if(!response)

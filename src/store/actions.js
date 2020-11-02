@@ -11,6 +11,7 @@ export default {
     //     putObj: {}
     //   }
     // }
+    commit('toggle_loading', true)
       const response = await getbible.get_translation(payload.abbreviation).catch(err => console.log(err))
       // console.log(response);
       if(!response) return;
@@ -39,6 +40,7 @@ export default {
     if(!success) return;
 
       commit('add_translation', payload);
+      commit('toggle_loading', false)
     },
     async remove({commit}, payload){
       // payload example
@@ -52,6 +54,7 @@ export default {
       //     keyPath: "askjv"
       //   }
       // }
+      commit('toggle_loading', true)
       const {translation, saved_translations} = payload
       let success = false
       //save translation in indexdb
@@ -67,8 +70,12 @@ export default {
       if(!success) return;
 
       commit('REMOVE_TRANSLATION', payload);
+      setTimeout(()=>{
+        commit('toggle_loading', false)
+      }, 1200)
     },
    async  initialise({commit}){
+    commit('toggle_loading', true)
         let saved_translations = await idb.getAll('saved_translations').catch(err => console.log(err));
         
         if(!saved_translations) saved_translations = [];
@@ -80,7 +87,7 @@ export default {
           
     commit('initialise', {saved_translations, translation: translations[0]})
         
-   
+    commit('toggle_loading', false)
 
     },
     set_chapter({commit}, payload) {
@@ -90,10 +97,15 @@ export default {
         commit('set_book', payload)
     },
     async set_translation({commit}, payload){
+      commit('toggle_loading', true)
         let translation = await idb.get('translations', payload.selected_translation).catch(err => console.log(err));
         
         if(!translation) return;
         payload.translation = translation
         commit('set_translation', payload)
+        // console.log("from acitons", payload);
+        setTimeout(()=>{
+          commit('toggle_loading', false)
+        }, 2500)
     }
 }

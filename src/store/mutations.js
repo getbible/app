@@ -1,3 +1,5 @@
+
+
 export default {
     add_translation (state, payload ) {
 
@@ -52,20 +54,23 @@ export default {
    //     state.search = search
    // }
    initialise(state, payload){
-     state.saved_translations = payload.saved_translations
-     state.in_memory_translation = payload.translation
+      state.saved_translations = payload.saved_translations
+      state.in_memory_translation = payload.translation
    },
    set_chapter(state, payload){
-      state.selected.chapter = payload;
+       state.selected.chapter = payload;
    },
    set_book(state, payload){
-     state.selected.chapter = null;
-     state.selected.book =  payload;
+      state.selected.chapter = null;
+      state.selected.book =  payload;
    },
    set_translation(state, payload){
-     state.selected.book = null
-     state.selected.chapter = null
-    state.selected.translation = payload.selected_translation;
-    state.in_memory_translation = payload.translation;
+      state.selected.book = null
+      state.selected.chapter = null
+      state.selected.translation = payload.selected_translation;
+      state.in_memory_translation = payload.translation;
+   },
+   toggle_loading(state, payload){
+      state.loading = payload;
    }
  }

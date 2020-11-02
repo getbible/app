@@ -59,10 +59,13 @@ export default {
       state.selected.chapter = payload;
    },
    set_book(state, payload){
+     state.selected.chapter = null;
      state.selected.book =  payload;
    },
    set_translation(state, payload){
-    state.selected.translation = payload.selectedTranslation;
+     state.selected.book = null
+     state.selected.chapter = null
+    state.selected.translation = payload.selected_translation;
     state.in_memory_translation = payload.translation;
    }
  }

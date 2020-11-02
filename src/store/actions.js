@@ -90,7 +90,7 @@ export default {
         commit('set_book', payload)
     },
     async set_translation({commit}, payload){
-        let translation = await idb.get('translations', payload.selectedTranslation).catch(err => console.log(err));
+        let translation = await idb.get('translations', payload.selected_translation).catch(err => console.log(err));
         
         if(!translation) return;
         payload.translation = translation

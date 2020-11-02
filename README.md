@@ -6,7 +6,7 @@ npm install
 ```
 # run electron server
 ```
-npm run electron:serve
+npm run getbible:serve
 ```
 # serve with hot reload at localhost:8080
 ```

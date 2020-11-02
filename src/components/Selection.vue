@@ -1,64 +1,55 @@
 <template>
-    <div class="uk-container">
-        <!-- <div class="uk-flex uk-flex-around">
-                <div class="input-group mb-3 cols-3">
-                    <div class="input-group-prepend">
-                        <label class="input-group-text" for="inputGroupSelect01"><h4>Translation</h4> </label>
-                    </div>
-                    <select @change="update_bk()" v-model="translation" class="uk-select" id="inputGroupSelect01">
-                        <option 
-                        class="uk-animation-slide-bottom uk-animation-15" v-for="(tr,i) in translations" 
-                        :key="i"
-                        :value="tr.abbreviation"
-                        >{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}
-                        </option>
-                        
-                    </select>
-                </div> 
-                <div class="input-group mb-3 cols-3">
-                    <div class="input-group-prepend">
-                        <label class="input-group-text" for="inputGroupSelect01"><h4>Book</h4> </label>
-                    </div>
-                    <select @change="update_ch()" v-model="book" class="uk-select" id="inputGroupSelect01">
-                        <option 
-                        v-for="(bk,i) in Object.keys(books)" 
-                        :key="i"
-                        :value="books[bk]['nr']"
-                        >{{books[bk]['name']}}
-                        </option>
-                    </select>
-                </div> 
-                <div class="input-group mb-3 cols-3">
-                    <div class="input-group-prepend">
-                        <label class="input-group-text" for="inputGroupSelect01"><h4>Chapter</h4></label>
-                    </div>
-                    <select @change="update_chapter()" v-model="chapter_num" class="uk-select" id="inputGroupSelect01">
-                        <option 
-                        v-for="(ch,i) in Object.keys(chapters)" 
-                        :key="i"
-                        :value="chapters[ch]['chapter']"
-                        >{{chapters[ch]['chapter']}}
-                        </option>
-                        
-                    </select>
-                </div>
-            </div> -->
-           
-            <div class="uk-margin">
-                <ul class="uk-pagination">
-                    <li><a href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>
-                    <li class="uk-margin-auto-left"><a href="#">Next Chapter<span class="uk-margin-small-left" uk-pagination-next></span></a></li>
-                </ul>
-            </div>
-    </div>
+    <div class=" uk-width-1-1">
+    <ul class="uk-nav-default uk-nav-parent-icon uk-witdth-1-1 "  uk-nav>
+        <li class="uk-parent uk-witdth-1-1"><a>Translation</a>
+            <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
+
+            <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
+                    <li
+                    v-for="(tr,i) in translations" 
+                    @change="update_bk(tr.abbreviation)"
+                    :key="i"
+                    :value="tr.abbreviation"
+                    ><a href="#">{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</a></li>
+                 <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
+            </ul>
+        </li>
+        <li class="uk-nav-divider uk-witdth-1-1"></li>
+        <li class="uk-parent uk-witdth-1-1"><a>Books</a>
+            <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
+
+            <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
+                    <li class="uk-card uk-card-hover "
+                     v-for="(bk,i) in Object.keys(books)" 
+                     @change="update_ch(books[bk]['nr'])"
+                    :key="i"
+                    :value="books[bk]['nr']"
+                    ><a href="#">{{books[bk]['name']}}</a></li>
+             <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
+            </ul>
+        </li>
+        <li class="uk-nav-divider uk-witdth-1-1"></li>
+        <li class="uk-parent uk-witdth-1-1 "><a>Chapters</a>
+            <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
+                <li><a href="#"><span uk-pagination-previous></span></a></li>
+                    <li
+                     v-for="(ch,i) in Object.keys(chapters)" 
+                    @change="update_chapter(chapters[ch]['chapter'])" 
+                    :key="i"
+                    ><a >{{chapters[ch]['chapter']}}</a></li>
+               <li><a href="#"><span uk-pagination-next></span></a></li>
+            </ul>
+        </li>
+     </ul>
+</div>
 </template>
 <script>
 import _ from 'lodash';
-import verses from './Verses.vue';
+// import verses from './Verses.vue';
 
 export default {
     components:{
-        verses
+        // verses
     },  
   data: function(){
                 return {
@@ -79,10 +70,7 @@ export default {
                 translations(){
                     return this.$store.state.saved_translations;
                 },
-                saved_translations(){
-                    console.log(this.$store.state.saved_translations);
-                    return this.$store.state.saved_translations
-                },
+                
                 fchapters: function (){
                     if(!this.search)
                     return this.chapter.verses
@@ -100,7 +88,9 @@ export default {
                 t(i){
                     return this.translations.find(t =>  t.abbreviation === i)
                 },  
-                async update_chapter() {
+                async update_chapter(c) {
+                    console.log(c);
+                    this.chapter_num = c
                     // this.loading = true
                     this.progress = 95
                     let config = {
@@ -135,7 +125,9 @@ export default {
                 async update_tr(){
 
                 },
-                async update_bk(){
+                async update_bk(a){
+                    this.translation = a
+                    console.log(a);
                     let config = {
                     headers: {'Access-Control-Allow-Origin': '*'}
                 };
@@ -149,7 +141,7 @@ export default {
                         // console.log(data)
                         this.books = data
                         this.progress = 60
-                        this.update_ch();
+                        this.update_ch(this.book);
                     }).catch(function(err) {
                         this.chapter = err
                         this.loading =false
@@ -157,7 +149,9 @@ export default {
                     });
                 
                 },
-                async update_ch(){
+                async update_ch(b){
+                    this.book = b
+                    console.log(b);
                     let config = {
                     headers: {'Access-Control-Allow-Origin': '*'}
                 };
@@ -167,7 +161,7 @@ export default {
                         // console.log(data)
                         this.chapters = data
                         this.progress = 85
-                        this.update_chapter();
+                        this.update_chapter(this.chapter_num);
                     }).catch(function(err) {
                         this.chapter = err
                         this.loading =false
@@ -176,8 +170,37 @@ export default {
                 }
             },
             created(){
-              
-             
+                let config = {
+                    headers: {'Access-Control-Allow-Origin': '*'}
+                };
+                // fetch(`https://getbible.net/v2/translations.json`,config)
+                // .then(response => response.json())
+                // .then(data => {
+                //     // console.log(data)
+                //     this.translations = data
+
+                    fetch(`https://getbible.net/v2/${this.translation}/books.json`, config)
+                    .then(response => response.json())
+                    .then(data => {
+                        // console.log(data)
+                        this.books = data
+
+                        this.update_ch(this.book);
+                    }).catch(function(err) {
+                        this.chapter = err
+                    });
+                // }).catch(function(err) {
+                //     this.chapter = err
+                // });
+
+                // fetch(`https://getbible.net/v2/kjv/${this.book}/${this.chapter_num}.json`,config)
+                // .then(response => response.json())
+                // .then(data => {
+                //     console.log(data)
+                //     this.chapter = data
+                // }).catch(function(err) {
+                //     this.chapter = err
+                // });
             }
 }
 </script>

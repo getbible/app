@@ -1,6 +1,7 @@
 const DB_NAME = 'getbibledb';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 let DB;
+// window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
 
 export default {
 
@@ -11,7 +12,7 @@ export default {
 			console.log('OPENING DB', DB);
 			let request = window.indexedDB.open(DB_NAME, DB_VERSION);
 			
-			request.onerror = e => {
+			request.onerror = (e) => {
 				console.log('Error opening db', e);
 				reject('Error');
 			};
@@ -24,37 +25,50 @@ export default {
 			request.onupgradeneeded = e => {
 				console.log('onupgradeneeded');
 				let db = e.target.result;
-				db.createObjectStore("savedTranslations", { autoIncrement: true, keyPath:'id' });
+				db.createObjectStore("saved_translations", { keyPath:'abbreviation' });
+				db.createObjectStore("translations", { keyPath:'abbreviation' });
 			};
 		});
 	},
-	async deleteTranslation(tr) {
+	async delete(delInfo) { 	
 
 		let db = await this.getDb();
 
-		return new Promise(resolve => {
+		return new Promise((resolve, reject) => {
 
-			let trans = db.transaction(['savedTranslations'],'readwrite');
+			let trans = db.transaction([delInfo.name],'readwrite');
 			trans.oncomplete = () => {
-				resolve();
+				resolve(true);
 			};
 
-			let store = trans.objectStore('savedTranslations');
-			store.delete(tr.id);
+			let store = trans.objectStore(delInfo.name);
+			console.log("deleting "+ delInfo.keyPath+ " from "+delInfo.name);
+			let request = store.delete([delInfo.keyPath]);
+			request.onerror= err => reject(err)
+			// request.onsuccess = e => console.log(e);
+
+			trans.onerror = e => {
+				reject(e)
+			}
+			trans.onabort = e => {
+				reject(e)
+			}
+			trans.commit();
+
 		});	
 	},
-	async getTranslations() {
+	async getAll(name) {
 
 		let db = await this.getDb();
 
 		return new Promise(resolve => {
 
-			let trans = db.transaction(['savedTranslations'],'readonly');
+			let trans = db.transaction([name],'readonly');
 			trans.oncomplete = () => {
 				resolve(tr);
 			};
 			
-			let store = trans.objectStore('savedTranslations');
+			let store = trans.objectStore(name);
 			let tr = [];
 			
 			store.openCursor().onsuccess = e => {
@@ -68,45 +82,52 @@ export default {
 		});
 	},
 
-	async saveTranslation(tr) {
+	async save(arg) {
 
 		let db = await this.getDb();
 
-		return new Promise(resolve => {
+		return new Promise((resolve, reject) => {
 
-			let trans = db.transaction(['savedTranslations'],'readwrite');
+			let trans = db.transaction([arg.name],'readwrite');
 			trans.oncomplete = () => {
-				resolve();
+				resolve(true);
 			};
-
-			let store = trans.objectStore('savedTranslations');
-			store.put(tr);
-
+			console.log(arg.name);
+			let store = trans.objectStore(arg.name);
+			store.put(arg.putObj);
+			trans.onerror = e => reject(e)
 		});
 	
     },
-    async getTranslation(abbr) {
+    async get(name, keyPath) {
 
 		let db = await this.getDb();
 
-		return new Promise(resolve => {
+		return new Promise((resolve, reject) => {
 
-			let trans = db.transaction(['savedTranslations'],'readonly');
+			let trans = db.transaction([name],'readonly');
 			trans.oncomplete = () => {
 				resolve(tr);
 			};
 			
-			let store = trans.objectStore('savedTranslations');
+			let store = trans.objectStore(name);
 			let tr = {};
 			
 			store.openCursor().onsuccess = e => {
 				let cursor = e.target.result;
 				if (cursor) {
-                    if(abbr == cursor.value.abbreviation)
+                    if(keyPath == cursor.value.keyPath)
 					tr = cursor.value
 					cursor.continue();
 				}
 			};
+			trans.onerror = e => {
+				reject(e)
+			}
+			trans.onabort = e => {
+				reject(e)
+			}
+			trans.commit();
 
 		});
 	},

@@ -1,12 +1,11 @@
 <template>
     <div class="uk-container">
-        <div class="uk-flex uk-flex-around">
+        <!-- <div class="uk-flex uk-flex-around">
                 <div class="input-group mb-3 cols-3">
                     <div class="input-group-prepend">
                         <label class="input-group-text" for="inputGroupSelect01"><h4>Translation</h4> </label>
                     </div>
                     <select @change="update_bk()" v-model="translation" class="uk-select" id="inputGroupSelect01">
-                        <!-- <option selected value="1">Choose...</option> -->
                         <option 
                         class="uk-animation-slide-bottom uk-animation-15" v-for="(tr,i) in translations" 
                         :key="i"
@@ -21,7 +20,6 @@
                         <label class="input-group-text" for="inputGroupSelect01"><h4>Book</h4> </label>
                     </div>
                     <select @change="update_ch()" v-model="book" class="uk-select" id="inputGroupSelect01">
-                        <!-- <option selected value="1">Choose...</option> -->
                         <option 
                         v-for="(bk,i) in Object.keys(books)" 
                         :key="i"
@@ -35,7 +33,6 @@
                         <label class="input-group-text" for="inputGroupSelect01"><h4>Chapter</h4></label>
                     </div>
                     <select @change="update_chapter()" v-model="chapter_num" class="uk-select" id="inputGroupSelect01">
-                        <!-- <option selected value="1">Choose...</option> -->
                         <option 
                         v-for="(ch,i) in Object.keys(chapters)" 
                         :key="i"
@@ -45,14 +42,9 @@
                         
                     </select>
                 </div>
-            </div>
-            <verses
-            v-if="translations.length && books[book]"
-            :dir="t(translation).direction.toLowerCase()"
-            :book_name="books[book].name"
-            :chapter="fchapters"
-            />
-
+            </div> -->
+           
+{{saved_translations}}
             <div class="uk-margin">
                 <ul class="uk-pagination">
                     <li><a href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>
@@ -86,9 +78,12 @@ export default {
             }},
             computed: {
                 translations(){
-                    return this.$store.state.settings.savedTr;
+                    return this.$store.state.saved_translations;
                 },
-                
+                saved_translations(){
+                    console.log(this.$store.state.saved_translations);
+                    return this.$store.state.saved_translations
+                },
                 fchapters: function (){
                     if(!this.search)
                     return this.chapter.verses
@@ -182,37 +177,8 @@ export default {
                 }
             },
             created(){
-                let config = {
-                    headers: {'Access-Control-Allow-Origin': '*'}
-                };
-                // fetch(`https://getbible.net/v2/translations.json`,config)
-                // .then(response => response.json())
-                // .then(data => {
-                //     // console.log(data)
-                //     this.translations = data
-
-                    fetch(`https://getbible.net/v2/${this.translation}/books.json`, config)
-                    .then(response => response.json())
-                    .then(data => {
-                        // console.log(data)
-                        this.books = data
-
-                        this.update_ch();
-                    }).catch(function(err) {
-                        this.chapter = err
-                    });
-                // }).catch(function(err) {
-                //     this.chapter = err
-                // });
-
-                // fetch(`https://getbible.net/v2/kjv/${this.book}/${this.chapter_num}.json`,config)
-                // .then(response => response.json())
-                // .then(data => {
-                //     console.log(data)
-                //     this.chapter = data
-                // }).catch(function(err) {
-                //     this.chapter = err
-                // });
+              
+             
             }
 }
 </script>

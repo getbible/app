@@ -44,7 +44,6 @@
                 </div>
             </div> -->
            
-{{saved_translations}}
             <div class="uk-margin">
                 <ul class="uk-pagination">
                     <li><a href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>

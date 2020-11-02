@@ -1,10 +1,20 @@
 <template>
-<div>
+<div >
+  <!-- <div class="uk-overlay-default uk-position-cover">
+    <div class="uk-position-center">
+        <h1>Loading... Please wait...</h1>
+    </div>
+  </div> -->
   <navbar/>
-  <div class="uk-container">
+  <div class="uk-container ">
+    <selections/>
+    <div class="uk-container uk-container-small">
+
     <options/>
+    </div>
   </div>
 </div>
+
 </template>
 
 <script>
@@ -15,6 +25,7 @@ import Icons from 'uikit/dist/js/uikit-icons';
 
 import navbar from './components/NavBar.vue';
 import options from './components/Options.vue';
+import Selections from  './components/Selection.vue'
 
 UIkit.use(Icons);
  
@@ -22,16 +33,13 @@ export default {
   name: 'App',
   components: {
     navbar,
-    options
+    options,
+    Selections,
   },
   created(){
-     const userSettings = localStorage.getItem('settings');
     
-    if (userSettings) {
-      const settings = JSON.parse(userSettings);
-      this.$store.commit('set_settings', settings);
-    }
-   
+    this.$store.dispatch('initialise')
+  //  console.log(JSON.parse(JSON.stringify(this.$store.state)));
   }
 }
 </script>

@@ -42,18 +42,22 @@ export default {
 			};
 
 			let store = trans.objectStore(delInfo.name);
-			console.log("deleting "+ delInfo.keyPath+ " from "+delInfo.name);
-			let request = store.delete([delInfo.keyPath]);
-			request.onerror= err => reject(err)
-			// request.onsuccess = e => console.log(e);
-
+			store.openCursor().onsuccess = e => {
+				let cursor = e.target.result;
+				if (cursor) {
+                    if(delInfo.keyPath == cursor.value['abbreviation']){
+						let request =cursor.delete()
+						request.onsuccess = e => console.log(e);}
+					
+					cursor.continue();
+				}
+			};
 			trans.onerror = e => {
 				reject(e)
 			}
 			trans.onabort = e => {
 				reject(e)
 			}
-			trans.commit();
 
 		});	
 	},

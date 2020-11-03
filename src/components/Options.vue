@@ -54,11 +54,9 @@
 </template>
 <script>
 import _ from 'lodash';
-import verses from './Verses.vue';
 
 export default {
     components:{
-        verses
     },  
   data: function(){
                 return {

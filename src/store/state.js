@@ -7,6 +7,7 @@ export default {
       book: null,
       chapter: null
     },
+    loading: false,
     in_memory_translation:{},
     search: '',
   }

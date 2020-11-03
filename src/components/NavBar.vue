@@ -72,13 +72,13 @@
         <div class="uk-position-fixed uk-position-bottom-left">
             <ul class="uk-list">
                 <li>
-                <a href="https://github.com/getbible" class="uk-icon-button uk-margin-small-left" uk-icon="github"></a>
+                <a href="#" class="uk-icon-button uk-margin-small-left" uk-icon="github"></a>
                 </li>
                 <li>
-                <a href="https://www.facebook.com/TheHolyScriptures" class="uk-icon-button  uk-margin-small-left" uk-icon="facebook"></a>
+                <a href="#" class="uk-icon-button  uk-margin-small-left" uk-icon="facebook"></a>
                 </li>
                 <li>
-                <a href="https://truechristian.church/whybible" class="uk-icon-button uk-margin-small-left" uk-icon="world"></a>
+                <a href="#" class="uk-icon-button uk-margin-small-left" uk-icon="world"></a>
                 </li>
             </ul>
         </div>

@@ -120,7 +120,7 @@ export default {
 			store.openCursor().onsuccess = e => {
 				let cursor = e.target.result;
 				if (cursor) {
-                    if(keyPath == cursor.value.keyPath)
+                    if(keyPath == cursor.value['abbreviation'])
 					tr = cursor.value
 					cursor.continue();
 				}
@@ -131,7 +131,6 @@ export default {
 			trans.onabort = e => {
 				reject(e)
 			}
-			trans.commit();
 
 		});
 	},

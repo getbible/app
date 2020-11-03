@@ -1,6 +1,6 @@
 <template>
 <div >
-  <!-- <div class="uk-overlay-default uk-position-cover">
+  <!-- <div v-if="loading" class="uk-overlay-default uk-position-cover">
     <div class="uk-position-center">
         <h1>Loading... Please wait...</h1>
     </div>
@@ -9,8 +9,14 @@
   <div class="uk-container ">
     <selections/>
     <div class="uk-container uk-container-small">
-
+      <verses/>
     <options/>
+
+    </div>
+  </div>
+  <div v-if="loading" id="overlay">
+    <div  class="uk-position-center less-opacity">
+        <h1>Loading... Please wait.</h1>
     </div>
   </div>
 </div>
@@ -22,10 +28,12 @@
 
 import UIkit from 'uikit';
 import Icons from 'uikit/dist/js/uikit-icons';
+import {mapGetters} from 'vuex';
 
 import navbar from './components/NavBar.vue';
 import options from './components/Options.vue';
 import Selections from  './components/Selection.vue'
+import Verses from './components/Verses.vue'
 
 UIkit.use(Icons);
  
@@ -35,6 +43,10 @@ export default {
     navbar,
     options,
     Selections,
+    Verses,
+  },
+  computed: {
+    ...mapGetters(['loading'])
   },
   created(){
     
@@ -60,5 +72,21 @@ export default {
 }
 .disabled:hover {
   color:gray 
+}
+#overlay {
+  position: fixed;
+  display: block;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255,255,255,0.7);
+  z-index: 20000;
+  cursor: pointer;
+}
+.less-opacity{
+  background-color: rgba(255,255,255,0.7);
 }
 </style>

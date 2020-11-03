@@ -16,6 +16,7 @@
     </ul>
 </template>
 <script>
+import {mapGetters} from 'vuex';
 export default {
     data: () => {
         return {
@@ -25,15 +26,7 @@ export default {
         }
     },
     computed: {
-        verses(){
-            return this.$store.getters.verses;
-        },
-        dir(){
-            return this.$store.getters.dir;
-        },
-        book_name(){
-            return this.$store.getters.book_name;
-        }
+       ...mapGetters(['verses', 'dir', 'book_name'])
     }
 }
 </script>

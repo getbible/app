@@ -134,5 +134,50 @@ export default {
 
 		});
 	},
+	async search(name, keyPath) {
+
+		let db = await this.getDb();
+
+		return new Promise((resolve, reject) => {
+
+			let trans = db.transaction([name],'readonly');
+			trans.oncomplete = () => {
+				resolve(tr);
+			};
+			
+			let store = trans.objectStore(name);
+			let tr = {};
+			
+			store.openCursor().onsuccess = e => {
+				let cursor = e.target.result;
+				if (cursor) {
+                    if (keyPath == cursor.value.keyPath){
+					tr = cursor.value
+					for (const book in cursor.value.books) {
+						for (const chapters in book) {
+							for (const verses in chapters) {
+								for (const verse in verses) {
+									if(verse.text.includes(keyPath)){
+										console.log("We found a row with value: " + JSON.stringify(verse.text));
+									}										
+								}
+							}
+						}
+					}
+					
+					}
+					cursor.continue();
+				}
+			};
+			trans.onerror = e => {
+				reject(e)
+			}
+			trans.onabort = e => {
+				reject(e)
+			}
+			trans.commit();
+
+		});
+	},
 
 }

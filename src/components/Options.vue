@@ -1,77 +1,26 @@
 <template>
     <div class="uk-container">
-        <!-- <div class="uk-flex uk-flex-around">
-                <div class="input-group mb-3 cols-3">
-                    <div class="input-group-prepend">
-                        <label class="input-group-text" for="inputGroupSelect01"><h4>Translation</h4> </label>
-                    </div>
-                    <select @change="update_bk()" v-model="translation" class="uk-select" id="inputGroupSelect01">
-                        <option 
-                        class="uk-animation-slide-bottom uk-animation-15" v-for="(tr,i) in translations" 
-                        :key="i"
-                        :value="tr.abbreviation"
-                        >{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}
-                        </option>
-                        
-                    </select>
-                </div> 
-                <div class="input-group mb-3 cols-3">
-                    <div class="input-group-prepend">
-                        <label class="input-group-text" for="inputGroupSelect01"><h4>Book</h4> </label>
-                    </div>
-                    <select @change="update_ch()" v-model="book" class="uk-select" id="inputGroupSelect01">
-                        <option 
-                        v-for="(bk,i) in Object.keys(books)" 
-                        :key="i"
-                        :value="books[bk]['nr']"
-                        >{{books[bk]['name']}}
-                        </option>
-                    </select>
-                </div> 
-                <div class="input-group mb-3 cols-3">
-                    <div class="input-group-prepend">
-                        <label class="input-group-text" for="inputGroupSelect01"><h4>Chapter</h4></label>
-                    </div>
-                    <select @change="update_chapter()" v-model="chapter_num" class="uk-select" id="inputGroupSelect01">
-                        <option 
-                        v-for="(ch,i) in Object.keys(chapters)" 
-                        :key="i"
-                        :value="chapters[ch]['chapter']"
-                        >{{chapters[ch]['chapter']}}
-                        </option>
-                        
-                    </select>
-                </div>
-            </div> -->
-           
+        
             <div class="uk-margin">
                 <ul class="uk-pagination">
-                    <li><a href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>
-                    <li class="uk-margin-auto-left"><a href="#">Next Chapter<span class="uk-margin-small-left" uk-pagination-next></span></a></li>
+                    <li @click="prev"><a href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>
+                    <li class="uk-margin-auto-left" @click="next"><a href="#">Next Chapter<span class="uk-margin-small-left" uk-pagination-next></span></a></li>
                 </ul>
             </div>
     </div>
 </template>
 <script>
 import _ from 'lodash';
+import {mapGetters} from 'vuex'
 
 export default {
     components:{
     },  
   data: function(){
                 return {
-                translation: 'akjv',
-                // translations: {},
-                chapter: 1,
-                chapter_num: 1,
-                chapters:{},
-                book: 1,
-                books: {},
                 progress: 0,
                 loading: false,
-                links: null,
-                search: '',
-                message: 'Loading...'
+
             }},
             computed: {
                 translations(){
@@ -81,6 +30,7 @@ export default {
                     console.log(this.$store.state.saved_translations);
                     return this.$store.state.saved_translations
                 },
+                ...mapGetters(['chapters', 'chapter']),
                 fchapters: function (){
                     if(!this.search)
                     return this.chapter.verses
@@ -98,6 +48,14 @@ export default {
                 t(i){
                     return this.translations.find(t =>  t.abbreviation === i)
                 },  
+                next(){
+                    if(this.chapter<this.chapters.length)
+                    this.$store.dispatch('set_chapter', this.chapter + 1)
+                },
+                prev(){
+                    if(this.chapter>1)
+                    this.$store.dispatch('set_chapter', this.chapter - 1)
+                },
                 async update_chapter() {
                     // this.loading = true
                     this.progress = 95

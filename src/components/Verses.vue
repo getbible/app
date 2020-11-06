@@ -1,5 +1,6 @@
 <template >
     <div v-if="verses.length">
+        {{search.toLowerCase() + fverses.length}}
     <ul :dir="dir" 
      class="uk-margin-medium-top uk-list uk-list-divider uk-animation-hover">
         <li  v-for="(verse, i) in pverses" :key="i" 
@@ -43,6 +44,7 @@
     </div>
 </template>
 <script>
+import _ from 'lodash';
 import {mapGetters} from 'vuex';
 export default {
     data: () => {
@@ -53,14 +55,27 @@ export default {
         }
     },
     computed: {
-       ...mapGetters(['verses', 'dir', 'book_name']),
+       ...mapGetters(['verses', 'dir', 'book_name', 'search']),
        pverses(){
-           return this.verses.slice(this.prev, this.next)
-       }
+           return this.fverses.slice(this.prev, this.next)
+       },
+        fverses: function (){
+                console.log(this.search);
+                    if(!this.search)
+                    return this.verses
+                    return this.filteredVerses
+                },
+                filteredVerses() {
+                    return _.orderBy(this.verses.filter((item) => 
+                            item.verse.toString().toLowerCase().includes(this.search.toLowerCase())
+                        || item.chapter.toString().toLowerCase().includes(this.search.toLowerCase())
+                        || item.name.toString().toLowerCase().includes(this.search.toLowerCase())
+                        || item.text.toLowerCase().includes(this.search.toLowerCase())), 'verse');
+                    },
     },
     methods: {
         nextV(){
-            if(this.next> this.verses.length) return;
+            if(this.next> this.fverses.length) return;
             this.next = this.next + 5
             this.prev = this.prev+ 5
             // console.log(this.next, this.prev);

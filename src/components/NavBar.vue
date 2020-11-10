@@ -7,7 +7,8 @@
                 <div class="uk-navbar-left">
             
                     <!-- <a class="uk-navbar-item uk-logo" href="#">GetBible</a> -->
-            
+             <a href="#selection" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: album; ratio:2"></span>{{book_name}}{{chapter}}</a>
+
                 <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: search; ratio:2"></span>Search</a>
 
                     <search/>
@@ -16,7 +17,7 @@
                     <a class="uk-navbar-item" href="#" uk-toggle><span  uk-icon="icon: history; ratio:2"></span></a>
             
                 </div>
-                <a class="uk-navbar-item uk-position-center-right" href="#modal-sections" uk-toggle><span  uk-icon="icon: cog; ratio:2"></span></a>
+                <a class="uk-navbar-item uk-position-center-right" href="#modal-sections" uk-toggle><span class="uk-icon-button" uk-icon="icon: cog; ratio:2"></span></a>
 
                 <div id="modal-sections" uk-modal>
                     <div class="uk-modal-dialog">
@@ -61,10 +62,10 @@
                                 
                             </div>
                         </div>
-                         <div class="uk-modal-footer uk-text-right">
+                         <!-- <div class="uk-modal-footer uk-text-right">
                             <button class="uk-button uk-button-default uk-modal-close" type="button">Cancel</button>
                             <button class="uk-button uk-button-primary" @click="saveSettings()" type="button">Save</button>
-                        </div> 
+                        </div>  -->
                     </div>
                 </div>
                 
@@ -86,6 +87,7 @@
 </template>
 <script>
 import UIkit from 'uikit';
+import {mapGetters} from 'vuex';
 import Search from './Search.vue';
 import getbible from '../api/getbible_v2_api'
 
@@ -101,10 +103,10 @@ export default {
     },
     computed: {
         saved_translations() {
-            console.log(this.$store.state.saved_translations[0]);
+            // console.log(this.$store.state.saved_translations[0]);
             return this.$store.state.saved_translations;
         },
-       
+       ...mapGetters(['book_name', 'chapter'])
         
     },
     methods: {

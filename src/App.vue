@@ -6,7 +6,7 @@
     </div>
   </div> -->
   <navbar/>
-  <div class="uk-container ">
+  <div class="uk-container uk-animation-slide-bottom">
     <selections/>
     <div class="uk-container uk-container-small">
       <verses/>
@@ -58,6 +58,9 @@ export default {
 
 <style lang="less">
 @import "../node_modules/uikit/src/less/uikit.less";
+@import "../node_modules/uikit/src/less/uikit.theme.less";
+@global-link-color: #DA7D02;
+@global-background:  #f5f4f4;;
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

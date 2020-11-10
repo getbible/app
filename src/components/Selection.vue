@@ -1,5 +1,5 @@
 <template>
-    <div class=" uk-width-1-1">
+    <div id="selection" class=" uk-animation-slide-bottom uk-width-1-1 uk-card uk-card-default uk-card-body ">
         <div v-if="!translations.length">No translation added. <br/>Please click <a @click="open_settings">HERE</a> to Open Settings</div>
         <div v-else>
 
@@ -9,6 +9,7 @@
 
             <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
                     <li
+                    class="uk-card uk-card-hover "
                     v-for="(tr,i) in translations" 
                     @click="set_translation(tr.abbreviation)"
                     :key="i"
@@ -34,10 +35,11 @@
             <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
                 <li><a href="#"><span uk-pagination-previous></span></a></li>
                     <li
+                    class="uk-card uk-card-hover "
                      v-for="(ch,i) in chapters" 
                     @click="set_chapter(ch['chapter'])" 
                     :key="i"
-                    ><a >{{ch['chapter']}}</a></li>
+                    ><a href="#selection" uk-toggle>{{ch['chapter']}}</a></li>
                <li><a href="#"><span uk-pagination-next></span></a></li>
             </ul>
         </li>
@@ -46,7 +48,7 @@
 </div>
 </template>
 <script>
-import _ from 'lodash';
+// import _ from 'lodash';
 import UIkit from 'uikit';
 
 import {mapGetters} from 'vuex';
@@ -64,18 +66,7 @@ export default {
                     return this.$store.state.saved_translations;
                 },
                 ...mapGetters(['chapters', 'books', 'translation', 'book_nr']),
-                fchapters: function (){
-                    if(!this.search)
-                    return this.chapter.verses
-                    return this.filteredChapters
-                },
-                filteredChapters() {
-                    return _.orderBy(this.chapter.verses.filter((item) => 
-                            item.verse.toString().toLowerCase().includes(this.search.toLowerCase())
-                        || item.chapter.toString().toLowerCase().includes(this.search.toLowerCase())
-                        || item.name.toString().toLowerCase().includes(this.search.toLowerCase())
-                        || item.text.toLowerCase().includes(this.search.toLowerCase())), 'verse');
-                    },
+               
             },
             methods:{
                 t(i){

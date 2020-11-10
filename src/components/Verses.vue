@@ -1,6 +1,8 @@
 <template >
     <div v-if="verses.length">
-        {{search.toLowerCase() + fverses.length}}
+        <!-- {{search.toLowerCase() + fverses.length}} -->
+        <br />
+        <div class="uk-card uk-card-default uk-card-body uk-width-1-1">
     <ul :dir="dir" 
      class="uk-margin-medium-top uk-list uk-list-divider uk-animation-hover">
         <li  v-for="(verse, i) in pverses" :key="i" 
@@ -17,7 +19,7 @@
             <p></p>
         </li>
     </ul>
-
+        </div>
     <div class="uk-position-small uk-position-center-left uk-overlay uk-overlay-default">
         <span @click="prevV" class="uk-icon-button" uk-icon="icon:chevron-left; ratio:2"></span>
 </div>

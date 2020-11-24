@@ -1,5 +1,5 @@
 <template>
-<div >
+<div class="secondary-lighten3">
   <!-- <div v-if="loading" class="uk-overlay-default uk-position-cover">
     <div class="uk-position-center">
         <h1>Loading... Please wait...</h1>
@@ -51,7 +51,8 @@ export default {
   created(){
     
     this.$store.dispatch('initialise')
-  //  console.log(JSON.parse(JSON.stringify(this.$store.state)));
+    console.log('Initialising');
+   console.log(JSON.parse(JSON.stringify(this.$store.state)));
   }
 }
 </script>
@@ -91,5 +92,28 @@ export default {
 }
 .less-opacity{
   background-color: rgba(255,255,255,0.7);
+}
+
+.primary {
+  background-color: #f9a03f !important;
+}
+.secondary {
+  background-color: #813405 !important;
+}
+.tertiary {
+  background-color: #d45113;
+}
+.secondary-lighten3 {
+  background-color: rgba(224, 222, 221, 1);
+}
+.text-primary {
+  color: #f9a03f !important;
+}
+.text-secondary {
+  color: #813405 !important;
+  // font: #813405 !important;
+}
+.text-tertiary {
+  color: #d45113;
 }
 </style>

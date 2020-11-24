@@ -1,6 +1,6 @@
 <template>
-    <div id="selection" class=" uk-animation-slide-bottom uk-width-1-1 uk-card uk-card-default uk-card-body ">
-        <div v-if="!translations.length">No translation added. <br/>Please click <a @click="open_settings">HERE</a> to Open Settings</div>
+    <div id="selection" class="primary text-secondary uk-animation-slide-bottom uk-width-1-1 uk-card uk-card-default uk-card-body " uk-margin>
+        <div class="" v-if="!saved_translations.length>0">No translation added. <br/>Please click <a @click="open_settings">HERE</a> to Open Settings</div>
         <div v-else>
 
     <ul class="uk-nav-default uk-nav-parent-icon uk-witdth-1-1 " uk-nav="multiple: false" >
@@ -9,11 +9,11 @@
 
             <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
                     <li
-                    class="uk-card uk-card-hover "
-                    v-for="(tr,i) in translations" 
+                    class="uk-card uk-card-hover text-secondary"
+                    v-for="(tr,i) in saved_translations" 
                     @click="set_translation(tr.abbreviation)"
                     :key="i"
-                    ><a href="#">{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</a></li>
+                    ><a class="text-secondary" href="#">{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</a></li>
                  <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
             </ul>
         </li>
@@ -22,7 +22,7 @@
             <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
 
             <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
-                    <li class="uk-card uk-card-hover "
+                    <li class="uk-card uk-card-hover text-secondary"
                      v-for="(bk,i) in books" 
                      @click="set_book(bk['nr'])"
                     :key="i"
@@ -33,14 +33,14 @@
         <li class="uk-nav-divider uk-witdth-1-1"></li>
         <li v-if="book_nr" class="uk-parent uk-witdth-1-1 "><a>Chapters</a>
             <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
-                <li><a href="#"><span uk-pagination-previous></span></a></li>
+                <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
                     <li
                     class="uk-card uk-card-hover "
                      v-for="(ch,i) in chapters" 
                     @click="set_chapter(ch['chapter'])" 
                     :key="i"
                     ><a href="#selection" uk-toggle>{{ch['chapter']}}</a></li>
-               <li><a href="#"><span uk-pagination-next></span></a></li>
+               <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
             </ul>
         </li>
      </ul>
@@ -62,10 +62,11 @@ export default {
              
             }},
             computed: {
-                translations(){
-                    return this.$store.state.saved_translations;
-                },
-                ...mapGetters(['chapters', 'books', 'translation', 'book_nr']),
+                // translations(){
+                //     // console.log(this.$store.state.saved_translations);
+                //     return this.$store.getters.saved_translations;
+                // },
+                ...mapGetters(['chapters', 'books', 'translation', 'book_nr', 'saved_translations']),
                
             },
             methods:{

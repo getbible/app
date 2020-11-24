@@ -1,33 +1,32 @@
 <template>
     
-            <div uk-sticky="sel-target: .uk-navbar-container; cls-active: uk-navbar-sticky">
+            <div  class="secondary" uk-sticky="sel-target: .uk-navbar-container; cls-active: uk-navbar-sticky">
    
-        <nav class="uk-navbar-container uk-na
-        vbar-transparent uk-margin-small" uk-navbar>
+        <nav class="uk-navbar-container primary text-secondary uk-margin-small" uk-navbar>
                 <div class="uk-navbar-left">
             
                     <!-- <a class="uk-navbar-item uk-logo" href="#">GetBible</a> -->
-             <a href="#selection" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: album; ratio:2"></span>{{book_name}}{{chapter}}</a>
+             <a href="#selection" class="uk-navbar-item uk-search uk-search-default primary text-secondary" uk-toggle><span  class="primary text-secondary" uk-icon="icon: album; ratio:2"></span>{{book_name }} {{chapter}}</a>
 
-                <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default" uk-toggle><span  uk-icon="icon: search; ratio:2"></span>Search</a>
+                <a href="#offcanvas-slide" class="uk-navbar-item uk-search uk-search-default primary text-secondary" uk-toggle><span class="primary text-secondary"   uk-icon="icon: search; ratio:2"></span>Search</a>
 
                     <search/>
                         
                     <!-- <span class="uk-label uk-label-primary"><span class="uk-badge uk-badge-danger">{{ num_of_tr}} </span>Translations Available</span> -->
-                    <a class="uk-navbar-item" href="#" uk-toggle><span  uk-icon="icon: history; ratio:2"></span></a>
+                    <a class="uk-navbar-item" href="#" uk-toggle><span  class="primary text-secondary" uk-icon="icon: history; ratio:2"></span></a>
             
                 </div>
-                <a class="uk-navbar-item uk-position-center-right" href="#modal-sections" uk-toggle><span class="uk-icon-button" uk-icon="icon: cog; ratio:2"></span></a>
+                <a class="uk-navbar-item  uk-position-center-right primary text-secondary" href="#modal-sections" uk-toggle><span class="uk-icon-button primary text-secondary" uk-icon="icon: cog; ratio:2"></span></a>
 
                 <div id="modal-sections" uk-modal>
-                    <div class="uk-modal-dialog">
+                    <div class="uk-modal-dialog primary text-secondary">
                         <button class="uk-modal-close-default" type="button" uk-close></button>
-                        <div class="uk-modal-header">
-                            <h2 class="uk-modal-title">Settings</h2>
+                        <div class="uk-modal-header secondary ">
+                            <h2 class="uk-modal-title text-primary">Settings</h2>
                         </div>
                         <div class="uk-modal-body">
                             <div class="uk-margin">
-                                <h3>Saved Translations</h3>
+                                <h3 class="text-secondary">Saved Translations</h3>
                                 <div>
                                         <ul class="uk-list uk-list-large uk-list-divider">
                                             <li
@@ -36,13 +35,14 @@
                                             ><div><span>{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</span> 
                                             {{" "}}<a @click="remove(tr.abbreviation)" class="uk-position-center-right uk-position-relative"><span  class="uk-button uk-button-danger uk-button-small" uk-icon="icon: close;"></span></a>
                                             </div> </li> 
-                                            <li v-if="!saved_translations.length">No saved translation</li>
+                                            <li v-if="!saved_translations.length>0">No saved translation</li>
                                             
                                             <li><b>Add: </b>
                                                 <div uk-form-custom="target: > * > span:first-child">
-                                    <select v-model="translation">
-                                        <option selected value="Add Translation...">Add Translation...</option>
+                                    <select class=" primary text-secondary" v-model="translation">
+                                        <option class="primary text-secondary" selected value="Add Translation...">Add Translation...</option>
                                         <option 
+                                        class="primary text-secondary"
                                         v-for="(tr,i) in Object.keys(translations)" 
                                         :key="i"
                                         :value="tr"
@@ -73,13 +73,13 @@
         <div class="uk-position-fixed uk-position-bottom-left">
             <ul class="uk-list">
                 <li>
-                <a href="#" class="uk-icon-button uk-margin-small-left" uk-icon="github"></a>
+                <a href="#" class="uk-icon-button primary uk-margin-small-left primary text-secondary" uk-icon="github"></a>
                 </li>
                 <li>
-                <a href="#" class="uk-icon-button  uk-margin-small-left" uk-icon="facebook"></a>
+                <a href="#" class="uk-icon-button primary uk-margin-small-left primary text-secondary" uk-icon="facebook"></a>
                 </li>
                 <li>
-                <a href="#" class="uk-icon-button uk-margin-small-left" uk-icon="world"></a>
+                <a href="#" class="uk-icon-button primary uk-margin-small-left primary text-secondary" uk-icon="world"></a>
                 </li>
             </ul>
         </div>
@@ -102,11 +102,11 @@ export default {
         }
     },
     computed: {
-        saved_translations() {
-            // console.log(this.$store.state.saved_translations[0]);
-            return this.$store.state.saved_translations;
-        },
-       ...mapGetters(['book_name', 'chapter'])
+        // saved_translations() {
+        //     // console.log(this.$store.state.saved_translations[0]);
+        //     return this.$store.state.saved_translations;
+        // },
+       ...mapGetters(['book_name', 'chapter', 'saved_translations'])
         
     },
     methods: {

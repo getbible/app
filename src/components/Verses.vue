@@ -1,8 +1,8 @@
 <template >
-    <div v-if="verses.length">
+    <div v-if="verses.length" >
         <!-- {{search.toLowerCase() + fverses.length}} -->
         <br />
-        <div class="uk-card uk-card-default primary uk-card-body uk-width-1-1">
+        <div class="uk-card uk-card-default primary uk-card-body uk-width-1-1 rounded">
     <ul :dir="dir" 
      class="uk-margin-medium-top uk-list uk-list-divider uk-animation-hover">
         <li  v-for="(verse, i) in pverses" :key="i" 
@@ -11,11 +11,14 @@
             
             <h5  class=" uk-primary text-secondary">
               <span class="uk-heading-bullet">  {{book_name+' '}}  </span>
-                <span class="uk-badge secondary badge-light">
+                <span class="uk-badge secondary text-primary badge-light">
                     {{verse.chapter}}:{{verse.verse}}
                 </span>
             </h5>
-            {{verse.text}} <br/>
+            <span class="text-secondary">
+                {{verse.text}} 
+            </span>
+                <br/>
             <p></p>
         </li>
     </ul>

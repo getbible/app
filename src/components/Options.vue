@@ -1,10 +1,10 @@
 <template>
     <div class="uk-container">
         
-            <div class="uk-margin">
-                <ul class="uk-pagination">
-                    <li @click="prev"><a href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>
-                    <li class="uk-margin-auto-left" @click="next"><a href="#">Next Chapter<span class="uk-margin-small-left" uk-pagination-next></span></a></li>
+            <div class="uk-margin" uk-margin>
+                <ul class="uk-pagination" v-if="chapter">
+                    <li @click="prev"><a class="text-primary" href="#"><span class="uk-margin-small-right" uk-pagination-previous></span> Previous Chapter</a></li>
+                    <li class="uk-margin-auto-left" @click="next"><a class="text-primary" href="#">Next Chapter<span class="uk-margin-small-left" uk-pagination-next></span></a></li>
                 </ul>
             </div>
     </div>
@@ -131,9 +131,6 @@ export default {
                     });
                 }
             },
-            created(){
-              
-             
-            }
+
 }
 </script>

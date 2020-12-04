@@ -19,7 +19,7 @@
                 <a class="uk-navbar-item  uk-position-center-right primary text-secondary" href="#modal-sections" uk-toggle><span class="uk-icon-button primary text-secondary" uk-icon="icon: cog; ratio:2"></span></a>
 
                 <div id="modal-sections" uk-modal>
-                    <div class="uk-modal-dialog primary text-secondary">
+                    <div class="uk-modal-dialog primary text-secondary rounded-bottom">
                         <button class="uk-modal-close-default" type="button" uk-close></button>
                         <div class="uk-modal-header secondary ">
                             <h2 class="uk-modal-title text-primary">Settings</h2>

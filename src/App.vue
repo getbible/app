@@ -6,7 +6,7 @@
     </div>
   </div> -->
   <navbar/>
-  <div class="uk-container uk-animation-slide-bottom">
+  <div class="uk-container uk-animation-slide-bottom uk-margin-top">
     <selections/>
     <div class="uk-container uk-container-small">
       <verses/>
@@ -61,7 +61,9 @@ export default {
 @import "../node_modules/uikit/src/less/uikit.less";
 @import "../node_modules/uikit/src/less/uikit.theme.less";
 @global-link-color: #DA7D02;
-@global-background:  #f5f4f4;;
+@global-background:  #f5f4f4;
+@primary:#55828b;
+@secondary: #fed18c;
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -95,10 +97,15 @@ export default {
 }
 
 .primary {
-  background-color: #f9a03f !important;
-}
+  // background-color: #813405 !important;
+  // background-color: #55828b !important;
+  background-color: @primary !important;
+  }
 .secondary {
-  background-color: #813405 !important;
+  // background-color: #f9a03f !important;
+  // background-color: #87bba2 !important;
+  // background-color: #fed18c !important;
+  background-color: @secondary !important;
 }
 .tertiary {
   background-color: #d45113;
@@ -107,13 +114,22 @@ export default {
   background-color: rgba(224, 222, 221, 1);
 }
 .text-primary {
-  color: #f9a03f !important;
-}
+  // color: #813405 !important;
+  color: #55828b !important;
+  }
 .text-secondary {
-  color: #813405 !important;
-  // font: #813405 !important;
+  // color: #f9a03f !important;
+  // color: #87bba2 !important;
+  color: #fed18c !important;
 }
 .text-tertiary {
   color: #d45113;
+}
+.rounded {
+  border-radius: 10px;
+}
+.rounded-bottom {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 </style>

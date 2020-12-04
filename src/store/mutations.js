@@ -46,16 +46,17 @@ export default {
      }
        
    }, 
-   // save_settings(state, settings){
-   //   state.settings =  settings;
-   //   localStorage.setItem('settings', JSON.stringify(settings))
-   // },
-   // add_search(state, search){
-   //     state.search = search
-   // }
+   save_settings(state, settings){
+     state.settings =  settings;
+     localStorage.setItem('settings', JSON.stringify(settings))
+   },
+   add_search(state, search){
+       state.search = search
+   },
    initialise(state, payload){
       state.saved_translations = payload.saved_translations
       state.in_memory_translation = payload.translation
+      console.log(state.saved_translations);
    },
    set_chapter(state, payload){
        state.selected.chapter = payload;
@@ -72,5 +73,8 @@ export default {
    },
    toggle_loading(state, payload){
       state.loading = payload;
+   },
+   search(state, payload){
+     state.search = payload;
    }
  }

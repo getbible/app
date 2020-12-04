@@ -77,7 +77,7 @@ export default {
    async  initialise({commit}){
     commit('toggle_loading', true)
         let saved_translations = await idb.getAll('saved_translations').catch(err => console.log(err));
-        
+        console.log(saved_translations);
         if(!saved_translations) saved_translations = [];
         
   
@@ -93,6 +93,9 @@ export default {
     set_chapter({commit}, payload) {
         commit('set_chapter', payload)
     },
+    message({commit}, payload){
+      commit('message', payload)
+    },
     set_book({commit}, payload) {
         commit('set_book', payload)
     },
@@ -107,5 +110,8 @@ export default {
         setTimeout(()=>{
           commit('toggle_loading', false)
         }, 2500)
+    },
+    search({commit}, payload){
+      commit('search', payload)
     }
 }

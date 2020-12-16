@@ -1,206 +1,94 @@
 <template>
-    <div class=" uk-width-1-1">
-    <ul class="uk-nav-default uk-nav-parent-icon uk-witdth-1-1 "  uk-nav>
-        <li class="uk-parent uk-witdth-1-1"><a>Translation</a>
+    <div id="selection" class="primary text-secondary uk-animation-slide-bottom uk-width-1-1 uk-card uk-card-default uk-card-body rounded" uk-margin>
+        <div class="" v-if="!saved_translations.length>0">No translation added. <br/>Please click <a @click="open_settings">HERE</a> to Open Settings</div>
+        <div v-else>
+
+    <ul class="uk-nav-default uk-nav-parent-icon uk-witdth-1-1 " uk-nav="multiple: false" >
+        <li class="uk-parent uk-witdth-1-1"><a class="text-secondary">Translation</a>
             <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
 
             <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
                     <li
-                    v-for="(tr,i) in translations" 
-                    @change="update_bk(tr.abbreviation)"
+                    class="uk-card uk-card-hover text-secondary rounded"
+                    v-for="(tr,i) in saved_translations" 
+                    @click="set_translation(tr.abbreviation)"
                     :key="i"
-                    :value="tr.abbreviation"
-                    ><a href="#">{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</a></li>
+                    ><a class="text-secondary" href="#">{{tr["language"]?`(${tr["language"]})`:null}} {{tr['translation']}}</a></li>
                  <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
             </ul>
         </li>
         <li class="uk-nav-divider uk-witdth-1-1"></li>
-        <li class="uk-parent uk-witdth-1-1"><a>Books</a>
+        <li v-if="translation" class="uk-parent uk-witdth-1-1"><a class="text-secondary">Books</a>
             <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
 
             <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
-                    <li class="uk-card uk-card-hover "
-                     v-for="(bk,i) in Object.keys(books)" 
-                     @change="update_ch(books[bk]['nr'])"
+                    <li class="uk-card uk-card-hover text-secondary"
+                     v-for="(bk,i) in books" 
+                     @click="set_book(bk['nr'])"
                     :key="i"
-                    :value="books[bk]['nr']"
-                    ><a href="#">{{books[bk]['name']}}</a></li>
+                    ><a href="#" class="text-secondary">{{bk['name']}}</a></li>
              <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
             </ul>
         </li>
         <li class="uk-nav-divider uk-witdth-1-1"></li>
-        <li class="uk-parent uk-witdth-1-1 "><a>Chapters</a>
+        <li v-if="book_nr" class="uk-parent uk-witdth-1-1 "><a class="text-secondary">Chapters</a>
             <ul class="uk-nav-sub uk-subnav uk-subnav-pill uk-pagination" uk-margin>
-                <li><a href="#"><span uk-pagination-previous></span></a></li>
+                <!-- <li><a href="#"><span uk-pagination-previous></span></a></li> -->
                     <li
-                     v-for="(ch,i) in Object.keys(chapters)" 
-                    @change="update_chapter(chapters[ch]['chapter'])" 
+                    class="uk-card uk-card-hover "
+                     v-for="(ch,i) in chapters" 
+                    @click="set_chapter(ch['chapter'])" 
                     :key="i"
-                    ><a >{{chapters[ch]['chapter']}}</a></li>
-               <li><a href="#"><span uk-pagination-next></span></a></li>
+                    ><a href="#selection" class="text-secondary" uk-toggle>{{ch['chapter']}}</a></li>
+               <!-- <li><a href="#"><span uk-pagination-next></span></a></li> -->
             </ul>
         </li>
      </ul>
+    </div>
 </div>
 </template>
 <script>
-import _ from 'lodash';
-// import verses from './Verses.vue';
+// import _ from 'lodash';
+import UIkit from 'uikit';
 
+import {mapGetters} from 'vuex';
 export default {
     components:{
         // verses
     },  
   data: function(){
                 return {
-                translation: 'akjv',
-                // translations: {},
-                chapter: 1,
-                chapter_num: 1,
-                chapters:{},
-                book: 1,
-                books: {},
-                progress: 0,
-                loading: false,
-                links: null,
-                search: '',
-                message: 'Loading...'
+                // translation: 'akjv',
+             
             }},
             computed: {
-                translations(){
-                    return this.$store.state.saved_translations;
-                },
-                
-                fchapters: function (){
-                    if(!this.search)
-                    return this.chapter.verses
-                    return this.filteredChapters
-                },
-                filteredChapters() {
-                    return _.orderBy(this.chapter.verses.filter((item) => 
-                            item.verse.toString().toLowerCase().includes(this.search.toLowerCase())
-                        || item.chapter.toString().toLowerCase().includes(this.search.toLowerCase())
-                        || item.name.toString().toLowerCase().includes(this.search.toLowerCase())
-                        || item.text.toLowerCase().includes(this.search.toLowerCase())), 'verse');
-                    },
+                // translations(){
+                //     // console.log(this.$store.state.saved_translations);
+                //     return this.$store.getters.saved_translations;
+                // },
+                ...mapGetters(['chapters', 'books', 'translation', 'book_nr', 'saved_translations']),
+               
             },
             methods:{
                 t(i){
                     return this.translations.find(t =>  t.abbreviation === i)
                 },  
-                async update_chapter(c) {
-                    console.log(c);
-                    this.chapter_num = c
-                    // this.loading = true
-                    this.progress = 95
-                    let config = {
-                    headers: {'Access-Control-Allow-Origin': '*'}
-                                };
-            
-                    let url =  `https://getbible.net/v2/${this.translation}/${this.book}/${this.chapter_num}.json`
-                    
-                    let response = await fetch(url, config).catch(function(err) {
-                            this.chapter = err
-                            this.loading =false
-                            this.message = 'Error'
-                            
-                        });
-
-                    if (!response) return;
-
-                    this.progress = 99
-                    let data = await response.json().catch(err => {
-                                                    this.chapter = err
-                                                    this.loading =false
-                                                    this.message = 'Error'
-                                                })
-                    this.loading =false
-                        
-                    if (!data) return;
-
-                    this.chapter = data
-                    this.progress =0
-
+                 set_translation(a) {
+                     console.log("Hello");
+                     this.$store.dispatch('set_translation', {selected_translation:a})
                 },
-                async update_tr(){
-
+                set_book(b){
+                    this.$store.dispatch('set_book', b)
                 },
-                async update_bk(a){
-                    this.translation = a
-                    console.log(a);
-                    let config = {
-                    headers: {'Access-Control-Allow-Origin': '*'}
-                };
-                    this.loading =true
-                    this.progress =25
-                    this.message = 'Loading...'
-                    let url = `https://getbible.net/v2/${this.translation}/books.json`
-                    fetch(url,config)
-                    .then(response => response.json())
-                    .then(data => {
-                        // console.log(data)
-                        this.books = data
-                        this.progress = 60
-                        this.update_ch(this.book);
-                    }).catch(function(err) {
-                        this.chapter = err
-                        this.loading =false
-                        this.message = 'Error'
-                    });
-                
+                 set_chapter(c){
+                     this.$store.dispatch('set_chapter', c)
                 },
-                async update_ch(b){
-                    this.book = b
-                    console.log(b);
-                    let config = {
-                    headers: {'Access-Control-Allow-Origin': '*'}
-                };
-                    fetch(`https://getbible.net/v2/${this.translation}/${this.book}/chapters.json`,config)
-                    .then(response => response.json())
-                    .then(data => {
-                        // console.log(data)
-                        this.chapters = data
-                        this.progress = 85
-                        this.update_chapter(this.chapter_num);
-                    }).catch(function(err) {
-                        this.chapter = err
-                        this.loading =false
-                        this.message = 'Error'
-                    });
+                open_settings(){
+                    UIkit.modal('#modal-sections').show()
                 }
             },
             created(){
-                let config = {
-                    headers: {'Access-Control-Allow-Origin': '*'}
-                };
-                // fetch(`https://getbible.net/v2/translations.json`,config)
-                // .then(response => response.json())
-                // .then(data => {
-                //     // console.log(data)
-                //     this.translations = data
-
-                    fetch(`https://getbible.net/v2/${this.translation}/books.json`, config)
-                    .then(response => response.json())
-                    .then(data => {
-                        // console.log(data)
-                        this.books = data
-
-                        this.update_ch(this.book);
-                    }).catch(function(err) {
-                        this.chapter = err
-                    });
-                // }).catch(function(err) {
-                //     this.chapter = err
-                // });
-
-                // fetch(`https://getbible.net/v2/kjv/${this.book}/${this.chapter_num}.json`,config)
-                // .then(response => response.json())
-                // .then(data => {
-                //     console.log(data)
-                //     this.chapter = data
-                // }).catch(function(err) {
-                //     this.chapter = err
-                // });
+              
             }
 }
 </script>

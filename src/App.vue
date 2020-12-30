@@ -1,10 +1,5 @@
 <template>
 <div class="secondary-lighten3">
-  <!-- <div v-if="loading" class="uk-overlay-default uk-position-cover">
-    <div class="uk-position-center">
-        <h1>Loading... Please wait...</h1>
-    </div>
-  </div> -->
   <navbar/>
   <div class="uk-container uk-animation-slide-bottom uk-margin-top">
     <selections/>
@@ -15,8 +10,8 @@
     </div>
   </div>
   <div v-if="loading" id="overlay">
-    <div  class="uk-position-center less-opacity">
-        <h1>Loading... Please wait.</h1>
+    <div  class="uk-position-center">
+        <span uk-spinner="ratio: 3"></span>
     </div>
   </div>
 </div>

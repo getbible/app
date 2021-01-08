@@ -1,44 +1,37 @@
 <template>
-<div class="secondary-lighten3">
-  <!-- <div v-if="loading" class="uk-overlay-default uk-position-cover">
-    <div class="uk-position-center">
-        <h1>Loading... Please wait...</h1>
+  <div class="secondary-lighten3">
+    <navbar />
+    <div class="uk-container uk-animation-slide-bottom uk-margin-top">
+      <selections />
+      <div class="uk-container uk-container-small">
+        <verses />
+        <options />
+      </div>
     </div>
-  </div> -->
-  <navbar/>
-  <div class="uk-container uk-animation-slide-bottom uk-margin-top">
-    <selections/>
-    <div class="uk-container uk-container-small">
-      <verses/>
-    <options/>
-
-    </div>
-  </div>
-  <div v-if="loading" id="overlay">
-    <div  class="uk-position-center less-opacity">
-        <h1>Loading... Please wait.</h1>
+    <div v-if="loading" id="overlay">
+      <div class="uk-position-center">
+        <span uk-spinner="ratio: 3"></span>
+      </div>
     </div>
   </div>
-</div>
-
 </template>
 
 <script>
 // import _ from 'lodash';
 
-import UIkit from 'uikit';
-import Icons from 'uikit/dist/js/uikit-icons';
-import {mapGetters} from 'vuex';
+import UIkit from "uikit";
+import Icons from "uikit/dist/js/uikit-icons";
+import { mapGetters } from "vuex";
 
-import navbar from './components/NavBar.vue';
-import options from './components/Options.vue';
-import Selections from  './components/Selection.vue'
-import Verses from './components/Verses.vue'
+import navbar from "./components/NavBar.vue";
+import options from "./components/Options.vue";
+import Selections from "./components/Selection.vue";
+import Verses from "./components/Verses.vue";
 
 UIkit.use(Icons);
- 
+
 export default {
-  name: 'App',
+  name: "App",
   components: {
     navbar,
     options,
@@ -46,23 +39,22 @@ export default {
     Verses,
   },
   computed: {
-    ...mapGetters(['loading'])
+    ...mapGetters(["loading"]),
   },
-  created(){
-    
-    this.$store.dispatch('initialise')
-    console.log('Initialising');
-   console.log(JSON.parse(JSON.stringify(this.$store.state)));
-  }
-}
+  created() {
+    this.$store.dispatch("initialise");
+    console.log("Initialising");
+    console.log(JSON.parse(JSON.stringify(this.$store.state)));
+  },
+};
 </script>
 
 <style lang="less">
 @import "../node_modules/uikit/src/less/uikit.less";
 @import "../node_modules/uikit/src/less/uikit.theme.less";
-@global-link-color: #DA7D02;
-@global-background:  #f5f4f4;
-@primary:#55828b;
+@global-link-color: #da7d02;
+@global-background: #f5f4f4;
+@primary: #55828b;
 @secondary: #fed18c;
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
@@ -74,10 +66,10 @@ export default {
 }
 .disabled {
   cursor: not-allowed;
-  color: gray
+  color: gray;
 }
 .disabled:hover {
-  color:gray 
+  color: gray;
 }
 #overlay {
   position: fixed;
@@ -88,19 +80,19 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255,255,255,0.7);
+  background-color: rgba(255, 255, 255, 0.7);
   z-index: 20000;
   cursor: pointer;
 }
-.less-opacity{
-  background-color: rgba(255,255,255,0.7);
+.less-opacity {
+  background-color: rgba(255, 255, 255, 0.7);
 }
 
 .primary {
   // background-color: #813405 !important;
   // background-color: #55828b !important;
   background-color: @primary !important;
-  }
+}
 .secondary {
   // background-color: #f9a03f !important;
   // background-color: #87bba2 !important;
@@ -116,7 +108,7 @@ export default {
 .text-primary {
   // color: #813405 !important;
   color: #55828b !important;
-  }
+}
 .text-secondary {
   // color: #f9a03f !important;
   // color: #87bba2 !important;

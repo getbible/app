@@ -1,6 +1,6 @@
 <template>
     <div id="selection" class="primary text-secondary uk-animation-slide-bottom uk-width-1-1 uk-card uk-card-default uk-card-body rounded" uk-margin>
-        <div class="" v-if="!saved_translations.length>0">No translation added. <br/>Please click <a @click="open_settings">HERE</a> to Open Settings</div>
+        <div class="" v-if="!saved_translations.length>0">No translations added. <br/>Please click <a @click="open_settings">HERE</a> to Open Settings</div>
         <div v-else>
 
     <ul class="uk-nav-default uk-nav-parent-icon uk-witdth-1-1 " uk-nav="multiple: false" >
@@ -73,14 +73,14 @@ export default {
                 t(i){
                     return this.translations.find(t =>  t.abbreviation === i)
                 },  
-                 set_translation(a) {
+                set_translation(a) {
                      console.log("Hello");
                      this.$store.dispatch('set_translation', {selected_translation:a})
                 },
                 set_book(b){
                     this.$store.dispatch('set_book', b)
                 },
-                 set_chapter(c){
+                set_chapter(c){
                      this.$store.dispatch('set_chapter', c)
                 },
                 open_settings(){

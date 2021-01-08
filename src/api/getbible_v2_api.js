@@ -4,6 +4,8 @@
 let BASE_URL = 'https://getbible.net';
 let API_VERSION = 'v2';
 
+export { BASE_URL, API_VERSION };
+
 
 export default {
     get_translations(){

@@ -3,34 +3,10 @@
 export default {
     add_translation (state, payload ) {
 
-     // payload = {
-     //   translation:{
-     //     name: 'translation',
-     //     putObj: {}
-     //   },
-     //   saved_translations:{
-     //     name: 'saved_translation',
-     //     putObj: {}
-     //   }
-     // }
-     
-
      state.saved_translations.push(payload.saved_translations.putObj)
        
    },
     REMOVE_TRANSLATION (state, payload ) {
-     // payload example
-       // payload = {
-       //   translation:{
-       //     name: 'translation',
-       //     keyPath: 'aksjv'
-       //   },
-       //   saved_translations:{
-       //     name: 'saved_translation',
-       //     keyPath: "askjv"
-       //   }
-       // }
-    
      
      const {keyPath} = payload.saved_translations;
 

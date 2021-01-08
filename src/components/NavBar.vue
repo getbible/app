@@ -59,7 +59,12 @@
                                         </ul>
                                         
                                     </div>
-                                
+                                <hr>
+                                <h3 class="text-secondary">Theme</h3>
+                                <div>
+                                       
+                                        <picker/>
+                                    </div>
                             </div>
                         </div>
                          <!-- <div class="uk-modal-footer uk-text-right">
@@ -90,10 +95,12 @@ import UIkit from 'uikit';
 import {mapGetters} from 'vuex';
 import Search from './Search.vue';
 import getbible from '../api/getbible_v2_api'
+import Picker from './Picker.vue'
 
 export default {
     components: {
-        Search
+        Search,
+        Picker
     },
     data: () => {
         return {

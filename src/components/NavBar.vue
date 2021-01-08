@@ -84,12 +84,12 @@
 <script>
 import Search from "./Search.vue";
 import Settings from "./Settings.vue";
-import Picker from "./Picker.vue";
+// import Picker from "./Picker.vue";
 export default {
   components: {
     Search,
     Settings,
-    Picker,
+    // Picker,
   },
 };
 </script>

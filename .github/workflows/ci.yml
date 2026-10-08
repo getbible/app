@@ -16,12 +16,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.6'
           cache: true
       - run: flutter pub get
       - name: Verify approved GetBible brand assets
         run: sha256sum -c assets/branding/BRAND_ASSETS.sha256
       - name: Validate Dart formatting and parsing
-        run: dart format --output=none .
+        run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze
       - run: flutter test
       - run: flutter build web --release --base-href /flutter/
@@ -34,3 +35,21 @@ jobs:
         with:
           name: getBible-live-web
           path: build/web
+
+  linux-reader:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.6'
+          cache: true
+      - name: Install Linux build and display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
+      - run: flutter pub get
+      - name: Exercise the complete reader and native clipboard
+        run: xvfb-run -a flutter test integration_test/reader_upgrade_test.dart -d linux
+      - run: flutter build linux --release

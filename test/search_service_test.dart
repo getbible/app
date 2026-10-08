@@ -19,7 +19,12 @@ void main() {
             chapter: 1,
             name: 'Genesis 1',
             verses: const <Verse>[
-              Verse(chapter: 1, verse: 1, name: '', text: 'Beginning begins begun.'),
+              Verse(
+                chapter: 1,
+                verse: 1,
+                name: '',
+                text: 'Beginning begins begun.',
+              ),
               Verse(chapter: 1, verse: 2, name: '', text: 'שלום עולם ושלום'),
             ],
           ),

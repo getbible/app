@@ -9,7 +9,7 @@ import '../../domain/models/annotations.dart';
 import '../../domain/models/passage.dart';
 import 'database_connection.dart';
 
-const int localDatabaseSchemaVersion = 1;
+const int localDatabaseSchemaVersion = 2;
 
 final class CacheRecord {
   const CacheRecord({
@@ -19,6 +19,8 @@ final class CacheRecord {
     required this.json,
     required this.checkedAt,
     required this.cachedAt,
+    this.freshUntil,
+    this.mustRevalidate = true,
   });
 
   final String key;
@@ -27,6 +29,8 @@ final class CacheRecord {
   final String json;
   final DateTime checkedAt;
   final DateTime cachedAt;
+  final DateTime? freshUntil;
+  final bool mustRevalidate;
 }
 
 final class LocalDatabase {
@@ -50,7 +54,7 @@ final class LocalDatabase {
 
   Future<CacheRecord?> readCache(String key) async {
     final List<Map<String, Object?>> rows = await _executor.runSelect(
-      'SELECT cache_key, kind, sha, payload, checked_at, cached_at FROM cache_entries WHERE cache_key = ?',
+      'SELECT cache_key, kind, sha, payload, checked_at, cached_at, fresh_until, must_revalidate FROM cache_entries WHERE cache_key = ?',
       <Object?>[key],
     );
     if (rows.isEmpty) return null;
@@ -64,6 +68,13 @@ final class LocalDatabase {
         row['checked_at']! as int,
         isUtc: true,
       ),
+      freshUntil: row['fresh_until'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              row['fresh_until']! as int,
+              isUtc: true,
+            ),
+      mustRevalidate: (row['must_revalidate']! as int) == 1,
       cachedAt: DateTime.fromMillisecondsSinceEpoch(
         row['cached_at']! as int,
         isUtc: true,
@@ -77,20 +88,26 @@ final class LocalDatabase {
     required String sha,
     required Object payload,
     required DateTime checkedAt,
+    String? rawJson,
+    DateTime? freshUntil,
+    bool mustRevalidate = true,
   }) async {
     final int now = DateTime.now().toUtc().millisecondsSinceEpoch;
     await _executor.runCustom(
-      'INSERT INTO cache_entries(cache_key, kind, sha, payload, checked_at, cached_at) '
-      'VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET '
+      'INSERT INTO cache_entries(cache_key, kind, sha, payload, checked_at, cached_at, fresh_until, must_revalidate) '
+      'VALUES(?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET '
       'kind=excluded.kind, sha=excluded.sha, payload=excluded.payload, '
-      'checked_at=excluded.checked_at, cached_at=excluded.cached_at',
+      'checked_at=excluded.checked_at, cached_at=excluded.cached_at, '
+      'fresh_until=excluded.fresh_until, must_revalidate=excluded.must_revalidate',
       <Object?>[
         key,
         kind,
         sha,
-        jsonEncode(payload),
+        rawJson ?? jsonEncode(payload),
         checkedAt.millisecondsSinceEpoch,
         now,
+        freshUntil?.millisecondsSinceEpoch,
+        mustRevalidate ? 1 : 0,
       ],
     );
   }
@@ -101,9 +118,34 @@ final class LocalDatabase {
         <Object?>[checkedAt.millisecondsSinceEpoch, key],
       );
 
-  Future<void> deleteCachePrefix(String prefix) => _executor.runCustom(
-    'DELETE FROM cache_entries WHERE cache_key = ? OR cache_key LIKE ?',
-    <Object?>[prefix, '$prefix%'],
+  Future<void> deleteCache(String key) => _executor.runCustom(
+    'DELETE FROM cache_entries WHERE cache_key = ?',
+    <Object?>[key],
+  );
+
+  /// Matches an exact key or delimiter-separated descendants. substr is literal
+  /// (unlike LIKE), so numeric neighbours and %, _ and \ are never wildcards.
+  Future<void> deleteCachePrefix(String prefix) {
+    final String descendants = prefix.endsWith(':') ? prefix : '$prefix:';
+    return _executor.runCustom(
+      'DELETE FROM cache_entries WHERE cache_key = ? OR substr(cache_key, 1, ?) = ?',
+      <Object?>[prefix, descendants.length, descendants],
+    );
+  }
+
+  /// Expire verification while retaining readable last-known-good Scripture.
+  Future<void> invalidateCachePrefix(String prefix) {
+    final String descendants = prefix.endsWith(':') ? prefix : '$prefix:';
+    return _executor.runCustom(
+      'UPDATE cache_entries SET sha = ?, checked_at = 0, fresh_until = NULL, must_revalidate = 1 '
+      'WHERE cache_key = ? OR substr(cache_key, 1, ?) = ?',
+      <Object?>['', prefix, descendants.length, descendants],
+    );
+  }
+
+  Future<void> clearScriptureCache() => _executor.runCustom(
+    "DELETE FROM cache_entries WHERE substr(cache_key, 1, 6) = 'bible:' "
+    "OR kind IN ('translations', 'books', 'chapters', 'chapter', 'fullTranslation')",
   );
 
   Future<void> clearCache() => _executor.runCustom('DELETE FROM cache_entries');
@@ -313,13 +355,38 @@ final class _DatabaseUser extends QueryExecutorUser {
   ) async {
     await executor.ensureOpen(this);
     await executor.runCustom('PRAGMA foreign_keys = ON');
-    if (details.wasCreated) {
-      await _createVersionOne(executor);
-      return;
-    }
     final int from = details.versionBefore ?? 0;
-    if (from < 1) await _createVersionOne(executor);
+    if (from < localDatabaseSchemaVersion) {
+      await executor.runCustom('BEGIN IMMEDIATE');
+      try {
+        if (details.wasCreated || from < 1) await _createVersionOne(executor);
+        if (from < 2) await _migrateVersionTwo(executor);
+        await executor.runCustom(
+          'PRAGMA user_version = $localDatabaseSchemaVersion',
+        );
+        await executor.runCustom('COMMIT');
+      } catch (_) {
+        await executor.runCustom('ROLLBACK');
+        rethrow;
+      }
+    }
   }
+}
+
+/// Forward migration keeps private tables, offsets, settings and database
+/// identity intact. Legacy payloads retain their original v2 provenance.
+Future<void> _migrateVersionTwo(QueryExecutor executor) async {
+  await executor.runCustom(
+    'ALTER TABLE cache_entries ADD COLUMN fresh_until INTEGER',
+  );
+  await executor.runCustom(
+    'ALTER TABLE cache_entries ADD COLUMN must_revalidate INTEGER NOT NULL DEFAULT 1',
+  );
+  await executor.runCustom(
+    "UPDATE cache_entries SET cache_key = 'bible:v2:s1:' || cache_key "
+    "WHERE kind IN ('translations', 'books', 'chapters', 'chapter', 'fullTranslation') "
+    "AND substr(cache_key, 1, 6) != 'bible:'",
+  );
 }
 
 Future<void> _createVersionOne(QueryExecutor executor) async {

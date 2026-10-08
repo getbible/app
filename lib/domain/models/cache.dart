@@ -3,16 +3,41 @@ import 'passage.dart';
 
 enum CacheFreshness { fresh, cachedVerified, cachedUnverified }
 
+/// Serialized Scripture and HTTP caches cannot cross service/API boundaries.
+final class ScriptureCacheIdentity {
+  const ScriptureCacheIdentity({
+    this.apiVersion = 'v3',
+    this.schemaVersion = 2,
+    this.sourceScope = '',
+  });
+  final String apiVersion;
+  final int schemaVersion;
+  final String sourceScope;
+  String get prefix =>
+      'bible:$apiVersion:s$schemaVersion:${sourceScope.isEmpty ? '' : 'origin:$sourceScope:'}';
+  String key(String resource) => '$prefix$resource';
+  static const ScriptureCacheIdentity legacy = ScriptureCacheIdentity(
+    apiVersion: 'v2',
+    schemaVersion: 1,
+  );
+}
+
 final class RepositoryResult<T> {
   const RepositoryResult({
     required this.data,
     required this.freshness,
     required this.checkedAt,
+    this.isLegacy = false,
+    this.sourceApiVersion = 'v3',
+    this.mayPersist = true,
   });
 
   final T data;
   final CacheFreshness freshness;
   final DateTime checkedAt;
+  final bool isLegacy;
+  final bool mayPersist;
+  final String sourceApiVersion;
 
   bool get isCached => freshness != CacheFreshness.fresh;
   bool get isVerified => freshness != CacheFreshness.cachedUnverified;

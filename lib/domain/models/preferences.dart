@@ -20,6 +20,7 @@ final class ReaderPreferences {
     this.activeMarkingGroupId = 'adultery',
     this.highContrast = false,
     this.reduceMotion = false,
+    this.showSourceStyles = true,
   });
 
   factory ReaderPreferences.fromJson(Object? value) {
@@ -52,6 +53,7 @@ final class ReaderPreferences {
       ),
       highContrast: optionalBool(json, 'highContrast'),
       reduceMotion: optionalBool(json, 'reduceMotion'),
+      showSourceStyles: optionalBool(json, 'showSourceStyles', true),
     );
   }
 
@@ -66,6 +68,7 @@ final class ReaderPreferences {
   final String activeMarkingGroupId;
   final bool highContrast;
   final bool reduceMotion;
+  final bool showSourceStyles;
 
   ReaderPreferences copyWith({
     AppearanceMode? appearanceMode,
@@ -78,6 +81,7 @@ final class ReaderPreferences {
     String? activeMarkingGroupId,
     bool? highContrast,
     bool? reduceMotion,
+    bool? showSourceStyles,
   }) => ReaderPreferences(
     appearanceMode: appearanceMode ?? this.appearanceMode,
     lightPalette: lightPalette ?? this.lightPalette,
@@ -89,6 +93,7 @@ final class ReaderPreferences {
     activeMarkingGroupId: activeMarkingGroupId ?? this.activeMarkingGroupId,
     highContrast: highContrast ?? this.highContrast,
     reduceMotion: reduceMotion ?? this.reduceMotion,
+    showSourceStyles: showSourceStyles ?? this.showSourceStyles,
   );
 
   JsonMap toJson() => <String, Object?>{
@@ -103,6 +108,7 @@ final class ReaderPreferences {
     'activeMarkingGroupId': activeMarkingGroupId,
     'highContrast': highContrast,
     'reduceMotion': reduceMotion,
+    'showSourceStyles': showSourceStyles,
   };
 }
 

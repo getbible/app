@@ -1,0 +1,133 @@
+{
+  "translation": "Fixture Bible",
+  "abbreviation": "fx",
+  "language": "Fixture language",
+  "direction": "LTR",
+  "book_nr": 900000123,
+  "book_name": "Extended Book",
+  "chapter": 3,
+  "name": "Extended Book 3",
+  "verses": [
+    {
+      "chapter": 3,
+      "verse": 7,
+      "name": "Extended Book 3:7",
+      "text": "  A😀  supplied\tname\nremains.  ",
+      "paragraph": true,
+      "tokens": [
+        {
+          "token": "A😀",
+          "word_start": 1,
+          "word_end": 1,
+          "lemma": {
+            "strong": [
+              "G1",
+              "G2"
+            ],
+            "other": [
+              "lex:one"
+            ]
+          },
+          "morph": {
+            "robinson": [
+              "N-NSM"
+            ]
+          },
+          "xlit": {
+            "beta": [
+              "a"
+            ]
+          },
+          "src": [
+            1,
+            "2,3"
+          ],
+          "gloss": "a",
+          "morphSegmented": true,
+          "source_extra": "preserved"
+        },
+        {
+          "token": "supplied name",
+          "word_start": 2,
+          "word_end": 3,
+          "type": "x-ketiv",
+          "variant": true
+        },
+        {
+          "token": "unlocated",
+          "word_start": 0,
+          "word_end": 0
+        }
+      ],
+      "spans": [
+        {
+          "tag": "transChange",
+          "span": "supplied",
+          "token_start": 1,
+          "token_end": 1,
+          "word_start": 2,
+          "word_end": 3,
+          "attrs": {
+            "type": "added",
+            "future_attribute": "source"
+          }
+        },
+        {
+          "tag": "q",
+          "span": "name",
+          "token_start": 1,
+          "token_end": 1,
+          "word_start": 3,
+          "word_end": 3,
+          "attrs": {
+            "who": "#someone"
+          }
+        }
+      ],
+      "future_verse": {
+        "nested": [
+          false,
+          0,
+          "kept"
+        ]
+      }
+    },
+    {
+      "chapter": 3,
+      "verse": 9,
+      "name": "Extended Book 3:9",
+      "text": "Another verse."
+    }
+  ],
+  "editorial": [
+    {
+      "order": 0,
+      "type": "heading",
+      "anchor": {
+        "verse": 7,
+        "edge": "before"
+      },
+      "text": "Source heading",
+      "heading_type": "section",
+      "canonical": false
+    },
+    {
+      "order": 1,
+      "type": "paragraph",
+      "start": 7,
+      "end": 9
+    },
+    {
+      "order": 2,
+      "type": "future",
+      "detail": {
+        "kept": true
+      }
+    }
+  ],
+  "future_chapter": {
+    "preserved": true
+  },
+  "lang": "en",
+  "encoding": "UTF-8"
+}

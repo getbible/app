@@ -1,0 +1,22 @@
+{
+  "translation": "Fixture Bible",
+  "abbreviation": "fx",
+  "language": "Fixture language",
+  "lang": "fx",
+  "direction": "LTR",
+  "nr": 900000999,
+  "name": "Source Preface",
+  "chapters": [],
+  "titles": [
+    {
+      "text": "Preface",
+      "canonical": false
+    }
+  ],
+  "introduction": [
+    {
+      "text": "Only an introduction, no Scripture coordinates."
+    }
+  ],
+  "encoding": "UTF-8"
+}

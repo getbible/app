@@ -6,15 +6,23 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../application/app_state.dart';
+import '../application/reference_preview_controller.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
 import '../domain/models/passage.dart';
+import '../domain/models/reference.dart';
 import '../domain/models/search.dart';
 import '../services/markdown_service.dart';
+import '../services/scripture_layout.dart';
+import '../services/scripture_text.dart';
 import 'boundary_turn_controller.dart';
 import 'widgets/reader_translation_field.dart';
+import 'widgets/reference_preview.dart';
+import 'widgets/scripture_editorial.dart';
+import 'widgets/scripture_paragraph_selection.dart';
 import 'widgets/scripture_verification_badge.dart';
+import 'widgets/scripture_verse_text.dart';
 
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key});
@@ -31,6 +39,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _boundaryRecordedForGesture = false;
   bool _showChrome = true;
   int? _editingNote;
+  bool _previewOpen = false;
 
   @override
   void initState() {
@@ -39,7 +48,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _updateChrome() {
-    final bool next = !_scrollController.hasClients || _scrollController.offset < 56;
+    final bool next =
+        !_scrollController.hasClients || _scrollController.offset < 56;
     if (next != _showChrome && mounted) setState(() => _showChrome = next);
   }
 
@@ -54,20 +64,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final AppState state = context.watch<AppState>();
     return Scaffold(
       key: _scaffoldKey,
-      drawer: _ReaderDrawer(state: state),
-      endDrawer: _StudyDrawer(
+      drawer: _ReaderDrawer(
         state: state,
-        onOpenPassage: _openPassage,
+        onReferencePreview: _showReferencePreview,
       ),
-      appBar: _showChrome ? _ReaderAppBar(
-        state: state,
-        onMenu: () => _scaffoldKey.currentState?.openDrawer(),
-        onStudy: () => _scaffoldKey.currentState?.openEndDrawer(),
-        onSearch: () => _showSearch(context, state),
-        onHome: () => unawaited(state.openDailyScripture()),
-        onTurn: (int direction) => unawaited(_turn(state, direction)),
-        onMarkdown: () => _showMarkdown(context, state),
-      ) : null,
+      endDrawer: _StudyDrawer(state: state, onOpenPassage: _openPassage),
+      appBar: _showChrome
+          ? _ReaderAppBar(
+              state: state,
+              onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+              onStudy: () => _scaffoldKey.currentState?.openEndDrawer(),
+              onSearch: () => _showSearch(context, state),
+              onHome: () => unawaited(state.openDailyScripture()),
+              onTurn: (int direction) => unawaited(_turn(state, direction)),
+              onMarkdown: () => _showMarkdown(context, state),
+            )
+          : null,
       body: SafeArea(child: _body(context, state)),
     );
   }
@@ -87,46 +99,78 @@ class _ReaderScreenState extends State<ReaderScreen> {
       textDirection: direction,
       child: Stack(
         children: <Widget>[
-          Column(children: <Widget>[
-          if (_showChrome) _ChapterHeading(state: state),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragEnd: (DragEndDetails details) {
-                final double velocity = details.primaryVelocity ?? 0;
-                if (velocity.abs() < 350) return;
-                unawaited(_turn(state, velocity > 0 ? -1 : 1));
-              },
-              child: CallbackShortcuts(
-                bindings: <ShortcutActivator, VoidCallback>{
-                  const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true):
-                      () => unawaited(_turn(state, -1)),
-                  const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true):
-                      () => unawaited(_turn(state, 1)),
-                },
-                child: Focus(
-                  autofocus: true,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (ScrollNotification notice) =>
-                        _onScrollNotification(notice, state),
-                    child: _ReaderBody(
-                      state: state,
-                      controller: _scrollController,
-                      verseKeys: _verseKeys,
-                      editingNote: _editingNote,
-                      onEditNote: (int? verse) =>
-                          setState(() => _editingNote = verse),
-                      onOpenVerseMenu: _showVerseMenu,
+          Column(
+            children: <Widget>[
+              if (_showChrome)
+                _ChapterHeading(
+                  state: state,
+                  onPreview: () => _showReferencePreview(),
+                ),
+              if (state.legacyScripture)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    'Saved legacy Scripture (API v2). Connect to refresh this passage from v3.',
+                  ),
+                ),
+              if (state.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    state.error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    final double velocity = details.primaryVelocity ?? 0;
+                    if (velocity.abs() < 350) return;
+                    unawaited(_turn(state, velocity > 0 ? -1 : 1));
+                  },
+                  child: CallbackShortcuts(
+                    bindings: <ShortcutActivator, VoidCallback>{
+                      const SingleActivator(
+                        LogicalKeyboardKey.arrowLeft,
+                        alt: true,
+                      ): () =>
+                          unawaited(_turn(state, -1)),
+                      const SingleActivator(
+                        LogicalKeyboardKey.arrowRight,
+                        alt: true,
+                      ): () =>
+                          unawaited(_turn(state, 1)),
+                    },
+                    child: Focus(
+                      autofocus: true,
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (ScrollNotification notice) =>
+                            _onScrollNotification(notice, state),
+                        child: _ReaderBody(
+                          state: state,
+                          controller: _scrollController,
+                          verseKeys: _verseKeys,
+                          editingNote: _editingNote,
+                          onEditNote: (int? verse) =>
+                              setState(() => _editingNote = verse),
+                          onOpenVerseMenu: _showVerseMenu,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+              if (_showChrome)
+                _MobileChapterNavigation(state: state, onTurn: _turn),
+            ],
           ),
-          if (_showChrome) _MobileChapterNavigation(state: state, onTurn: _turn),
-        ]),
-          if (!_showChrome)
-            _EdgeChapterNavigation(state: state, onTurn: _turn),
+          if (!_showChrome) _EdgeChapterNavigation(state: state, onTurn: _turn),
         ],
       ),
     );
@@ -150,6 +194,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _turn(AppState state, int direction) async {
+    if (_previewOpen ||
+        state.loading ||
+        _editingNote != null ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        _scaffoldKey.currentState?.isDrawerOpen == true ||
+        _scaffoldKey.currentState?.isEndDrawerOpen == true) {
+      return;
+    }
     if ((direction < 0 && !state.canGoPrevious) ||
         (direction > 0 && !state.canGoNext)) {
       return;
@@ -163,10 +215,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _showMarkdown(BuildContext context, AppState state) =>
       showDialog<void>(
         context: context,
-        builder: (BuildContext context) => _ScriptureShareDialog(
-          state: state,
-          initialVerse: null,
-        ),
+        builder: (BuildContext context) =>
+            _ScriptureShareDialog(state: state, initialVerse: null),
       );
 
   Future<void> _openPassage(Passage passage) async {
@@ -180,15 +230,118 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _scrollToVerse(int? verse) async {
     if (verse == null) return;
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (!mounted) return;
-    final BuildContext? target = _verseKeys[verse]?.currentContext;
-    if (target != null && target.mounted) {
-      await Scrollable.ensureVisible(
-        target,
-        alignment: 0.2,
-        duration: const Duration(milliseconds: 260),
+    final AppState state = context.read<AppState>();
+    final BibleChapter? chapter = state.current;
+    final Passage origin = state.passage;
+    bool ownsScroll() =>
+        mounted && identical(state.current, chapter) && state.passage == origin;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!ownsScroll() || !_scrollController.hasClients) return;
+    final List<Verse> verses = chapter?.verses ?? const <Verse>[];
+    final int targetIndex = verses.indexWhere(
+      (Verse item) => item.verse == verse,
+    );
+    if (targetIndex < 0) return;
+    // A lazy chapter list has no element for a distant verse yet. First place
+    // its estimated row in view, then realize adjacent viewports until the
+    // actual keyed verse is mounted. Original source IDs may be noncontiguous.
+    if (_verseKeys[verse]?.currentContext == null && verses.length > 1) {
+      final ScrollPosition position = _scrollController.position;
+      _scrollController.jumpTo(
+        position.maxScrollExtent * targetIndex / (verses.length - 1),
       );
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    final Set<int> visitedOffsets = <int>{};
+    while (ownsScroll()) {
+      final BuildContext? target = _verseKeys[verse]?.currentContext;
+      if (target != null &&
+          target.mounted &&
+          target.findRenderObject()?.attached == true) {
+        if (!mounted || !ownsScroll()) return;
+        final bool reducedMotion =
+            state.preferences.reduceMotion ||
+            MediaQuery.disableAnimationsOf(context);
+        await Scrollable.ensureVisible(
+          target,
+          alignment: 0.2,
+          duration: reducedMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 260),
+        );
+        return;
+      }
+      if (!_scrollController.hasClients) return;
+      final List<int> realized = <int>[
+        for (int index = 0; index < verses.length; index++)
+          if (_verseKeys[verses[index].verse]?.currentContext != null) index,
+      ];
+      final ScrollPosition position = _scrollController.position;
+      final int direction = realized.isNotEmpty && targetIndex < realized.first
+          ? -1
+          : 1;
+      final double next =
+          (position.pixels + direction * position.viewportDimension * .8).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          );
+      // Stop at a boundary or a repeated offset rather than guessing a maximum
+      // introduction length. Every iteration either reveals the target or
+      // advances to a previously unseen part of this chapter.
+      if (next == position.pixels || !visitedOffsets.add(next.round())) return;
+      _scrollController.jumpTo(next);
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
+  Future<void> _showReferencePreview([ReferenceRequest? request]) async {
+    if (_previewOpen) return;
+    final AppState state = context.read<AppState>();
+    final FocusNode? previousFocus = FocusManager.instance.primaryFocus;
+    final ReferencePreviewController controller = ReferencePreviewController(
+      lookup: state.referenceLookup,
+    );
+    _previewOpen = true;
+    _boundaryTurns.clear();
+    try {
+      await showAdaptiveReferencePreview(
+        context: context,
+        controller: controller,
+        selectedTranslation: state.passage.translation,
+        translationName: state.currentTranslation?.translation,
+        selectedTranslationDirection:
+            state.current?.direction ??
+            state.currentTranslation?.direction ??
+            'LTR',
+        showSourceStyles: state.preferences.showSourceStyles,
+        initialRequest: request,
+        labels: ReferencePreviewLabels(copy: state.ui('copy')),
+        onOpenInReader: (Passage selected) async {
+          if (_editingNote != null) {
+            throw const ReferenceLookupException(
+              'Save or close the note editor before opening another reference.',
+            );
+          }
+          final ReferenceResult? citation = controller.result;
+          bool ownsNavigation() =>
+              controller.isVisible && identical(controller.result, citation);
+          await state.loadPassage(selected, ownsRequest: ownsNavigation);
+          if (!mounted || !ownsNavigation()) return;
+          if (state.error != null || state.passage != selected) {
+            throw StateError(
+              state.error ?? 'The selected verse could not be opened.',
+            );
+          }
+          await _scrollToVerse(selected.verse);
+          if (!ownsNavigation() || state.passage != selected) return;
+        },
+      );
+    } finally {
+      controller.dispose();
+      _previewOpen = false;
+      if (mounted && previousFocus?.context != null) {
+        previousFocus!.requestFocus();
+      }
     }
   }
 
@@ -223,6 +376,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
               title: Text('More marking groups…'),
             ),
           ),
+        const PopupMenuItem<String>(
+          value: '__preview__',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.find_in_page_outlined),
+            title: Text('Reference preview'),
+          ),
+        ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: '__note__',
@@ -251,21 +412,36 @@ class _ReaderScreenState extends State<ReaderScreen> {
       ],
     );
     if (choice == null || !mounted) return;
-    if (choice == '__note__') {
+    if (choice == '__preview__') {
+      await _showReferencePreview(
+        StructuredReferenceRequest(
+          translation: state.passage.translation,
+          translationName: state.currentTranslation?.translation,
+          sourceLabel: reference,
+          translationDirection:
+              state.current?.direction ?? state.currentTranslation?.direction,
+          selections: <ReferenceSelection>[
+            ReferenceSelection.verse(
+              state.passage.copyWith(verse: verse.verse),
+            ),
+          ],
+        ),
+      );
+    } else if (choice == '__note__') {
       setState(() => _editingNote = verse.verse);
     } else if (choice == '__share__') {
       await showDialog<void>(
         context: context,
-        builder: (BuildContext context) => _ScriptureShareDialog(
-          state: state,
-          initialVerse: verse.verse,
-        ),
+        builder: (BuildContext context) =>
+            _ScriptureShareDialog(state: state, initialVerse: verse.verse),
       );
     } else if (choice == '__none__') {
       await state.removeWholeVerseMarking(verse.verse);
     } else if (choice == '__groups__') {
       final String? groupId = await _showMarkingGroupPicker(context, state);
-      if (groupId != null) await state.markWholeVerse(verse, reference, groupId);
+      if (groupId != null) {
+        await state.markWholeVerse(verse, reference, groupId);
+      }
     } else {
       await state.markWholeVerse(verse, reference, choice);
     }
@@ -276,7 +452,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     AppState state,
   ) => showDialog<String>(
     context: context,
-    builder: (BuildContext context) => _MarkingGroupPicker(groups: state.groups),
+    builder: (BuildContext context) =>
+        _MarkingGroupPicker(groups: state.groups),
   );
 
   Future<void> _showSearch(BuildContext context, AppState state) async {
@@ -392,12 +569,17 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         IconButton(
           tooltip: state.ui('openAsMarkdown'),
-          onPressed: onMarkdown,
+          onPressed: state.current?.verses.isNotEmpty == true
+              ? onMarkdown
+              : null,
           icon: const Icon(Icons.menu_book_outlined),
         ),
         Padding(
           padding: const EdgeInsetsDirectional.only(end: 10),
-          child: OutlinedButton(onPressed: onStudy, child: Text(state.ui('study'))),
+          child: OutlinedButton(
+            onPressed: onStudy,
+            child: Text(state.ui('study')),
+          ),
         ),
       ],
     );
@@ -405,9 +587,10 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 class _ChapterHeading extends StatelessWidget {
-  const _ChapterHeading({required this.state});
+  const _ChapterHeading({required this.state, required this.onPreview});
 
   final AppState state;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -416,13 +599,24 @@ class _ChapterHeading extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
       child: Row(
         children: <Widget>[
-          Text(chapter.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Expanded(
+            child: TextButton(
+              style: TextButton.styleFrom(
+                alignment: AlignmentDirectional.centerStart,
+              ),
+              onPressed: onPreview,
+              child: Text(
+                chapter.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
           const SizedBox(width: 12),
           Text(
             chapter.abbreviation.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall,
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           ScriptureVerificationBadge(
             freshness: state.freshness ?? CacheFreshness.cachedUnverified,
           ),
@@ -452,60 +646,116 @@ class _ReaderBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final BibleChapter chapter = state.current!;
-    final double maximumWidth = state.preferences.readingWidth ==
-            ReadingWidth.constrained
+    final ScriptureChapterLayout layout = ScriptureChapterLayout(chapter);
+    final List<(EditorialHeading?, Verse?)> rows =
+        <(EditorialHeading?, Verse?)>[
+          for (final ScriptureReadingBlock block in layout.blocks)
+            if (block is ScriptureHeadingBlock)
+              (block.heading, null)
+            else if (block is ScriptureParagraphBlock)
+              for (final Verse verse in block.verses) (null, verse),
+        ];
+    final double maximumWidth =
+        state.preferences.readingWidth == ReadingWidth.constrained
         ? 920
         : double.infinity;
-    if (state.preferences.layout == ReaderLayout.paragraph) {
-      return Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maximumWidth),
-          child: _ParagraphReader(
-            state: state,
-            controller: controller,
-            verseKeys: verseKeys,
-            onOpenVerseMenu: onOpenVerseMenu,
-          ),
-        ),
-      );
-    }
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maximumWidth),
-        child: ListView.builder(
-          controller: controller,
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
-          itemCount: chapter.verses.length + 1,
-          itemBuilder: (BuildContext context, int index) {
-            if (index == chapter.verses.length) {
-              return _ChapterFooter(state: state);
-            }
-            final Verse verse = chapter.verses[index];
-            final GlobalKey key = verseKeys.putIfAbsent(
-              verse.verse,
-              GlobalKey.new,
-            );
-            final String reference =
-                '${chapter.bookName} ${chapter.chapter}:${verse.verse}';
-            final VerseNote? note = state.notes
-                .where((VerseNote item) => item.verse == verse.verse)
-                .firstOrNull;
-            return _VerseLine(
-              key: key,
-              state: state,
-              verse: verse,
-              reference: reference,
-              note: note,
-              editing: editingNote == verse.verse,
-              onEditNote: onEditNote,
-              onOpenMenu: onOpenVerseMenu,
-            );
-          },
-        ),
+        child: state.preferences.layout == ReaderLayout.paragraph
+            ? _ParagraphReader(
+                state: state,
+                controller: controller,
+                verseKeys: verseKeys,
+                editingNote: editingNote,
+                onEditNote: onEditNote,
+                onOpenVerseMenu: onOpenVerseMenu,
+              )
+            : ListView.builder(
+                controller: controller,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+                itemCount: rows.length + 2,
+                itemBuilder: (BuildContext context, int index) {
+                  if (index == 0) return _ChapterIntroductions(state: state);
+                  if (index == rows.length + 1) {
+                    return _ChapterFooter(state: state);
+                  }
+                  final (EditorialHeading? heading, Verse? verse) =
+                      rows[index - 1];
+                  if (heading != null) {
+                    return ScriptureEditorialHeading(
+                      heading: heading,
+                      textStyle: _scriptureStyle(context, state),
+                    );
+                  }
+                  final Verse selected = verse!;
+                  final String reference =
+                      '${chapter.bookName} ${chapter.chapter}:${selected.verse}';
+                  final VerseNote? note = state.notes
+                      .where((VerseNote item) => item.verse == selected.verse)
+                      .firstOrNull;
+                  return _VerseLine(
+                    key: verseKeys.putIfAbsent(selected.verse, GlobalKey.new),
+                    state: state,
+                    verse: selected,
+                    reference: reference,
+                    note: note,
+                    editing: editingNote == selected.verse,
+                    onEditNote: onEditNote,
+                    onOpenMenu: onOpenVerseMenu,
+                  );
+                },
+              ),
       ),
+    );
+  }
+}
+
+TextStyle _scriptureStyle(BuildContext context, AppState state) => TextStyle(
+  fontFamily: _fontFamily(state.preferences.readerFont),
+  fontSize: state.preferences.textSize,
+  height: 1.55,
+  color: Theme.of(context).colorScheme.onSurface,
+);
+
+class _ChapterIntroductions extends StatelessWidget {
+  const _ChapterIntroductions({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final BibleChapter chapter = state.current!;
+    final bool firstChapter =
+        state.chapters.firstOrNull?.chapter == chapter.chapter;
+    final BibleBook? book = state.books
+        .where((BibleBook item) => item.number == chapter.bookNumber)
+        .firstOrNull;
+    final Translation? translation = state.currentTranslation;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (firstChapter &&
+            state.books.firstOrNull?.number == chapter.bookNumber &&
+            translation != null)
+          ScriptureIntroductionSection(
+            titles: translation.titles,
+            introduction: translation.introduction,
+            textStyle: _scriptureStyle(context, state),
+          ),
+        if (firstChapter && book != null && !chapter.isIntroduction)
+          ScriptureIntroductionSection(
+            titles: book.titles,
+            introduction: book.introduction,
+            textStyle: _scriptureStyle(context, state),
+          ),
+        ScriptureIntroductionSection(
+          titles: chapter.titles,
+          introduction: chapter.introduction,
+          textStyle: _scriptureStyle(context, state),
+        ),
+      ],
     );
   }
 }
@@ -515,38 +765,90 @@ class _ParagraphReader extends StatelessWidget {
     required this.state,
     required this.controller,
     required this.verseKeys,
+    required this.editingNote,
+    required this.onEditNote,
     required this.onOpenVerseMenu,
   });
 
   final AppState state;
   final ScrollController controller;
   final Map<int, GlobalKey> verseKeys;
+  final int? editingNote;
+  final ValueChanged<int?> onEditNote;
   final Future<void> Function(BuildContext, Verse, String) onOpenVerseMenu;
 
   @override
   Widget build(BuildContext context) {
     final BibleChapter chapter = state.current!;
+    final ScriptureChapterLayout layout = ScriptureChapterLayout(chapter);
+    return ListView(
+      controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      children: <Widget>[
+        _ChapterIntroductions(state: state),
+        for (final ScriptureReadingBlock block in layout.blocks)
+          if (block is ScriptureHeadingBlock)
+            ScriptureEditorialHeading(
+              heading: block.heading,
+              textStyle: _scriptureStyle(context, state),
+            )
+          else if (block is ScriptureParagraphBlock)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _paragraph(context, block.verses),
+            ),
+        for (final VerseNote note in state.notes)
+          if (editingNote == note.verse)
+            _InlineNoteEditor(
+              state: state,
+              verse: note.verse,
+              reference: note.reference,
+              note: note,
+              onClose: () => onEditNote(null),
+            )
+          else
+            _SavedNote(note: note, onTap: () => onEditNote(note.verse)),
+        if (editingNote != null &&
+            !state.notes.any((VerseNote note) => note.verse == editingNote))
+          _InlineNoteEditor(
+            state: state,
+            verse: editingNote!,
+            reference: '${chapter.bookName} ${chapter.chapter}:$editingNote',
+            note: null,
+            onClose: () => onEditNote(null),
+          ),
+        _ChapterFooter(state: state),
+      ],
+    );
+  }
+
+  Widget _paragraph(BuildContext context, List<Verse> verses) {
+    final Passage origin = state.passage;
+    final String bookName = state.current!.bookName;
+    final ScriptureParagraphTextMap mapping = ScriptureParagraphTextMap(
+      verses,
+      versePrefix: (_) => '\uFFFC',
+    );
     final List<InlineSpan> content = <InlineSpan>[];
-    for (final Verse verse in chapter.verses) {
+    for (int index = 0; index < verses.length; index++) {
+      final Verse verse = verses[index];
       final String reference =
-          '${chapter.bookName} ${chapter.chapter}:${verse.verse}';
-      final Marking? whole = state.markings
-          .where((Marking item) => item.verse == verse.verse && item.isWholeVerse)
-          .firstOrNull;
-      final MarkingGroup? group = whole == null
-          ? null
-          : state.groups
-              .where((MarkingGroup item) => item.id == whole.groupId)
-              .firstOrNull;
-      content
-        ..add(WidgetSpan(
+          '${state.current!.bookName} ${state.current!.chapter}:${verse.verse}';
+      if (index > 0) content.add(const TextSpan(text: ' '));
+      content.add(
+        WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Builder(
             key: verseKeys.putIfAbsent(verse.verse, GlobalKey.new),
             builder: (BuildContext anchor) => InkWell(
               onTap: () => onOpenVerseMenu(anchor, verse, reference),
               child: Padding(
-                padding: const EdgeInsetsDirectional.only(end: 6, top: 5, bottom: 5),
+                padding: const EdgeInsetsDirectional.only(
+                  end: 6,
+                  top: 5,
+                  bottom: 5,
+                ),
                 child: Text(
                   '${verse.verse}',
                   style: TextStyle(
@@ -558,36 +860,109 @@ class _ParagraphReader extends StatelessWidget {
               ),
             ),
           ),
-        ))
-        ..add(TextSpan(
-          text: '${verse.text.trim()} ',
-          style: TextStyle(
-            backgroundColor: group == null
-                ? null
-                : _hexColor(group.color).withAlpha(45),
-          ),
-        ));
-    }
-    return ListView(
-      controller: controller,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      children: <Widget>[
-        SelectableText.rich(
-          TextSpan(
-            style: TextStyle(
-              fontFamily: _fontFamily(state.preferences.readerFont),
-              fontSize: state.preferences.textSize,
-              height: 1.55,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            children: content,
-          ),
         ),
-        for (final VerseNote note in state.notes)
-          _SavedNote(note: note, onTap: () {}),
-        _ChapterFooter(state: state),
-      ],
+      );
+      content.add(
+        scriptureVerseSpan(
+          context: context,
+          verse: verse,
+          style: _scriptureStyle(context, state),
+          passage: state.passage,
+          markings: state.markings,
+          groups: state.groups,
+          showSourceStyles: state.preferences.showSourceStyles,
+        ),
+      );
+    }
+    return ScriptureParagraphSelection(
+      mapping: mapping,
+      child: SelectableText.rich(
+        TextSpan(style: _scriptureStyle(context, state), children: content),
+        contextMenuBuilder: (BuildContext context, EditableTextState editable) {
+          final TextSelection selection = editable.textEditingValue.selection;
+          final List<ScriptureVerseSelection> ranges = mapping.selections(
+            selection.start,
+            selection.end,
+          );
+          return AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: editable.contextMenuAnchors,
+            buttonItems: <ContextMenuButtonItem>[
+              for (final ContextMenuButtonItem button
+                  in editable.contextMenuButtonItems)
+                if (button.type == ContextMenuButtonType.copy &&
+                    ranges.isNotEmpty)
+                  ContextMenuButtonItem(
+                    type: ContextMenuButtonType.copy,
+                    onPressed: () {
+                      editable.hideToolbar();
+                      unawaited(
+                        Clipboard.setData(
+                          ClipboardData(
+                            text: ranges
+                                .map(
+                                  (ScriptureVerseSelection item) => item.quote,
+                                )
+                                .join(' '),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  button,
+              if (ranges.isNotEmpty && state.activeGroup != null)
+                ContextMenuButtonItem(
+                  label: 'Mark: ${state.activeGroup!.name}',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    unawaited(
+                      state.markTextSelections(
+                        origin,
+                        ranges,
+                        bookName,
+                        state.activeGroup!.id,
+                      ),
+                    );
+                  },
+                ),
+              if (ranges.isNotEmpty && state.groups.length > 1)
+                ContextMenuButtonItem(
+                  label: 'More marking groups…',
+                  onPressed: () async {
+                    editable.hideToolbar();
+                    final String? groupId = await showDialog<String>(
+                      context: context,
+                      builder: (BuildContext context) =>
+                          _MarkingGroupPicker(groups: state.groups),
+                    );
+                    if (context.mounted && groupId != null) {
+                      await state.markTextSelections(
+                        origin,
+                        ranges,
+                        bookName,
+                        groupId,
+                      );
+                    }
+                  },
+                ),
+              if (ranges.any(
+                (ScriptureVerseSelection item) => state.selectionHasMarking(
+                  item.verse.verse,
+                  item.range.start,
+                  item.range.end,
+                ),
+              ))
+                ContextMenuButtonItem(
+                  label: 'Remove highlighting',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    unawaited(state.removeTextSelections(origin, ranges));
+                  },
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -620,8 +995,8 @@ class _VerseLine extends StatelessWidget {
     final MarkingGroup? wholeGroup = whole == null
         ? null
         : state.groups
-            .where((MarkingGroup item) => item.id == whole.groupId)
-            .firstOrNull;
+              .where((MarkingGroup item) => item.id == whole.groupId)
+              .firstOrNull;
     final Color? wholeColor = wholeGroup == null
         ? null
         : _hexColor(wholeGroup.color).withAlpha(45);
@@ -642,8 +1017,10 @@ class _VerseLine extends StatelessWidget {
                       onTap: () => onOpenMenu(anchorContext, verse, reference),
                       borderRadius: BorderRadius.circular(20),
                       child: ConstrainedBox(
-                        constraints:
-                            const BoxConstraints(minWidth: 40, minHeight: 36),
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 36,
+                        ),
                         child: Center(
                           child: Text(
                             '${verse.verse}',
@@ -657,7 +1034,13 @@ class _VerseLine extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Expanded(child: _SelectableMarkedVerse(state: state, verse: verse, reference: reference)),
+                  Expanded(
+                    child: _SelectableMarkedVerse(
+                      state: state,
+                      verse: verse,
+                      reference: reference,
+                    ),
+                  ),
                 ],
               ),
               if (editing)
@@ -669,10 +1052,7 @@ class _VerseLine extends StatelessWidget {
                   onClose: () => onEditNote(null),
                 )
               else if (note != null)
-                _SavedNote(
-                  note: note!,
-                  onTap: () => onEditNote(verse.verse),
-                ),
+                _SavedNote(note: note!, onTap: () => onEditNote(verse.verse)),
             ],
           ),
         ),
@@ -682,7 +1062,11 @@ class _VerseLine extends StatelessWidget {
 }
 
 class _SelectableMarkedVerse extends StatelessWidget {
-  const _SelectableMarkedVerse({required this.state, required this.verse, required this.reference});
+  const _SelectableMarkedVerse({
+    required this.state,
+    required this.verse,
+    required this.reference,
+  });
 
   final AppState state;
   final Verse verse;
@@ -690,122 +1074,88 @@ class _SelectableMarkedVerse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SelectableText.rich(
-      _markedText(context),
+    return ScriptureVerseText(
+      verse: verse,
+      style: _scriptureStyle(context, state).copyWith(height: 1.38),
+      passage: state.passage,
+      markings: state.markings,
+      groups: state.groups,
+      showSourceStyles: state.preferences.showSourceStyles,
+      includeWholeVerse: false,
       contextMenuBuilder:
           (BuildContext context, EditableTextState editableTextState) {
-        final TextSelection selection =
-            editableTextState.textEditingValue.selection;
-        final bool valid = selection.isValid &&
-            !selection.isCollapsed &&
-            selection.start >= 0 &&
-            selection.end <= verse.text.length;
-        final List<ContextMenuButtonItem> buttons = <ContextMenuButtonItem>[
-          ...editableTextState.contextMenuButtonItems,
-          if (valid && state.activeGroup != null)
-            ContextMenuButtonItem(
-              label: 'Mark: ${state.activeGroup!.name}',
-              onPressed: () {
-                editableTextState.hideToolbar();
-                unawaited(state.markSelectedText(
-                  verse,
-                  selection.start,
-                  selection.end,
-                  reference,
-                  state.activeGroup!.id,
-                ));
-              },
-            ),
-          if (valid && state.groups.length > 1)
-            ContextMenuButtonItem(
-              label: 'More marking groups…',
-              onPressed: () async {
-                editableTextState.hideToolbar();
-                final String? groupId = await showDialog<String>(
-                  context: context,
-                  builder: (BuildContext context) =>
-                      _MarkingGroupPicker(groups: state.groups),
-                );
-                if (!context.mounted) return;
-                if (groupId != null) {
-                  await state.markSelectedText(
-                    verse,
+            final TextSelection selection =
+                editableTextState.textEditingValue.selection;
+            final bool valid =
+                selection.isValid &&
+                !selection.isCollapsed &&
+                selection.start >= 0 &&
+                selection.end <= verse.text.length;
+            final List<ContextMenuButtonItem> buttons = <ContextMenuButtonItem>[
+              ...editableTextState.contextMenuButtonItems,
+              if (valid && state.activeGroup != null)
+                ContextMenuButtonItem(
+                  label: 'Mark: ${state.activeGroup!.name}',
+                  onPressed: () {
+                    editableTextState.hideToolbar();
+                    unawaited(
+                      state.markSelectedText(
+                        verse,
+                        selection.start,
+                        selection.end,
+                        reference,
+                        state.activeGroup!.id,
+                      ),
+                    );
+                  },
+                ),
+              if (valid && state.groups.length > 1)
+                ContextMenuButtonItem(
+                  label: 'More marking groups…',
+                  onPressed: () async {
+                    editableTextState.hideToolbar();
+                    final String? groupId = await showDialog<String>(
+                      context: context,
+                      builder: (BuildContext context) =>
+                          _MarkingGroupPicker(groups: state.groups),
+                    );
+                    if (!context.mounted) return;
+                    if (groupId != null) {
+                      await state.markSelectedText(
+                        verse,
+                        selection.start,
+                        selection.end,
+                        reference,
+                        groupId,
+                      );
+                    }
+                  },
+                ),
+              if (valid &&
+                  state.selectionHasMarking(
+                    verse.verse,
                     selection.start,
                     selection.end,
-                    reference,
-                    groupId,
-                  );
-                }
-              },
-            ),
-          if (valid &&
-              state.selectionHasMarking(
-                verse.verse,
-                selection.start,
-                selection.end,
-              ))
-            ContextMenuButtonItem(
-              label: 'Remove highlighting',
-              onPressed: () {
-                editableTextState.hideToolbar();
-                unawaited(state.removeSelectionMarkings(
-                  verse.verse,
-                  selection.start,
-                  selection.end,
-                ));
-              },
-            ),
-        ];
-        return AdaptiveTextSelectionToolbar.buttonItems(
-          anchors: editableTextState.contextMenuAnchors,
-          buttonItems: buttons,
-        );
-      },
-    );
-  }
-
-  TextSpan _markedText(BuildContext context) {
-    final List<Marking> ranged = state.markings
-        .where((Marking item) =>
-            item.verse == verse.verse &&
-            !item.isWholeVerse &&
-            item.start! >= 0 &&
-            item.end! <= verse.text.length)
-        .toList()
-      ..sort((Marking left, Marking right) => left.start!.compareTo(right.start!));
-    final Set<int> boundaries = <int>{0, verse.text.length};
-    for (final Marking marking in ranged) {
-      boundaries.add(marking.start!);
-      boundaries.add(marking.end!);
-    }
-    final List<int> offsets = boundaries.toList()..sort();
-    final List<InlineSpan> spans = <InlineSpan>[];
-    for (int index = 0; index < offsets.length - 1; index++) {
-      final int start = offsets[index];
-      final int end = offsets[index + 1];
-      final Marking? marking = ranged.reversed
-          .where((Marking item) => item.start! <= start && item.end! >= end)
-          .firstOrNull;
-      final MarkingGroup? group = marking == null
-          ? null
-          : state.groups
-              .where((MarkingGroup item) => item.id == marking.groupId)
-              .firstOrNull;
-      spans.add(TextSpan(
-        text: verse.text.substring(start, end),
-        style: TextStyle(
-          backgroundColor: group == null ? null : _hexColor(group.color),
-        ),
-      ));
-    }
-    return TextSpan(
-      style: TextStyle(
-        fontFamily: _fontFamily(state.preferences.readerFont),
-        fontSize: state.preferences.textSize,
-        height: 1.38,
-        color: Theme.of(context).colorScheme.onSurface,
-      ),
-      children: spans,
+                  ))
+                ContextMenuButtonItem(
+                  label: 'Remove highlighting',
+                  onPressed: () {
+                    editableTextState.hideToolbar();
+                    unawaited(
+                      state.removeSelectionMarkings(
+                        verse.verse,
+                        selection.start,
+                        selection.end,
+                      ),
+                    );
+                  },
+                ),
+            ];
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editableTextState.contextMenuAnchors,
+              buttonItems: buttons,
+            );
+          },
     );
   }
 }
@@ -830,8 +1180,9 @@ class _InlineNoteEditor extends StatefulWidget {
 }
 
 class _InlineNoteEditorState extends State<_InlineNoteEditor> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.note?.text ?? '');
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.note?.text ?? '',
+  );
 
   @override
   void dispose() {
@@ -850,7 +1201,12 @@ class _InlineNoteEditorState extends State<_InlineNoteEditor> {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Expanded(child: Text(widget.reference, style: const TextStyle(fontWeight: FontWeight.w600))),
+                Expanded(
+                  child: Text(
+                    widget.reference,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
                 IconButton(
                   tooltip: 'Close note editor',
                   onPressed: widget.onClose,
@@ -911,23 +1267,23 @@ class _SavedNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(44, 4, 0, 4),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('NOTE', style: Theme.of(context).textTheme.labelSmall),
-                const SizedBox(height: 3),
-                Text(note.text, maxLines: 3, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
+    padding: const EdgeInsetsDirectional.fromSTEB(44, 4, 0, 4),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('NOTE', style: Theme.of(context).textTheme.labelSmall),
+            const SizedBox(height: 3),
+            Text(note.text, maxLines: 3, overflow: TextOverflow.ellipsis),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _StudyDrawer extends StatefulWidget {
@@ -958,7 +1314,10 @@ class _StudyDrawerState extends State<_StudyDrawer> {
         child: Column(
           children: <Widget>[
             ListTile(
-              title: const Text('Study tools', style: TextStyle(fontWeight: FontWeight.w700)),
+              title: const Text(
+                'Study tools',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               trailing: IconButton(
                 tooltip: 'Close Study tools',
                 onPressed: () => Navigator.of(context).pop(),
@@ -975,9 +1334,7 @@ class _StudyDrawerState extends State<_StudyDrawer> {
                   setState(() => _tab = value.first),
             ),
             const Divider(),
-            Expanded(
-              child: _tab == 0 ? _markings(state) : _notes(state),
-            ),
+            Expanded(child: _tab == 0 ? _markings(state) : _notes(state)),
             if (_tab == 0)
               Padding(
                 padding: const EdgeInsets.all(12),
@@ -1002,10 +1359,11 @@ class _StudyDrawerState extends State<_StudyDrawer> {
       final MarkingGroup? group = state.groups
           .where((MarkingGroup item) => item.id == _selectedGroup)
           .firstOrNull;
-      final List<Marking> items = state.savedMarkings
-          .where((Marking item) => item.groupId == _selectedGroup)
-          .toList()
-        ..sort(compareMarkings);
+      final List<Marking> items =
+          state.savedMarkings
+              .where((Marking item) => item.groupId == _selectedGroup)
+              .toList()
+            ..sort(compareMarkings);
       return Column(
         children: <Widget>[
           ListTile(
@@ -1022,25 +1380,33 @@ class _StudyDrawerState extends State<_StudyDrawer> {
                       final Marking marking = items[index];
                       return ListTile(
                         title: Text(marking.reference),
-                        subtitle: Text(marking.quote, maxLines: 2, overflow: TextOverflow.ellipsis),
-                        onTap: () => widget.onOpenPassage(Passage(
-                          translation: state.passage.translation,
-                          book: marking.passage.book,
-                          chapter: marking.passage.chapter,
-                          verse: marking.verse,
-                        )),
+                        subtitle: Text(
+                          marking.quote,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => widget.onOpenPassage(
+                          Passage(
+                            translation: state.passage.translation,
+                            book: marking.passage.book,
+                            chapter: marking.passage.chapter,
+                            verse: marking.verse,
+                          ),
+                        ),
                         trailing: Wrap(
                           spacing: 0,
                           children: <Widget>[
                             IconButton(
                               tooltip: 'Open ${marking.reference}',
                               icon: const Icon(Icons.open_in_new, size: 20),
-                              onPressed: () => widget.onOpenPassage(Passage(
-                                translation: state.passage.translation,
-                                book: marking.passage.book,
-                                chapter: marking.passage.chapter,
-                                verse: marking.verse,
-                              )),
+                              onPressed: () => widget.onOpenPassage(
+                                Passage(
+                                  translation: state.passage.translation,
+                                  book: marking.passage.book,
+                                  chapter: marking.passage.chapter,
+                                  verse: marking.verse,
+                                ),
+                              ),
                             ),
                             IconButton(
                               tooltip: 'Delete marking at ${marking.reference}',
@@ -1058,7 +1424,10 @@ class _StudyDrawerState extends State<_StudyDrawer> {
     }
     final String query = _groupQuery.trim().toLowerCase();
     final List<MarkingGroup> visible = state.groups
-        .where((MarkingGroup group) => query.isEmpty || group.name.toLowerCase().contains(query))
+        .where(
+          (MarkingGroup group) =>
+              query.isEmpty || group.name.toLowerCase().contains(query),
+        )
         .toList(growable: false);
     return Column(
       children: <Widget>[
@@ -1085,11 +1454,16 @@ class _StudyDrawerState extends State<_StudyDrawer> {
             itemCount: visible.length,
             itemBuilder: (BuildContext context, int index) {
               final MarkingGroup group = visible[index];
-              final int count = state.savedMarkings.where((Marking item) => item.groupId == group.id).length;
-              final bool selected = state.preferences.activeMarkingGroupId == group.id;
+              final int count = state.savedMarkings
+                  .where((Marking item) => item.groupId == group.id)
+                  .length;
+              final bool selected =
+                  state.preferences.activeMarkingGroupId == group.id;
               return Card(
                 clipBehavior: Clip.antiAlias,
-                color: selected ? Theme.of(context).colorScheme.secondaryContainer : null,
+                color: selected
+                    ? Theme.of(context).colorScheme.secondaryContainer
+                    : null,
                 child: InkWell(
                   onTap: () {
                     unawaited(state.selectActiveGroup(group.id));
@@ -1099,16 +1473,35 @@ class _StudyDrawerState extends State<_StudyDrawer> {
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: <Widget>[
-                        Container(width: 18, height: 40, decoration: BoxDecoration(color: _hexColor(group.color), borderRadius: BorderRadius.circular(6))),
+                        Container(
+                          width: 18,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _hexColor(group.color),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
                         const SizedBox(width: 10),
-                        Expanded(child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(group.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            Text('$count ${count == 1 ? 'marking' : 'markings'}', style: Theme.of(context).textTheme.bodySmall),
-                          ],
-                        )),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                group.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '$count ${count == 1 ? 'marking' : 'markings'}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
                         if (selected) const Icon(Icons.check_circle, size: 18),
                       ],
                     ),
@@ -1129,8 +1522,14 @@ class _StudyDrawerState extends State<_StudyDrawer> {
         title: const Text('Delete this marking?'),
         content: Text('Remove the saved marking at ${marking.reference}?'),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -1138,12 +1537,17 @@ class _StudyDrawerState extends State<_StudyDrawer> {
   }
 
   Widget _notes(AppState state) {
-    final List<VerseNote> notes = <VerseNote>[...state.savedNotes]..sort(compareNotes);
+    final List<VerseNote> notes = <VerseNote>[...state.savedNotes]
+      ..sort(compareNotes);
     if (notes.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Text('No verse notes yet. Select a verse and choose Add note to create one.'),
-      ));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'No verse notes yet. Select a verse and choose Add note to create one.',
+          ),
+        ),
+      );
     }
     return ListView.builder(
       itemCount: notes.length,
@@ -1151,13 +1555,19 @@ class _StudyDrawerState extends State<_StudyDrawer> {
         final VerseNote note = notes[index];
         return ListTile(
           title: Text(note.reference),
-          subtitle: Text(note.text, maxLines: 3, overflow: TextOverflow.ellipsis),
-          onTap: () => widget.onOpenPassage(Passage(
-            translation: state.passage.translation,
-            book: note.passage.book,
-            chapter: note.passage.chapter,
-            verse: note.verse,
-          )),
+          subtitle: Text(
+            note.text,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onTap: () => widget.onOpenPassage(
+            Passage(
+              translation: state.passage.translation,
+              book: note.passage.book,
+              chapter: note.passage.chapter,
+              verse: note.verse,
+            ),
+          ),
         );
       },
     );
@@ -1232,36 +1642,36 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
                 animation: widget.state,
                 builder: (BuildContext context, Widget? child) =>
                     ListView.builder(
-                  itemCount: widget.state.groups.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    final MarkingGroup group = widget.state.groups[index];
-                    return ListTile(
-                      leading: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: _hexColor(group.color),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      title: Text(group.name),
-                      subtitle: Text(group.color),
-                      onTap: () => setState(() {
-                        _editingId = group.id;
-                        _name.text = group.name;
-                        _color.text = group.color;
-                        _error = null;
-                      }),
-                      trailing: IconButton(
-                        tooltip: 'Delete ${group.name}',
-                        onPressed: widget.state.groups.length <= 1
-                            ? null
-                            : () => _delete(group),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    );
-                  },
-                ),
+                      itemCount: widget.state.groups.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final MarkingGroup group = widget.state.groups[index];
+                        return ListTile(
+                          leading: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: _hexColor(group.color),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          title: Text(group.name),
+                          subtitle: Text(group.color),
+                          onTap: () => setState(() {
+                            _editingId = group.id;
+                            _name.text = group.name;
+                            _color.text = group.color;
+                            _error = null;
+                          }),
+                          trailing: IconButton(
+                            tooltip: 'Delete ${group.name}',
+                            onPressed: widget.state.groups.length <= 1
+                                ? null
+                                : () => _delete(group),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        );
+                      },
+                    ),
               ),
             ),
           ],
@@ -1359,7 +1769,9 @@ class _SearchDialogState extends State<_SearchDialog> {
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close),
               ),
-              title: Text('Search ${widget.state.current?.abbreviation.toUpperCase() ?? ''}'),
+              title: Text(
+                'Search ${widget.state.current?.abbreviation.toUpperCase() ?? ''}',
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -1388,35 +1800,66 @@ class _SearchDialogState extends State<_SearchDialog> {
                       DropdownButton<SearchWordMode>(
                         value: _words,
                         items: const <DropdownMenuItem<SearchWordMode>>[
-                          DropdownMenuItem(value: SearchWordMode.all, child: Text('All words')),
-                          DropdownMenuItem(value: SearchWordMode.any, child: Text('Any word')),
-                          DropdownMenuItem(value: SearchWordMode.phrase, child: Text('Exact phrase')),
+                          DropdownMenuItem(
+                            value: SearchWordMode.all,
+                            child: Text('All words'),
+                          ),
+                          DropdownMenuItem(
+                            value: SearchWordMode.any,
+                            child: Text('Any word'),
+                          ),
+                          DropdownMenuItem(
+                            value: SearchWordMode.phrase,
+                            child: Text('Exact phrase'),
+                          ),
                         ],
-                        onChanged: (SearchWordMode? value) => setState(() => _words = value ?? _words),
+                        onChanged: (SearchWordMode? value) =>
+                            setState(() => _words = value ?? _words),
                       ),
                       DropdownButton<SearchMatchMode>(
                         value: _match,
                         items: const <DropdownMenuItem<SearchMatchMode>>[
-                          DropdownMenuItem(value: SearchMatchMode.exact, child: Text('Exact word')),
-                          DropdownMenuItem(value: SearchMatchMode.partial, child: Text('Partial word')),
+                          DropdownMenuItem(
+                            value: SearchMatchMode.exact,
+                            child: Text('Exact word'),
+                          ),
+                          DropdownMenuItem(
+                            value: SearchMatchMode.partial,
+                            child: Text('Partial word'),
+                          ),
                         ],
-                        onChanged: (SearchMatchMode? value) => setState(() => _match = value ?? _match),
+                        onChanged: (SearchMatchMode? value) =>
+                            setState(() => _match = value ?? _match),
                       ),
                       DropdownButton<SearchScope>(
                         value: _scope,
                         items: <DropdownMenuItem<SearchScope>>[
-                          const DropdownMenuItem(value: SearchScope.all(), child: Text('Whole Bible')),
-                          const DropdownMenuItem(value: SearchScope.oldTestament(), child: Text('Old Testament')),
-                          const DropdownMenuItem(value: SearchScope.newTestament(), child: Text('New Testament')),
+                          const DropdownMenuItem(
+                            value: SearchScope.all(),
+                            child: Text('Whole Bible'),
+                          ),
+                          const DropdownMenuItem(
+                            value: SearchScope.oldTestament(),
+                            child: Text('Old Testament'),
+                          ),
+                          const DropdownMenuItem(
+                            value: SearchScope.newTestament(),
+                            child: Text('New Testament'),
+                          ),
                           for (final BibleBook book in widget.state.books)
-                            DropdownMenuItem(value: SearchScope.book(book.number), child: Text(book.name)),
+                            DropdownMenuItem(
+                              value: SearchScope.book(book.number),
+                              child: Text(book.name),
+                            ),
                         ],
-                        onChanged: (SearchScope? value) => setState(() => _scope = value ?? _scope),
+                        onChanged: (SearchScope? value) =>
+                            setState(() => _scope = value ?? _scope),
                       ),
                       FilterChip(
                         label: const Text('Case sensitive'),
                         selected: _caseSensitive,
-                        onSelected: (bool value) => setState(() => _caseSensitive = value),
+                        onSelected: (bool value) =>
+                            setState(() => _caseSensitive = value),
                       ),
                     ],
                   ),
@@ -1434,7 +1877,9 @@ class _SearchDialogState extends State<_SearchDialog> {
                     return Center(child: Text(widget.state.searchError!));
                   }
                   if (_hasSearched && widget.state.searchResultCount == 0) {
-                    return const Center(child: Text('0 results. Try a different search.'));
+                    return const Center(
+                      child: Text('0 results. Try a different search.'),
+                    );
                   }
                   if (widget.state.searchResults.isEmpty) {
                     return const Center(child: Text('Enter a search above.'));
@@ -1460,7 +1905,8 @@ class _SearchDialogState extends State<_SearchDialog> {
                             return false;
                           },
                           child: ListView.builder(
-                            itemCount: widget.state.searchResults.length +
+                            itemCount:
+                                widget.state.searchResults.length +
                                 (widget.state.searchComplete ? 0 : 1),
                             itemBuilder: (BuildContext context, int index) {
                               if (index == widget.state.searchResults.length) {
@@ -1496,148 +1942,236 @@ class _SearchDialogState extends State<_SearchDialog> {
   void _search() {
     if (_query.text.trim().isEmpty) return;
     setState(() => _hasSearched = true);
-    unawaited(widget.state.search(
-      _query.text,
-      SearchOptions(
-        words: _words,
-        match: _match,
-        caseSensitive: _caseSensitive,
-        scope: _scope,
-        locale: widget.state.currentTranslation?.lang ?? 'und',
+    unawaited(
+      widget.state.search(
+        _query.text,
+        SearchOptions(
+          words: _words,
+          match: _match,
+          caseSensitive: _caseSensitive,
+          scope: _scope,
+          locale: widget.state.currentTranslation?.lang ?? 'und',
+        ),
       ),
-    ));
+    );
   }
 }
 
 class _ReaderDrawer extends StatelessWidget {
-  const _ReaderDrawer({required this.state});
+  const _ReaderDrawer({required this.state, required this.onReferencePreview});
 
   final AppState state;
+  final Future<void> Function() onReferencePreview;
 
   @override
   Widget build(BuildContext context) => Drawer(
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: <Widget>[
-              Text(state.ui('readerOptions'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 18),
-              ReaderTranslationField(
-                value: state.passage.translation,
-                translations: state.translations,
-                onChanged: (String? value) {
-                  if (value != null) unawaited(state.loadPassage(Passage(translation: value, book: state.passage.book, chapter: state.passage.chapter)));
-                },
+    child: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          Text(
+            state.ui('readerOptions'),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 18),
+          ReaderTranslationField(
+            value: state.passage.translation,
+            translations: state.translations,
+            onChanged: (String? value) {
+              if (value != null) {
+                unawaited(
+                  state.loadPassage(
+                    Passage(
+                      translation: value,
+                      book: state.passage.book,
+                      chapter: state.passage.chapter,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            key: ValueKey<int>(state.passage.book),
+            initialValue: state.passage.book,
+            decoration: InputDecoration(labelText: state.ui('book')),
+            items: state.books
+                .map(
+                  (BibleBook item) => DropdownMenuItem(
+                    value: item.number,
+                    child: Text(item.name),
+                  ),
+                )
+                .toList(),
+            onChanged: (int? value) {
+              if (value != null) unawaited(state.openBook(value));
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            key: ValueKey<String>(
+              'chapter-${state.passage.book}-${state.passage.chapter}',
+            ),
+            initialValue: state.passage.chapter,
+            decoration: InputDecoration(labelText: state.ui('chapter')),
+            items: state.chapters
+                .map(
+                  (ChapterInfo item) => DropdownMenuItem(
+                    value: item.chapter,
+                    child: Text(
+                      item.isIntroduction ? 'Introduction' : '${item.chapter}',
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (int? value) {
+              if (value != null) {
+                unawaited(
+                  state.loadPassage(
+                    state.passage.copyWith(chapter: value, clearVerse: true),
+                  ),
+                );
+              }
+            },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.find_in_page_outlined),
+            title: const Text('Reference preview'),
+            onTap: () {
+              Navigator.of(context).pop();
+              unawaited(onReferencePreview());
+            },
+          ),
+          const Divider(height: 32),
+          const Text(
+            'Appearance',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<AppearanceMode>(
+            segments: AppearanceMode.values
+                .map(
+                  (AppearanceMode value) =>
+                      ButtonSegment(value: value, label: Text(value.name)),
+                )
+                .toList(),
+            selected: <AppearanceMode>{state.preferences.appearanceMode},
+            onSelectionChanged: (Set<AppearanceMode> value) =>
+                unawaited(state.setAppearance(value.first)),
+          ),
+          const SizedBox(height: 16),
+          Text(state.ui('textSize')),
+          Slider(
+            min: 16,
+            max: 36,
+            divisions: 20,
+            value: state.preferences.textSize,
+            label: '${state.preferences.textSize.round()}',
+            onChanged: (double value) => unawaited(state.setTextSize(value)),
+          ),
+          SegmentedButton<ReaderLayout>(
+            segments: <ButtonSegment<ReaderLayout>>[
+              ButtonSegment(
+                value: ReaderLayout.lines,
+                label: Text(state.ui('oneVersePerLine')),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                key: ValueKey<int>(state.passage.book),
-                initialValue: state.passage.book,
-                decoration: InputDecoration(labelText: state.ui('book')),
-                items: state.books.map((BibleBook item) => DropdownMenuItem(value: item.number, child: Text(item.name))).toList(),
-                onChanged: (int? value) {
-                  if (value != null) unawaited(state.loadPassage(Passage(translation: state.passage.translation, book: value, chapter: 1)));
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                key: ValueKey<String>('chapter-${state.passage.book}-${state.passage.chapter}'),
-                initialValue: state.passage.chapter,
-                decoration: InputDecoration(labelText: state.ui('chapter')),
-                items: state.chapters.map((ChapterInfo item) => DropdownMenuItem(value: item.chapter, child: Text('${item.chapter}'))).toList(),
-                onChanged: (int? value) {
-                  if (value != null) unawaited(state.loadPassage(state.passage.copyWith(chapter: value, clearVerse: true)));
-                },
-              ),
-              const Divider(height: 32),
-              const Text('Appearance', style: TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              SegmentedButton<AppearanceMode>(
-                segments: AppearanceMode.values.map((AppearanceMode value) => ButtonSegment(value: value, label: Text(value.name))).toList(),
-                selected: <AppearanceMode>{state.preferences.appearanceMode},
-                onSelectionChanged: (Set<AppearanceMode> value) => unawaited(state.setAppearance(value.first)),
-              ),
-              const SizedBox(height: 16),
-              Text(state.ui('textSize')),
-              Slider(
-                min: 16,
-                max: 36,
-                divisions: 20,
-                value: state.preferences.textSize,
-                label: '${state.preferences.textSize.round()}',
-                onChanged: (double value) => unawaited(state.setTextSize(value)),
-              ),
-              SegmentedButton<ReaderLayout>(
-                segments: <ButtonSegment<ReaderLayout>>[
-                  ButtonSegment(value: ReaderLayout.lines, label: Text(state.ui('oneVersePerLine'))),
-                  ButtonSegment(value: ReaderLayout.paragraph, label: Text(state.ui('continuousParagraph'))),
-                ],
-                selected: <ReaderLayout>{state.preferences.layout},
-                onSelectionChanged: (Set<ReaderLayout> value) => unawaited(state.setLayout(value.first)),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                key: ValueKey<String>('light-${state.preferences.lightPalette}'),
-                initialValue: state.preferences.lightPalette,
-                decoration: const InputDecoration(labelText: 'Light reading palette'),
-                items: const <DropdownMenuItem<String>>[
-                  DropdownMenuItem(value: 'white', child: Text('Pure white')),
-                  DropdownMenuItem(value: 'paper', child: Text('Warm paper')),
-                  DropdownMenuItem(value: 'ivory', child: Text('Soft ivory')),
-                  DropdownMenuItem(value: 'mist', child: Text('Cool mist')),
-                ],
-                onChanged: (String? value) {
-                  if (value != null) unawaited(state.setLightPalette(value));
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey<String>('dark-${state.preferences.darkPalette}'),
-                initialValue: state.preferences.darkPalette,
-                decoration: const InputDecoration(labelText: 'Dark reading palette'),
-                items: const <DropdownMenuItem<String>>[
-                  DropdownMenuItem(value: 'black', child: Text('Pure black')),
-                  DropdownMenuItem(value: 'brown', child: Text('Warm brown')),
-                  DropdownMenuItem(value: 'charcoal', child: Text('Soft charcoal')),
-                  DropdownMenuItem(value: 'navy', child: Text('Midnight blue')),
-                ],
-                onChanged: (String? value) {
-                  if (value != null) unawaited(state.setDarkPalette(value));
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey<String>('font-${state.preferences.readerFont}'),
-                initialValue: state.preferences.readerFont,
-                decoration: InputDecoration(labelText: state.ui('readingFont')),
-                items: const <DropdownMenuItem<String>>[
-                  DropdownMenuItem(value: 'serif', child: Text('Classic serif')),
-                  DropdownMenuItem(value: 'book', child: Text('Book serif')),
-                  DropdownMenuItem(value: 'baskerville', child: Text('Baskerville')),
-                  DropdownMenuItem(value: 'garamond', child: Text('Garamond')),
-                  DropdownMenuItem(value: 'charter', child: Text('Charter')),
-                  DropdownMenuItem(value: 'cambria', child: Text('Cambria')),
-                  DropdownMenuItem(value: 'times', child: Text('Times New Roman')),
-                  DropdownMenuItem(value: 'sans', child: Text('Clean sans')),
-                  DropdownMenuItem(value: 'system', child: Text('System sans')),
-                ],
-                onChanged: (String? value) {
-                  if (value != null) unawaited(state.setReaderFont(value));
-                },
-              ),
-              const SizedBox(height: 12),
-              SegmentedButton<ReadingWidth>(
-                segments: <ButtonSegment<ReadingWidth>>[
-                  ButtonSegment(value: ReadingWidth.full, label: Text(state.ui('fullScreenWidth'))),
-                  ButtonSegment(value: ReadingWidth.constrained, label: Text(state.ui('page'))),
-                ],
-                selected: <ReadingWidth>{state.preferences.readingWidth},
-                onSelectionChanged: (Set<ReadingWidth> value) => unawaited(state.setReadingWidth(value.first)),
+              ButtonSegment(
+                value: ReaderLayout.paragraph,
+                label: Text(state.ui('continuousParagraph')),
               ),
             ],
+            selected: <ReaderLayout>{state.preferences.layout},
+            onSelectionChanged: (Set<ReaderLayout> value) =>
+                unawaited(state.setLayout(value.first)),
           ),
-        ),
-      );
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            key: ValueKey<String>('light-${state.preferences.lightPalette}'),
+            initialValue: state.preferences.lightPalette,
+            decoration: const InputDecoration(
+              labelText: 'Light reading palette',
+            ),
+            items: const <DropdownMenuItem<String>>[
+              DropdownMenuItem(value: 'white', child: Text('Pure white')),
+              DropdownMenuItem(value: 'paper', child: Text('Warm paper')),
+              DropdownMenuItem(value: 'ivory', child: Text('Soft ivory')),
+              DropdownMenuItem(value: 'mist', child: Text('Cool mist')),
+            ],
+            onChanged: (String? value) {
+              if (value != null) unawaited(state.setLightPalette(value));
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: ValueKey<String>('dark-${state.preferences.darkPalette}'),
+            initialValue: state.preferences.darkPalette,
+            decoration: const InputDecoration(
+              labelText: 'Dark reading palette',
+            ),
+            items: const <DropdownMenuItem<String>>[
+              DropdownMenuItem(value: 'black', child: Text('Pure black')),
+              DropdownMenuItem(value: 'brown', child: Text('Warm brown')),
+              DropdownMenuItem(value: 'charcoal', child: Text('Soft charcoal')),
+              DropdownMenuItem(value: 'navy', child: Text('Midnight blue')),
+            ],
+            onChanged: (String? value) {
+              if (value != null) unawaited(state.setDarkPalette(value));
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: ValueKey<String>('font-${state.preferences.readerFont}'),
+            initialValue: state.preferences.readerFont,
+            decoration: InputDecoration(labelText: state.ui('readingFont')),
+            items: const <DropdownMenuItem<String>>[
+              DropdownMenuItem(value: 'serif', child: Text('Classic serif')),
+              DropdownMenuItem(value: 'book', child: Text('Book serif')),
+              DropdownMenuItem(
+                value: 'baskerville',
+                child: Text('Baskerville'),
+              ),
+              DropdownMenuItem(value: 'garamond', child: Text('Garamond')),
+              DropdownMenuItem(value: 'charter', child: Text('Charter')),
+              DropdownMenuItem(value: 'cambria', child: Text('Cambria')),
+              DropdownMenuItem(value: 'times', child: Text('Times New Roman')),
+              DropdownMenuItem(value: 'sans', child: Text('Clean sans')),
+              DropdownMenuItem(value: 'system', child: Text('System sans')),
+            ],
+            onChanged: (String? value) {
+              if (value != null) unawaited(state.setReaderFont(value));
+            },
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<ReadingWidth>(
+            segments: <ButtonSegment<ReadingWidth>>[
+              ButtonSegment(
+                value: ReadingWidth.full,
+                label: Text(state.ui('fullScreenWidth')),
+              ),
+              ButtonSegment(
+                value: ReadingWidth.constrained,
+                label: Text(state.ui('page')),
+              ),
+            ],
+            selected: <ReadingWidth>{state.preferences.readingWidth},
+            onSelectionChanged: (Set<ReadingWidth> value) =>
+                unawaited(state.setReadingWidth(value.first)),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Source text styles'),
+            subtitle: const Text(
+              'Show emphasis provided by this Bible edition',
+            ),
+            value: state.preferences.showSourceStyles,
+            onChanged: (bool value) => unawaited(state.setSourceStyles(value)),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _MobileChapterNavigation extends StatelessWidget {
@@ -1653,9 +2187,25 @@ class _MobileChapterNavigation extends StatelessWidget {
       elevation: 3,
       child: Row(
         children: <Widget>[
-          Expanded(child: TextButton(onPressed: state.canGoPrevious ? () => onTurn(state, -1) : null, child: const Text('Previous'))),
-          Expanded(child: Text(state.current?.name ?? '', textAlign: TextAlign.center, overflow: TextOverflow.ellipsis)),
-          Expanded(child: TextButton(onPressed: state.canGoNext ? () => onTurn(state, 1) : null, child: const Text('Next'))),
+          Expanded(
+            child: TextButton(
+              onPressed: state.canGoPrevious ? () => onTurn(state, -1) : null,
+              child: const Text('Previous'),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              state.current?.name ?? '',
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Expanded(
+            child: TextButton(
+              onPressed: state.canGoNext ? () => onTurn(state, 1) : null,
+              child: const Text('Next'),
+            ),
+          ),
         ],
       ),
     );
@@ -1670,27 +2220,27 @@ class _EdgeChapterNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Positioned.fill(
-        child: IgnorePointer(
-          ignoring: false,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              _EdgeButton(
-                tooltip: state.ui('previousChapter'),
-                icon: Icons.chevron_left,
-                enabled: state.canGoPrevious,
-                onPressed: () => onTurn(state, -1),
-              ),
-              _EdgeButton(
-                tooltip: state.ui('nextChapter'),
-                icon: Icons.chevron_right,
-                enabled: state.canGoNext,
-                onPressed: () => onTurn(state, 1),
-              ),
-            ],
+    child: IgnorePointer(
+      ignoring: false,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          _EdgeButton(
+            tooltip: state.ui('previousChapter'),
+            icon: Icons.chevron_left,
+            enabled: state.canGoPrevious,
+            onPressed: () => onTurn(state, -1),
           ),
-        ),
-      );
+          _EdgeButton(
+            tooltip: state.ui('nextChapter'),
+            icon: Icons.chevron_right,
+            enabled: state.canGoNext,
+            onPressed: () => onTurn(state, 1),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _EdgeButton extends StatelessWidget {
@@ -1708,17 +2258,17 @@ class _EdgeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Align(
-        alignment: Alignment.center,
-        child: Material(
-          color: Theme.of(context).colorScheme.surface.withAlpha(205),
-          borderRadius: BorderRadius.circular(6),
-          child: IconButton(
-            tooltip: tooltip,
-            onPressed: enabled ? onPressed : null,
-            icon: Icon(icon),
-          ),
-        ),
-      );
+    alignment: Alignment.center,
+    child: Material(
+      color: Theme.of(context).colorScheme.surface.withAlpha(205),
+      borderRadius: BorderRadius.circular(6),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(icon),
+      ),
+    ),
+  );
 }
 
 class _ChapterFooter extends StatelessWidget {
@@ -1730,41 +2280,66 @@ class _ChapterFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final Translation? translation = state.currentTranslation;
     return Padding(
-        padding: const EdgeInsets.only(top: 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Divider(),
-            TextButton.icon(
-              style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              onPressed: translation == null ? null : () => _showTranslationDetails(context, translation),
-              icon: const Icon(Icons.menu_book_outlined, size: 18),
-              label: Text(translation?.translation ?? state.current?.translation ?? ''),
+      padding: const EdgeInsets.only(top: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Divider(),
+          TextButton.icon(
+            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            onPressed: translation == null
+                ? null
+                : () => _showTranslationDetails(context, translation),
+            icon: const Icon(Icons.menu_book_outlined, size: 18),
+            label: Text(
+              translation?.translation ?? state.current?.translation ?? '',
             ),
-            const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Expanded(child: TextButton(
-                  style: TextButton.styleFrom(alignment: AlignmentDirectional.centerStart, padding: EdgeInsets.zero),
-                  onPressed: () => launchUrl(Uri.parse('https://getbible.life')),
-                  child: Text('getBible.Life — ${state.ui('wordsOfEternalLife')}'),
-                )),
-                Expanded(child: TextButton(
-                  style: TextButton.styleFrom(alignment: AlignmentDirectional.centerEnd, padding: EdgeInsets.zero),
-                  onPressed: () => launchUrl(Uri.parse('https://wiki.crosswire.org/Frontends:getBible')),
-                  child: Text('${state.ui('lovinglyMaintainedBy')} Vast Development Method ♥', textAlign: TextAlign.end),
-                )),
-              ],
-            ),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    alignment: AlignmentDirectional.centerStart,
+                    padding: EdgeInsets.zero,
+                  ),
+                  onPressed: () =>
+                      launchUrl(Uri.parse('https://getbible.life')),
+                  child: Text(
+                    'getBible.Life — ${state.ui('wordsOfEternalLife')}',
+                  ),
+                ),
+              ),
+              Expanded(
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    alignment: AlignmentDirectional.centerEnd,
+                    padding: EdgeInsets.zero,
+                  ),
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://wiki.crosswire.org/Frontends:getBible'),
+                  ),
+                  child: Text(
+                    '${state.ui('lovinglyMaintainedBy')} Vast Development Method ♥',
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _ScriptureShareDialog extends StatefulWidget {
-  const _ScriptureShareDialog({required this.state, required this.initialVerse});
+  const _ScriptureShareDialog({
+    required this.state,
+    required this.initialVerse,
+  });
 
   final AppState state;
   final int? initialVerse;
@@ -1799,7 +2374,7 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
     final String reference = verses.length == 1
         ? '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}'
         : '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}\u2013${verses.last.verse}';
-    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text.trim()}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
+    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
   }
 
   String get _value => _markdown
@@ -1808,79 +2383,83 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(widget.initialVerse == null
-            ? widget.state.ui('openAsMarkdown')
-            : 'Copy or share Scripture'),
-        content: SizedBox(
-          width: 640,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                SegmentedButton<bool>(
-                  segments: const <ButtonSegment<bool>>[
-                    ButtonSegment(value: false, label: Text('Share text')),
-                    ButtonSegment(value: true, label: Text('Markdown')),
-                  ],
-                  selected: <bool>{_markdown},
-                  onSelectionChanged: (Set<bool> value) =>
-                      setState(() => _markdown = value.first),
-                ),
-                const SizedBox(height: 14),
-                if (_chapter.verses.length > 1) ...<Widget>[
-                  Text(
-                    'Verses ${_chapter.verses[_first].verse}\u2013${_chapter.verses[_last].verse}',
-                    textAlign: TextAlign.center,
-                  ),
-                  RangeSlider(
-                    min: 0,
-                    max: (_chapter.verses.length - 1).toDouble(),
-                    divisions: _chapter.verses.length - 1,
-                    labels: RangeLabels(
-                      '${_chapter.verses[_first].verse}',
-                      '${_chapter.verses[_last].verse}',
-                    ),
-                    values: RangeValues(_first.toDouble(), _last.toDouble()),
-                    onChanged: (RangeValues value) => setState(() {
-                      _first = value.start.round();
-                      _last = value.end.round();
-                      _copied = false;
-                    }),
-                  ),
-                ],
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 330),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(child: SelectableText(_value)),
-                ),
-                if (_copied)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text('Copied to clipboard.', textAlign: TextAlign.end),
-                  ),
+    title: Text(
+      widget.initialVerse == null
+          ? widget.state.ui('openAsMarkdown')
+          : 'Copy or share Scripture',
+    ),
+    content: SizedBox(
+      width: 640,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            SegmentedButton<bool>(
+              segments: const <ButtonSegment<bool>>[
+                ButtonSegment(value: false, label: Text('Share text')),
+                ButtonSegment(value: true, label: Text('Markdown')),
               ],
+              selected: <bool>{_markdown},
+              onSelectionChanged: (Set<bool> value) =>
+                  setState(() => _markdown = value.first),
             ),
-          ),
+            const SizedBox(height: 14),
+            if (_chapter.verses.length > 1) ...<Widget>[
+              Text(
+                'Verses ${_chapter.verses[_first].verse}\u2013${_chapter.verses[_last].verse}',
+                textAlign: TextAlign.center,
+              ),
+              RangeSlider(
+                min: 0,
+                max: (_chapter.verses.length - 1).toDouble(),
+                divisions: _chapter.verses.length - 1,
+                labels: RangeLabels(
+                  '${_chapter.verses[_first].verse}',
+                  '${_chapter.verses[_last].verse}',
+                ),
+                values: RangeValues(_first.toDouble(), _last.toDouble()),
+                onChanged: (RangeValues value) => setState(() {
+                  _first = value.start.round();
+                  _last = value.end.round();
+                  _copied = false;
+                }),
+              ),
+            ],
+            Container(
+              constraints: const BoxConstraints(maxHeight: 330),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SingleChildScrollView(child: SelectableText(_value)),
+            ),
+            if (_copied)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Copied to clipboard.', textAlign: TextAlign.end),
+              ),
+          ],
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(widget.state.ui('cancel')),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: _value));
-              if (mounted) setState(() => _copied = true);
-            },
-            icon: const Icon(Icons.copy),
-            label: Text(widget.state.ui('copy')),
-          ),
-        ],
-      );
+      ),
+    ),
+    actions: <Widget>[
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text(widget.state.ui('cancel')),
+      ),
+      FilledButton.icon(
+        onPressed: () async {
+          await Clipboard.setData(ClipboardData(text: _value));
+          if (mounted) setState(() => _copied = true);
+        },
+        icon: const Icon(Icons.copy),
+        label: Text(widget.state.ui('copy')),
+      ),
+    ],
+  );
 }
 
 Future<void> _showTranslationDetails(
@@ -1899,7 +2478,8 @@ Future<void> _showTranslationDetails(
     ('Source', translation.distributionSource),
     ('Versification', translation.distributionVersification),
     ('Catalog subject', translation.distributionLcsh),
-    for (final MapEntry<String, String> item in translation.distributionHistory.entries)
+    for (final MapEntry<String, String> item
+        in translation.distributionHistory.entries)
       ('History — ${item.key}', item.value),
   ].where(((String, String) item) => item.$2.trim().isNotEmpty).toList();
   return showDialog<void>(
@@ -1954,7 +2534,10 @@ class _MarkingGroupPickerState extends State<_MarkingGroupPicker> {
   Widget build(BuildContext context) {
     final String query = _query.trim().toLowerCase();
     final List<MarkingGroup> groups = widget.groups
-        .where((MarkingGroup group) => query.isEmpty || group.name.toLowerCase().contains(query))
+        .where(
+          (MarkingGroup group) =>
+              query.isEmpty || group.name.toLowerCase().contains(query),
+        )
         .toList(growable: false);
     return AlertDialog(
       title: const Text('Choose a marking'),
@@ -1986,7 +2569,9 @@ class _MarkingGroupPickerState extends State<_MarkingGroupPicker> {
                 itemBuilder: (BuildContext context, int index) {
                   final MarkingGroup group = groups[index];
                   return Material(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(8),
@@ -2004,7 +2589,10 @@ class _MarkingGroupPickerState extends State<_MarkingGroupPicker> {
         ),
       ),
       actions: <Widget>[
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
       ],
     );
   }
@@ -2017,20 +2605,23 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const Icon(Icons.cloud_off, size: 48),
-              const SizedBox(height: 16),
-              Text(state.error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: () => state.loadPassage(state.passage), child: const Text('Retry')),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(Icons.cloud_off, size: 48),
+          const SizedBox(height: 16),
+          Text(state.error!, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => state.loadPassage(state.passage),
+            child: const Text('Retry'),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 class _GroupChoice extends StatelessWidget {
@@ -2040,17 +2631,24 @@ class _GroupChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: <Widget>[
-          Container(width: 18, height: 18, decoration: BoxDecoration(color: _hexColor(group.color), shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(group.name)),
-        ],
-      );
+    children: <Widget>[
+      Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          color: _hexColor(group.color),
+          shape: BoxShape.circle,
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Text(group.name)),
+    ],
+  );
 }
 
 class CacheStatusNotice extends StatelessWidget {
   const CacheStatusNotice({required this.freshness, super.key})
-      : assert(freshness != CacheFreshness.fresh);
+    : assert(freshness != CacheFreshness.fresh);
 
   final CacheFreshness freshness;
 
@@ -2071,9 +2669,21 @@ class CacheStatusNotice extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: <Widget>[
-              Container(width: 4, height: 22, decoration: BoxDecoration(color: verified ? colors.primary : colors.error, borderRadius: BorderRadius.circular(2))),
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: verified ? colors.primary : colors.error,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: Text(message, style: Theme.of(context).textTheme.bodySmall)),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
             ],
           ),
         ),
@@ -2088,13 +2698,13 @@ Color _hexColor(String value) {
 }
 
 String? _fontFamily(String value) => switch (value) {
-      'serif' => 'serif',
-      'book' => 'Georgia',
-      'baskerville' => 'Baskerville',
-      'garamond' => 'Garamond',
-      'charter' => 'Charter',
-      'cambria' => 'Cambria',
-      'times' => 'Times New Roman',
-      'sans' => 'Arial',
-      _ => null,
-    };
+  'serif' => 'serif',
+  'book' => 'Georgia',
+  'baskerville' => 'Baskerville',
+  'garamond' => 'Garamond',
+  'charter' => 'Charter',
+  'cambria' => 'Cambria',
+  'times' => 'Times New Roman',
+  'sans' => 'Arial',
+  _ => null,
+};

@@ -1,10 +1,10 @@
 # getBible.live (Flutter implementation)
 
-Cross-platform Flutter implementation of [getBible.Life](https://app.getbible.life), maintained at [`getbible/flutter`](https://github.com/getbible/flutter). It targets Android, iOS, web, Windows, macOS, and Linux from one native Flutter codebase. Scripture comes from GetBible API v2 and reader data remains on the device. The reader does not use a WebView.
+Cross-platform Flutter implementation of [getBible.Life](https://app.getbible.life), maintained at [`getbible/app`](https://github.com/getbible/app). It targets Android, iOS, web, Windows, macOS, and Linux from one native Flutter codebase. Scripture comes from GetBible Bible v3, reference previews use Query v3, and private reader data remains on the device. The reader does not use a WebView.
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
-> Development status: the repository contains the native foundation, typed domain model, API client, SQLite persistence, cache verification, reader shell, search/backup/Markdown services, tests, and CI. Store publication still requires complete feature-parity verification, physical-device QA, signing identities, and store-console access. See [feature parity](docs/FEATURE_PARITY.md).
+> Development status: the repository contains shared typed HTTP service boundaries, lossless Bible v3 models and versioned caches, native rich Scripture, reusable Query v3 reference previews, local annotations, existing search/backup/Markdown services, tests, and CI. API search and the dictionary/commentary/topic study workflows are later work. Store publication still requires complete feature-parity verification, physical-device QA, signing identities, and store-console access. See [feature parity](docs/FEATURE_PARITY.md).
 
 ## Supported targets
 
@@ -33,6 +33,35 @@ flutter run
 ```
 
 The application ID and iOS bundle ID are `life.getbible.mobile`. No API key is required for the public GetBible API.
+
+## Scripture and reference previews
+
+The reader discovers translations, books and chapters through
+`https://api.getbible.net/v3`, including published source IDs beyond the usual
+66-book canon. It retains original verse text, lexical metadata, source styles,
+ordered chapter headings and introductions. The **Source text styles** reader
+preference changes presentation without modifying Scripture or private saved
+text ranges. Personal selected-text markings retain their original UTF-16
+code-unit offsets and quote; a quote mismatch after a source revision stays
+saved without coloring unrelated text.
+
+Open **Reference preview** from the chapter heading, navigation drawer or verse
+context menu. Query v3 at `https://query.getbible.net/v3` resolves the chosen
+Bible's citation without installing a translation. The compact sheet or wide
+panel shows the reference, translation and native selectable Scripture, with
+Copy, exact-verse Open and bounded citation back history. Closing preserves the
+reader position; Open loads the contextual chapter only when explicitly chosen.
+Finish or close an active inline note editor before using **Open in reader**;
+the preview keeps its draft in place while that editor is active.
+Missing or incompatible references display an error without substituting a
+default passage. Complete installed-Bible offline reference resolution is later
+work.
+
+`ApiConfiguration` also provides independent versioned roots for Search,
+Dictionaries, Commentaries and public Bookmarks. Their typed service boundaries
+do not imply that the corresponding later study screens or API-search workflow
+are complete. See [API/cache behavior](docs/API_AND_CACHE.md) and
+[architecture](docs/ARCHITECTURE.md) for the implemented ownership and limits.
 
 ## Test the application
 
@@ -88,7 +117,7 @@ The code is divided into domain models/contracts, data adapters, application sta
 lib/
   application/       lifecycle and reader state
   core/              errors, JSON validation, starter groups
-  data/api/          GetBible API v2 client
+  data/api/          shared transport, service configuration, Bible/Query v3 adapters
   data/database/     local SQLite schema and platform executors
   data/repositories/ cache and persistence implementations
   domain/models/     versioned data contracts
@@ -101,7 +130,7 @@ See [architecture](docs/ARCHITECTURE.md) and [data contracts](docs/DATA_AND_BACK
 
 ## Privacy
 
-Notes, markings, preferences, cached Scripture, and reading position are stored locally. The app has no accounts, advertising, analytics, or tracking. Network traffic is limited to resources required for Scripture and daily-passage retrieval. See [privacy policy draft](docs/PRIVACY.md).
+Notes, markings, preferences, cached Scripture, and reading position are stored locally. The app has no accounts, advertising, analytics, or tracking. Network traffic retrieves Scripture, metadata, daily passages and explicitly requested reference previews. Query requests contain the selected translation and entered Scripture reference or selected coordinates expressed with discovered book names; private notes and markings are not uploaded. See [privacy policy draft](docs/PRIVACY.md).
 
 ## Branding
 
@@ -124,4 +153,4 @@ All platform launchers, favicons, splash artwork, window icons, and in-app ident
 
 ## License
 
-The existing repository license is retained in [LICENSE](LICENSE). Scripture translations remain subject to the license and copyright metadata returned by GetBible API v2; the application license does not relicense translation content.
+The existing repository license is retained in [LICENSE](LICENSE). Scripture translations remain subject to the license and copyright metadata returned by GetBible Bible v3; the application license does not relicense translation content.

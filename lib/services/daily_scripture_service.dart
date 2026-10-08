@@ -9,8 +9,8 @@ DailyScriptureCache parseDailyScripture(Object? value, DateTime cachedAt) {
     json.containsKey('getbible')
         ? 'getbible'
         : json.containsKey('url')
-            ? 'url'
-            : 'link',
+        ? 'url'
+        : 'link',
   );
   final String name = optionalString(
     json,
@@ -25,8 +25,8 @@ DailyScriptureCache parseDailyScripture(Object? value, DateTime cachedAt) {
   final String bookName = explicitBook.isNotEmpty
       ? explicitBook
       : path.length >= 3
-          ? Uri.decodeComponent(path[path.length - 3])
-          : reference?.group(1) ?? '';
+      ? Uri.decodeComponent(path[path.length - 3])
+      : reference?.group(1) ?? '';
   final int chapter = _positive(
     json['chapter'] ??
         (path.length >= 2 ? path[path.length - 2] : null) ??

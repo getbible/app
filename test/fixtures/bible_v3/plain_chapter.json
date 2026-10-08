@@ -1,0 +1,20 @@
+{
+  "translation": "Plain",
+  "abbreviation": "plain",
+  "language": "English",
+  "direction": "LTR",
+  "book_nr": 1,
+  "book_name": "Genesis",
+  "chapter": 1,
+  "name": "Genesis 1",
+  "verses": [
+    {
+      "chapter": 1,
+      "verse": 1,
+      "name": "Genesis 1:1",
+      "text": "First verse."
+    }
+  ],
+  "lang": "en",
+  "encoding": "UTF-8"
+}

@@ -10,7 +10,8 @@ String scriptureMarkdown(
   int firstIndex,
   int lastIndex,
 ) {
-  if (firstIndex < 0 || lastIndex < firstIndex ||
+  if (firstIndex < 0 ||
+      lastIndex < firstIndex ||
       lastIndex >= chapter.verses.length) {
     throw RangeError.range(lastIndex, firstIndex, chapter.verses.length - 1);
   }
@@ -18,8 +19,8 @@ String scriptureMarkdown(
   final String reference = verses.length == chapter.verses.length
       ? '${chapter.bookName} ${chapter.chapter}'
       : verses.length == 1
-          ? '${chapter.bookName} ${chapter.chapter}:${verses.first.verse}'
-          : '${chapter.bookName} ${chapter.chapter}:${verses.first.verse}\u2013${verses.last.verse}';
+      ? '${chapter.bookName} ${chapter.chapter}:${verses.first.verse}'
+      : '${chapter.bookName} ${chapter.chapter}:${verses.first.verse}\u2013${verses.last.verse}';
   final String body = verses
       .map((Verse verse) => '${verse.verse}. ${verse.text.trim()}')
       .join('\n');

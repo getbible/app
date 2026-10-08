@@ -6,7 +6,9 @@ import 'dart:io';
 ///   dart run tool/sync_web_locales.dart ../app.getbible.life
 void main(List<String> arguments) {
   if (arguments.length != 1) {
-    stderr.writeln('Usage: dart run tool/sync_web_locales.dart <web-repository>');
+    stderr.writeln(
+      'Usage: dart run tool/sync_web_locales.dart <web-repository>',
+    );
     exitCode = 64;
     return;
   }
@@ -18,12 +20,13 @@ void main(List<String> arguments) {
     return;
   }
   target.createSync(recursive: true);
-  final List<File> files = source
-      .listSync()
-      .whereType<File>()
-      .where((File file) => file.path.endsWith('.json'))
-      .toList()
-    ..sort((File left, File right) => left.path.compareTo(right.path));
+  final List<File> files =
+      source
+          .listSync()
+          .whereType<File>()
+          .where((File file) => file.path.endsWith('.json'))
+          .toList()
+        ..sort((File left, File right) => left.path.compareTo(right.path));
   for (final File file in files) {
     final String name = file.uri.pathSegments.last;
     file.copySync('${target.path}/$name');

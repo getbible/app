@@ -32,3 +32,9 @@ The schema 1 → 2 migration runs transactionally and keeps the historical `getb
 `test/fixtures/database_schema_v1.sql` records the released schema. Migration regressions reopen an actual schema-one SQLite file, verify every private table and legacy cache payload, and prove that a failed migration rolls back columns, keys and schema version. Exact-prefix tests preserve neighbouring numeric IDs and literal wildcard characters.
 
 Selected-text offsets are **UTF-16 code-unit positions, end exclusive**, matching Flutter/Dart selection and the existing website backup contract. Source word/token coordinates are separate metadata and must be mapped onto the unchanged verse text before use. A changed or unavailable quote remains a saved private record; it must not mark unrelated replacement text.
+
+## Database schema 3
+
+The forward schema 1/2 → 3 migration adds local notebooks, ordered blocks and independent durable draft journals. Canonical notes, their IDs and timestamps, private markings, preferences and cached Scripture remain intact. Saves and document reads are atomic; optimistic base revisions prevent overwriting newer local edits. Independent editor journals retain failed drafts for restart and explicit conflict copying. Both released schemas have SQLite fixtures, rollback checks and actual file-reopen tests. See [Notebooks](notebooks.md).
+
+Website-compatible backups still contain verse notes and markings only. Notebook export/import belongs to step 12 and is explicitly disclosed in the notebook UI. Existing reader-data replacement/reset preserves notebook tables, and cache cleanup never deletes private notebooks. Public-topic copying uses a separate additive transaction with scoped provenance and duplicate checks; it does not replace private groups.

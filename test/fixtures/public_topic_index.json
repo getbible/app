@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "catalog_version": 1,
+  "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "counts": {
+    "topics": 2,
+    "verses": 3,
+    "locales": 2
+  },
+  "resources": {
+    "topics": "topics.json",
+    "topic": "topics/{id}.json",
+    "chapter": "verses/{book}/{chapter}.json",
+    "locales": "locales.json",
+    "locale": "locales/{locale}.json",
+    "all": "all.json",
+    "catalog": "catalog.json",
+    "checksums": "checksums.json"
+  },
+  "locales": [
+    "en",
+    "af"
+  ]
+}

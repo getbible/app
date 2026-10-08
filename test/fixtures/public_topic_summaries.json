@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "topics": [
+    {
+      "id": "authority-of-the-bible",
+      "name": "Authority of the Bible",
+      "color": "#93c5fd",
+      "aliases": [
+        "Bible authority"
+      ],
+      "default": true,
+      "verses": 3
+    },
+    {
+      "id": "hope",
+      "name": "Hope",
+      "color": "#0000ff",
+      "aliases": [],
+      "default": false,
+      "verses": 0
+    }
+  ]
+}

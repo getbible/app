@@ -1,0 +1,226 @@
+{
+  "catalogue": {
+    "schema": "getbible-commentaries-catalog-v1",
+    "version": 1,
+    "generated_at": "2026-10-08T00:00:00Z",
+    "base_url": "https://commentaries.getbible.net/v1",
+    "metadata_url_template": "{commentary}/metadata.json",
+    "books_url_template": "{commentary}/books.json",
+    "commentary_url_template": "{commentary}.json",
+    "book_url_template": "{commentary}/{book}.json",
+    "chapter_url_template": "{commentary}/{book}/{chapter}.json",
+    "module_count": 1,
+    "commentaries": [
+      {
+        "id": "fixture",
+        "name": "Fixture Commentary",
+        "language": "en",
+        "license": "Public Domain",
+        "book_count": 2,
+        "chapter_count": 3,
+        "entry_count": 6,
+        "bytes": 1024
+      }
+    ]
+  },
+  "metadata": {
+    "schema": "getbible-commentary-metadata-v1",
+    "id": "fixture",
+    "module": "Fixture",
+    "name": "Fixture Commentary",
+    "language": "en",
+    "version": "1.0",
+    "license": "Public Domain",
+    "driver": "RawCom",
+    "source_type": "SWORD",
+    "versification": "KJV",
+    "book_count": 2,
+    "chapter_count": 3,
+    "entry_count": 6,
+    "bytes": 1024,
+    "storage": {
+      "source_entry_count": 0,
+      "source_text_bytes": 0,
+      "text_bytes": 0,
+      "repetition_ratio": 0,
+      "chapter_bytes": 0,
+      "book_bytes": 0,
+      "commentary_bytes": 0,
+      "published_bytes": 0
+    },
+    "books_url": "books.json",
+    "book_url_template": "{book}.json",
+    "chapter_url_template": "{book}/{chapter}.json",
+    "source": "CrossWire SWORD",
+    "source_module_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Fixture",
+    "text_source": "",
+    "copyright": "Public-domain source",
+    "copyright_holder": "",
+    "copyright_contact": {
+      "name": "",
+      "email": "",
+      "address": ""
+    },
+    "distribution_notes": "",
+    "about": "Fixture source attribution.",
+    "conversion_note": "Source text converted to plain text.",
+    "references": {
+      "api": "getbible-v2",
+      "versification": "KJV",
+      "translations": [
+        "kjv"
+      ],
+      "names": "kjv",
+      "language": "en",
+      "librarian": [
+        "fixture"
+      ],
+      "aliases": []
+    }
+  },
+  "coverage": {
+    "schema": "getbible-commentary-books-v1",
+    "commentary": "fixture",
+    "language": "en",
+    "name": "Fixture Commentary",
+    "book_url_template": "{book}.json",
+    "chapter_url_template": "{book}/{chapter}.json",
+    "book_count": 2,
+    "books": [
+      {
+        "book": 1,
+        "name": "Genesis",
+        "chapters": [
+          0,
+          1
+        ],
+        "entry_count": 5
+      },
+      {
+        "book": 43,
+        "name": "John",
+        "chapters": [
+          2
+        ],
+        "entry_count": 1
+      }
+    ]
+  },
+  "book_intro": {
+    "schema": "getbible-commentary-chapter-v1",
+    "commentary": "fixture",
+    "language": "en",
+    "book": 1,
+    "name": "Genesis",
+    "chapter": 0,
+    "entries": [
+      {
+        "book": 1,
+        "chapter": 0,
+        "verse": 0,
+        "text": "Book introduction.\n\nA second paragraph."
+      }
+    ]
+  },
+  "chapter": {
+    "schema": "getbible-commentary-chapter-v1",
+    "commentary": "fixture",
+    "language": "en",
+    "book": 1,
+    "name": "Genesis",
+    "chapter": 1,
+    "entries": [
+      {
+        "book": 1,
+        "chapter": 1,
+        "verse": 0,
+        "text": "Chapter introduction."
+      },
+      {
+        "book": 1,
+        "chapter": 1,
+        "verse": 3,
+        "text": "First ranged comment.\n\n<b>Plain text stays plain.</b>",
+        "verses": [
+          3,
+          4,
+          5
+        ],
+        "osis": "Gen.1.3",
+        "references": [
+          {
+            "ref": "Genesis 1:1-2",
+            "osis": "Gen.1.1-Gen.1.2",
+            "book": 1,
+            "chapter": 1,
+            "verse": 1,
+            "verses": [
+              1,
+              2
+            ],
+            "text": "Gen. 1:1–2"
+          },
+          {
+            "ref": "John 1",
+            "osis": "John.1",
+            "book": 43,
+            "chapter": 1
+          }
+        ]
+      },
+      {
+        "book": 1,
+        "chapter": 1,
+        "verse": 5,
+        "text": "Second comment for the same verse.",
+        "osis": "Gen.1.5"
+      },
+      {
+        "book": 1,
+        "chapter": 1,
+        "verse": 8,
+        "text": "Cross-chapter quotation.",
+        "verses": [
+          8,
+          9
+        ],
+        "osis": "Gen.1.8",
+        "references": [
+          {
+            "ref": "Genesis 1:1-2",
+            "osis": "Gen.1.1-Gen.1.2",
+            "book": 1,
+            "chapter": 1,
+            "verse": 1,
+            "verses": [
+              1,
+              2
+            ],
+            "text": "Gen. 1:1–2"
+          }
+        ]
+      }
+    ]
+  },
+  "next_chapter": {
+    "schema": "getbible-commentary-chapter-v1",
+    "commentary": "fixture",
+    "language": "en",
+    "book": 1,
+    "name": "Genesis",
+    "chapter": 2,
+    "entries": [
+      {
+        "book": 1,
+        "chapter": 2,
+        "verse": 1,
+        "text": "Cross-chapter quotation.",
+        "verses": [
+          1,
+          2
+        ],
+        "osis": "Gen.2.1"
+      }
+    ]
+  }
+}

@@ -411,6 +411,86 @@ void main() {
     expect(find.text('Chapter introduction.'), findsOneWidget);
   });
 
+  testWidgets('panel replacement and tab dismissal cancel late repaint', (
+    WidgetTester tester,
+  ) async {
+    final Completer<CommentaryChapter> oldResult =
+        Completer<CommentaryChapter>();
+    final Completer<CommentaryChapter> newResult =
+        Completer<CommentaryChapter>();
+    final _Repository oldRepository = _Repository(fixture)
+      ..delayedChapter = oldResult;
+    final _Repository newRepository = _Repository(fixture)
+      ..delayedChapter = newResult;
+    final CommentaryController oldController = CommentaryController(
+      repository: oldRepository,
+      preferences: _Preferences(),
+    );
+    final CommentaryController newController = CommentaryController(
+      repository: newRepository,
+      preferences: _Preferences(),
+    );
+    addTearDown(oldController.dispose);
+    addTearDown(newController.dispose);
+    int oldNotifications = 0;
+    int newNotifications = 0;
+    oldController.addListener(() => oldNotifications++);
+    newController.addListener(() => newNotifications++);
+    CommentaryController active = oldController;
+    bool visible = true;
+    late StateSetter rebuild;
+    final StudyContext captured = _context();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            rebuild = setState;
+            return Scaffold(
+              body: visible
+                  ? CommentaryPanel(
+                      key: const ValueKey<String>('commentary'),
+                      controller: active,
+                      context: captured,
+                      onPreviewReference: (_) async {},
+                    )
+                  : const Text('Another Study tab'),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(oldRepository.chapterReads, hasLength(1));
+    expect(oldController.isLoading, isTrue);
+    final int beforeReplacement = oldNotifications;
+    rebuild(() => active = newController);
+    await tester.pump();
+    await tester.pump();
+    expect(oldController.context, isNull);
+    expect(oldController.isLoading, isFalse);
+    expect(newRepository.chapterReads, hasLength(1));
+    oldResult.complete(
+      CommentaryAdapter.chapter(fixture['chapter'], 'fixture', 1, 1),
+    );
+    await tester.pump();
+    expect(oldController.chapter, isNull);
+    expect(oldNotifications, beforeReplacement);
+    expect(newController.isLoading, isTrue);
+    final int beforeDismissal = newNotifications;
+    rebuild(() => visible = false);
+    await tester.pump();
+    expect(newController.context, isNull);
+    expect(newController.isLoading, isFalse);
+    newResult.complete(
+      CommentaryAdapter.chapter(fixture['chapter'], 'fixture', 1, 1),
+    );
+    await tester.pumpAndSettle();
+    expect(newController.chapter, isNull);
+    expect(newNotifications, beforeDismissal);
+    expect(find.text('Another Study tab'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'narrow RTL 200 percent text remains accessible without overflow',
     (WidgetTester tester) async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getbible_live/application/online_search_controller.dart';
+import 'package:getbible_live/core/errors.dart';
 import 'package:getbible_live/core/request_cancellation.dart';
 import 'package:getbible_live/domain/models/bible.dart';
 import 'package:getbible_live/domain/models/online_search.dart';
@@ -223,6 +224,51 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
+  );
+
+  testWidgets(
+    'reopened rate-limited search restores the Retry availability timer',
+    (WidgetTester tester) async {
+      DateTime now = DateTime.utc(2026);
+      final OnlineSearchController controller = OnlineSearchController(
+        repository: _RateLimitedRepository(),
+        now: () => now,
+      );
+      addTearDown(controller.dispose);
+      await controller.search('tst', 'faith');
+      controller.cancel();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchPanel(
+              controller: controller,
+              translation: 'tst',
+              books: const <BibleBook>[],
+              onOpen: (_) async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final Finder retry = find.widgetWithText(OutlinedButton, 'Retry');
+      expect(tester.widget<OutlinedButton>(retry).onPressed, isNull);
+      now = now.add(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 30));
+      expect(tester.widget<OutlinedButton>(retry).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+}
+
+final class _RateLimitedRepository implements SearchRepository {
+  @override
+  Future<OnlineSearchPage> search(
+    OnlineSearchRequest request, {
+    RequestCancellation? cancellation,
+  }) async => throw RateLimitException(
+    Uri.parse('https://search.getbible.net/v3/tst'),
+    retryAfter: const Duration(seconds: 30),
   );
 }
 

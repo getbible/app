@@ -12,7 +12,8 @@ pub.dev distributes Dart/Flutter libraries; it does not host or execute this app
 dart format --output=none --set-exit-if-changed .
 flutter analyze
 flutter test
-flutter test integration_test
+flutter test integration_test/reader_upgrade_test.dart -d <device-id>
+flutter test integration_test/study_workspace_test.dart -d <device-id>
 ```
 
 Required suites cover serialization, API parsing, passage links, expiry/hash invalidation, offline fallback, Unicode/RTL search, marking overlap removal, annotation translation rules, note merge/order, backup fixtures, migrations, reader widgets, toolbar positioning, inline notes, and accessibility semantics.
@@ -101,6 +102,46 @@ Exercise RTL, large text, keyboard input/selection, Copy, offline failure,
 404, rate limit and retry, and confirm no chapter turn fires while the preview
 is open. Widget tests do not establish actual browser CORS, physical-device
 clipboard behavior or offline installed-Bible resolution.
+
+### Search and contextual Study
+
+The focused suites cover Search pagination/filter/reference envelopes, late
+responses and route ownership; dictionary identifiers/aliases and bounded
+history; sparse commentary ranges and introductions; public-topic locales and
+explicit collision-safe copying; and notebook ordering, autosave, draft conflicts,
+Unicode limits and forward schema migrations. See the individual feature guides
+for their contract cases.
+
+`test/support/study_workspace_journey.dart` runs through
+`test/study_composition_test.dart` and
+`integration_test/study_workspace_test.dart`. It opens Study from original
+Scripture text, reads on-demand dictionaries/commentary, follows and explicitly
+copies a public topic, edits a private notebook, and reopens it offline. It verifies
+that canonical verse-note identities and original Scripture stay unchanged and
+that the workflow performs no bulk resource download.
+
+Additional composed regressions cover Search dismissal and delayed Open,
+stored-citation Bible attribution, wide/compact nested notebook preview routes,
+word tap versus native selection/scrolling, and short-height large-text Study
+surfaces. `app_shutdown_test.dart` overlaps two shutdowns before autosave fires
+and reopens actual SQLite to verify the final private edit survived.
+Its fault-injection case rejects a failed journal write, verifies that the draft,
+database and public reader remain usable, and retries shutdown after recovery.
+
+CI runs both native Linux journeys before building the Linux release. Integration
+tests use deterministic HTTP fixtures; public contracts and real downloaded
+resource documents are checked separately. Neither replaces physical-device
+gestures, assistive technology, clipboard, process suspension or browser-runtime
+CORS QA. After an integration run, use normal `flutter pub get`/build commands
+for the production target so the integration-test plugin is not retained in
+production plugin registration.
+
+For manual QA, exercise Study with native selection, 200% text, RTL, a visible
+keyboard and a short landscape viewport. Open a notebook reference preview,
+Open in reader, then return to the still-owned insertion dialog: its captured
+quotation must remain the original text. Search from captured Study context must
+retain that context's Bible even after a reference changed the reader's Bible.
+Check dirty indicators, retry and recovery before suspending or restarting.
 
 ## Primary manual journeys
 

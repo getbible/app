@@ -16,6 +16,7 @@ final class StudyContext {
     this.verse,
     this.selectionStart,
     this.selectionEnd,
+    this.availableBooks = const <BibleBook>[],
   });
 
   final Passage passage;
@@ -26,6 +27,7 @@ final class StudyContext {
   final Verse? verse;
   final int? selectionStart;
   final int? selectionEnd;
+  final List<BibleBook> availableBooks;
 
   String get translation => passage.translation;
   int get book => passage.book;

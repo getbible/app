@@ -27,6 +27,13 @@ shutdown awaits the controller before closing SQLite. A forced process terminati
 before a pending debounce/write completes can lose that last uncommitted edit;
 this is not a claim of keystroke-level crash durability.
 
+An explicitly requested application close waits for the current draft revision
+to be durable. If its journal cannot be written, close reports a storage failure
+and keeps the editor and database available for retry. A draft whose journal is
+durable may safely survive shutdown even if activation/conflict resolution is
+pending; it is restored on restart. Older journaled revisions never count as
+durability for a newer private edit.
+
 Each edit first writes a durable draft journal. Activation failure retains the
 entire draft and presents Retry. Selecting another notebook or explicitly opening
 a Scripture citation preserves any failed draft. Restart restores the selected

@@ -55,6 +55,13 @@ final class OnlineSearchController extends ChangeNotifier {
       !_loadingMore &&
       (_retryAt == null || !_now().isBefore(_retryAt!));
   DateTime? get retryAt => _retryAt;
+  Duration? get retryDelay {
+    final DateTime? retryAt = _retryAt;
+    if (retryAt == null) return null;
+    final Duration delay = retryAt.difference(_now());
+    return delay.isNegative ? Duration.zero : delay;
+  }
+
   int get nextOffset => _nextOffset;
 
   Future<void> search(
@@ -170,14 +177,17 @@ final class OnlineSearchController extends ChangeNotifier {
 
   /// Invalidates pending work on input changes or surface dismissal. Completed
   /// results remain available when the caller merely closes the surface.
-  void cancel() {
+  /// Widget lifecycle cleanup uses [notify] false while the tree is locked.
+  void cancel({bool notify = true}) {
     _owner.cancel();
     _loading = false;
     _loadingMore = false;
-    if (!_disposed) notifyListeners();
+    if (notify && !_disposed) notifyListeners();
   }
 
-  void clear() {
+  /// Clears the query and invalidates pending results. Lifecycle-driven context
+  /// replacement can opt out of notifications during an existing widget build.
+  void clear({bool notify = true}) {
     _owner.cancel();
     _request = null;
     _firstPage = null;
@@ -190,7 +200,7 @@ final class OnlineSearchController extends ChangeNotifier {
     _hasMore = false;
     _loading = false;
     _loadingMore = false;
-    if (!_disposed) notifyListeners();
+    if (notify && !_disposed) notifyListeners();
   }
 
   @override

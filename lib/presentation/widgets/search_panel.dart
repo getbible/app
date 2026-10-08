@@ -79,9 +79,10 @@ class _SearchPanelState extends State<SearchPanel> {
       _proximity.text = criteria.proximity?.toString() ?? '';
       _hasSearched = true;
     } else {
-      if (previous != null) widget.controller.clear();
+      if (previous != null) widget.controller.clear(notify: false);
       _applyInitialQuery();
     }
+    _scheduleRetryAvailability();
   }
 
   @override
@@ -89,14 +90,15 @@ class _SearchPanelState extends State<SearchPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_scheduleRetryAvailability);
-      oldWidget.controller.cancel();
+      oldWidget.controller.cancel(notify: false);
       widget.controller.addListener(_scheduleRetryAvailability);
     }
     if (oldWidget.controller != widget.controller ||
         oldWidget.translation != widget.translation ||
         oldWidget.initialQuery != widget.initialQuery ||
         oldWidget.initialPhrase != widget.initialPhrase) {
-      widget.controller.clear();
+      _retryTimer?.cancel();
+      widget.controller.clear(notify: false);
       _hasSearched = false;
       _applyInitialQuery();
     }
@@ -114,10 +116,8 @@ class _SearchPanelState extends State<SearchPanel> {
 
   void _scheduleRetryAvailability() {
     _retryTimer?.cancel();
-    final DateTime? retryAt = widget.controller.retryAt;
-    if (retryAt == null) return;
-    final Duration remaining = retryAt.difference(DateTime.now());
-    if (remaining.isNegative) return;
+    final Duration? remaining = widget.controller.retryDelay;
+    if (remaining == null || remaining <= Duration.zero) return;
     _retryTimer = Timer(remaining, () {
       if (mounted) setState(() {});
     });
@@ -200,7 +200,7 @@ class _SearchPanelState extends State<SearchPanel> {
   void dispose() {
     _retryTimer?.cancel();
     widget.controller.removeListener(_scheduleRetryAvailability);
-    widget.controller.cancel();
+    widget.controller.cancel(notify: false);
     _query.dispose();
     _exclusions.dispose();
     _proximity.dispose();

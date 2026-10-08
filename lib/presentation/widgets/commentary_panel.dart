@@ -28,6 +28,8 @@ final class CommentaryPanel extends StatefulWidget {
 }
 
 final class _CommentaryPanelState extends State<CommentaryPanel> {
+  int _openingGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -39,14 +41,25 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller ||
         oldWidget.context != widget.context) {
+      oldWidget.controller.close(notify: false);
       _openAfterBuild();
     }
   }
 
   void _openAfterBuild() {
+    final int generation = ++_openingGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(widget.controller.open(widget.context));
+      if (mounted && generation == _openingGeneration) {
+        unawaited(widget.controller.open(widget.context));
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _openingGeneration++;
+    widget.controller.close(notify: false);
+    super.dispose();
   }
 
   @override

@@ -704,6 +704,103 @@ void main() {
       expect(restored.hasConflict, isTrue);
     },
   );
+
+  test(
+    'durability distinguishes failed journal writes from safely retained failed activation',
+    () async {
+      final LocalDatabase database = await LocalDatabase.memory();
+      addTearDown(database.close);
+      final _ControlledRepository repository = _ControlledRepository(
+        SqlNotebookRepository(database),
+      );
+      final NotebookController controller = NotebookController(
+        repository,
+        autosaveDelay: const Duration(hours: 1),
+      );
+      addTearDown(controller.dispose);
+      await controller.createNotebook();
+      expect(controller.hasUndurableDrafts, isFalse);
+      repository.failJournal = true;
+      controller.updateBlockText(
+        controller.notebook!.blocks.single.id,
+        'Latest private revision needs a durable journal',
+      );
+      expect(controller.hasUndurableDrafts, isTrue);
+      expect(await controller.flush(), isFalse);
+      expect(controller.hasUndurableDrafts, isTrue);
+      expect(await database.getNotebookDrafts(), isEmpty);
+      expect(
+        controller.notebook!.blocks.single.text,
+        'Latest private revision needs a durable journal',
+      );
+      repository.failJournal = false;
+      repository.failSave = true;
+      expect(await controller.flush(), isFalse);
+      expect(controller.hasUnsavedDrafts, isTrue);
+      expect(controller.hasUndurableDrafts, isFalse);
+      expect(
+        (await database.getNotebookDrafts()).single.notebook.blocks.single.text,
+        'Latest private revision needs a durable journal',
+      );
+      controller.updateBlockText(
+        controller.notebook!.blocks.single.id,
+        'A newer revision is not covered by the old journal',
+      );
+      expect(controller.hasUndurableDrafts, isTrue);
+      expect(await controller.flush(), isFalse);
+      expect(controller.hasUndurableDrafts, isFalse);
+      repository.failSave = false;
+      await controller.retry();
+      expect(controller.hasUnsavedDrafts, isFalse);
+      expect(controller.hasUndurableDrafts, isFalse);
+    },
+  );
+
+  test(
+    'loaded unchanged journals remain durable if a new journal write fails, while later private edits require durability',
+    () async {
+      final LocalDatabase database = await LocalDatabase.memory();
+      addTearDown(database.close);
+      final Notebook original = _document();
+      await database.saveNotebook(original, expectedRevision: null);
+      await database.saveNotebookDraft(
+        original.edit(
+          title: 'Durable recovered title',
+          now: original.updatedAt,
+        ),
+        expectedRevision: 1,
+        editorId: 'recovered',
+      );
+      final _ControlledRepository repository = _ControlledRepository(
+        SqlNotebookRepository(database),
+      )..failJournal = true;
+      final NotebookController controller = NotebookController(
+        repository,
+        autosaveDelay: const Duration(hours: 1),
+      );
+      addTearDown(controller.dispose);
+      await controller.load();
+      expect(controller.hasUnsavedDrafts, isTrue);
+      expect(controller.hasUndurableDrafts, isFalse);
+      expect(await controller.flush(), isFalse);
+      expect(controller.hasUndurableDrafts, isFalse);
+      controller.updateTitle('New private title not yet journaled');
+      expect(controller.hasUndurableDrafts, isTrue);
+      expect(await controller.flush(), isFalse);
+      expect(controller.hasUndurableDrafts, isTrue);
+      expect(
+        (await database.getNotebookDrafts()).single.notebook.title,
+        'Durable recovered title',
+      );
+      repository.failJournal = false;
+      expect(await controller.flush(), isTrue);
+      expect(controller.hasUndurableDrafts, isFalse);
+      expect(
+        (await database.getNotebook(original.id))!.title,
+        'New private title not yet journaled',
+      );
+    },
+  );
 }
 
 Notebook _document() => Notebook(
@@ -805,6 +902,7 @@ final class _ControlledRepository implements NotebookRepository {
   _ControlledRepository(this.delegate);
   final NotebookRepository delegate;
   bool failSave = false;
+  bool failJournal = false;
   Completer<void>? pause;
   Completer<void>? started;
   @override
@@ -818,11 +916,17 @@ final class _ControlledRepository implements NotebookRepository {
     Notebook notebook, {
     required int? expectedRevision,
     String editorId = 'primary',
-  }) => delegate.saveDraft(
-    notebook,
-    expectedRevision: expectedRevision,
-    editorId: editorId,
-  );
+  }) async {
+    if (failJournal) {
+      throw StateError('Draft journal storage temporarily unavailable');
+    }
+    await delegate.saveDraft(
+      notebook,
+      expectedRevision: expectedRevision,
+      editorId: editorId,
+    );
+  }
+
   @override
   Future<void> save(
     Notebook notebook, {

@@ -52,4 +52,6 @@ jobs:
       - run: flutter pub get
       - name: Exercise the complete reader and native clipboard
         run: xvfb-run -a flutter test integration_test/reader_upgrade_test.dart -d linux
+      - name: Exercise contextual Study and private notebook persistence
+        run: xvfb-run -a flutter test integration_test/study_workspace_test.dart -d linux
       - run: flutter build linux --release

@@ -235,7 +235,9 @@ final class CommentaryController extends ChangeNotifier {
     });
   }
 
-  void close() {
+  /// Widget teardown cancels work synchronously without notifying a widget tree
+  /// that is being rebuilt. Explicit workspace dismissal normally notifies.
+  void close({bool notify = true}) {
     if (_disposed) return;
     _owner.cancel();
     _loading = false;
@@ -246,7 +248,7 @@ final class CommentaryController extends ChangeNotifier {
     _chapter = null;
     _error = null;
     _preferenceWarning = null;
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   @override

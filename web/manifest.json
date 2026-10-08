@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#F8F3E8",
     "theme_color": "#496456",
-    "description": "A local-first, cross-platform Flutter Bible reader powered by GetBible API v2.",
+    "description": "A local-first, cross-platform Flutter Bible reader with GetBible v3 Scripture and contextual study tools.",
     "prefer_related_applications": false,
     "icons": [
         {

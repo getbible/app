@@ -66,9 +66,9 @@ The preview provides native Copy, exact-verse Open, bounded back history,
 cancellation on replacement/dismissal, and adaptive compact/wide presentation.
 The dedicated Query unit/widget suites verify this behavior, including Unicode,
 RTL, large text, all-or-error batching and late Open route ownership. New labels
-are injectable; complete locale adoption and integration with dictionaries,
-commentaries, public topics and personal note citations remain later feature
-work. Browser/device runtime and side-by-side QA are still release gates.
+are injectable; complete locale adoption remains step 16. Dictionaries,
+commentaries, public topics and personal notebook citations now reuse this
+shared preview. Browser/device runtime and side-by-side QA are still release gates.
 
 ## Release gate
 
@@ -76,7 +76,7 @@ No Flutter release may be described as feature-equivalent while applicable rows 
 
 ## Search v3 increment
 
-Online Search now uses service-native paginated requests and preserves ranked original-text results. Filters, reference responses, revision consistency, cancellation, rate limits and native narrow RTL/200% layouts have 19 focused automated checks. See [Search v3](search-v3.md). Whole-translation search remains an explicit offline service, rather than the online reader path. Composed reader and platform evidence is recorded with the completed Study increment.
+Online Search now uses service-native paginated requests and preserves ranked original-text results. Filters, reference responses, revision consistency, cancellation, rate limits and native narrow RTL/200% layouts have 29 focused automated checks. See [Search v3](search-v3.md). Whole-translation search remains an explicit offline service, rather than the online reader path. Composed reader and platform evidence is recorded with the completed Study increment.
 
 ## Native dictionary resources
 
@@ -84,11 +84,11 @@ The native resource panel adds on-demand dictionaries and lexical lookup through
 
 ## Commentary resource increment
 
-Native commentary reading requests only discovered coverage and the chosen chapter. It distinguishes introductions from Scripture, includes earlier-anchored ranges and multiple source entries, and preserves source OSIS, attribution and v2 citation provenance. Thirteen focused checks cover sparse availability, request ownership, preferences and RTL/200% native layouts; six resource fixtures match the current live contract. See [Commentaries](commentaries.md).
+Native commentary reading requests only discovered coverage and the chosen chapter. It distinguishes introductions from Scripture, includes earlier-anchored ranges and multiple source entries, and preserves source OSIS, attribution and v2 citation provenance. Fourteen focused checks cover sparse availability, request ownership, dismissal, preferences and RTL/200% native layouts; six resource fixtures match the current live contract. See [Commentaries](commentaries.md).
 
 ## Local notebook storage increment
 
-Independent titled study/sermon notebooks complement canonical inline verse notes. Ordered blocks, captured quotations, serialized autosave, durable editor journals and explicit conflict recovery preserve private content. Twenty-six notebook, native-input and migration checks cover schema 1/2 upgrades, actual SQLite restart, simultaneous local editors and 200% RTL editing. Website-compatible backups continue to omit notebooks until step 12; the UI states this boundary. See [Notebooks](notebooks.md).
+Independent titled study/sermon notebooks complement canonical inline verse notes. Ordered blocks, captured quotations, serialized autosave, durable editor journals and explicit conflict recovery preserve private content. Twenty-eight notebook, native-input and migration checks cover schema 1/2 upgrades, actual SQLite restart, simultaneous local editors and 200% RTL editing. Website-compatible backups continue to omit notebooks until step 12; the UI states this boundary. See [Notebooks](notebooks.md).
 
 ## Public topic increment
 

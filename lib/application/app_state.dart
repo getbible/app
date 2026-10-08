@@ -17,10 +17,12 @@ import '../domain/models/online_search.dart';
 import '../domain/models/passage.dart';
 import '../domain/models/preferences.dart';
 import '../domain/models/search.dart';
+import '../domain/repositories/notebook_repository.dart';
 import '../services/daily_scripture_service.dart';
 import '../services/scripture_text.dart';
 import 'grouped_reference_lookup.dart';
 import 'online_search_controller.dart';
+import 'study_services.dart';
 
 export '../domain/models/preferences.dart'
     show AppearanceMode, ReaderLayout, ReadingWidth;
@@ -34,6 +36,7 @@ final class AppState extends ChangeNotifier {
     this.referenceLookup,
     this._api,
     this.onlineSearch,
+    this.study,
   ) {
     onlineSearch.addListener(_searchChanged);
   }
@@ -43,6 +46,7 @@ final class AppState extends ChangeNotifier {
   factory AppState.fromDatabase(
     LocalDatabase database, {
     GetBibleApiClient? api,
+    NotebookRepository? notebookRepository,
   }) {
     final GetBibleApiClient client = api ?? GetBibleApiClient();
     final CachedBibleRepository repository = CachedBibleRepository(
@@ -62,6 +66,11 @@ final class AppState extends ChangeNotifier {
       ),
       client,
       OnlineSearchController(repository: ApiSearchRepository(client.transport)),
+      StudyServices(
+        database: database,
+        transport: client.transport,
+        notebookRepository: notebookRepository,
+      ),
     );
   }
 
@@ -71,6 +80,7 @@ final class AppState extends ChangeNotifier {
     return state;
   }
 
+  final StudyServices study;
   final OnlineSearchController onlineSearch;
   final GroupedReferenceLookup referenceLookup;
   final GetBibleApiClient _api;
@@ -97,6 +107,7 @@ final class AppState extends ChangeNotifier {
   bool loading = true;
   String? error;
   int _passageRequest = 0;
+  Future<void>? _closeFuture;
 
   bool get searchLoading => onlineSearch.isLoading;
   String? get searchError => onlineSearch.error?.toString();
@@ -257,6 +268,7 @@ final class AppState extends ChangeNotifier {
       translations = translationResult.data;
       books = bookResult.data;
       chapters = chapterIndexResult.data;
+      if (passage.translation != next.translation) onlineSearch.clear();
       passage = next;
       current = chapterResult.data;
       ui = nextUi;
@@ -612,6 +624,17 @@ final class AppState extends ChangeNotifier {
 
   Future<void> loadMoreSearchResults() => onlineSearch.loadMore();
 
+  /// Explicit public-topic copying is followed by a fresh private annotation
+  /// snapshot. Merely browsing/following a topic never calls this operation.
+  Future<void> refreshAnnotations() async {
+    groups = await annotations.getGroups();
+    markings = await annotations.getMarkingsForPassage(passage);
+    savedMarkings = await annotations.getMarkings();
+    notes = await annotations.getNotesForPassage(passage);
+    savedNotes = await annotations.getNotes();
+    notifyListeners();
+  }
+
   Future<void> setAppearance(AppearanceMode mode) async {
     preferences = preferences.copyWith(appearanceMode: mode);
     notifyListeners();
@@ -660,7 +683,16 @@ final class AppState extends ChangeNotifier {
     await settings.savePreferences(preferences);
   }
 
-  Future<void> close() async {
+  /// Every caller awaits the same shutdown, including pending private writes.
+  Future<void> close() =>
+      _closeFuture ??= _close().catchError((Object error, StackTrace stack) {
+        _closeFuture = null;
+        Error.throwWithStackTrace(error, stack);
+      });
+
+  Future<void> _close() async {
+    onlineSearch.cancel(notify: false);
+    await study.close();
     _passageRequest++;
     onlineSearch.removeListener(_searchChanged);
     onlineSearch.dispose();

@@ -417,6 +417,39 @@ void main() {
     },
   );
 
+  test(
+    'silent lifecycle cancellation clears pending state without notifying application listeners',
+    () async {
+      final Completer<OnlineSearchPage> pending = Completer<OnlineSearchPage>();
+      final _Repository repository = _Repository(<Future<OnlineSearchPage>>[
+        pending.future,
+      ]);
+      final OnlineSearchController controller = OnlineSearchController(
+        repository: repository,
+      );
+      addTearDown(controller.dispose);
+      int notifications = 0;
+      controller.addListener(() => notifications += 1);
+      final Future<void> searching = controller.search('tst', 'faith');
+      expect(notifications, greaterThan(0));
+      final int before = notifications;
+      controller.cancel(notify: false);
+      expect(repository.tokens.single!.isCancelled, true);
+      expect(controller.isLoading, false);
+      expect(notifications, before);
+      controller.clear(notify: false);
+      expect(controller.request, isNull);
+      expect(notifications, before);
+      controller.cancel();
+      controller.clear();
+      expect(notifications, before + 2);
+      pending.complete(_page(<int>[1], total: 1));
+      await searching;
+      expect(controller.results, isEmpty);
+      expect(notifications, before + 2);
+    },
+  );
+
   test('bounds apply before HTTP and advanced inputs are immutable', () {
     final List<int> books = <int>[1];
     final OnlineSearchCriteria criteria = OnlineSearchCriteria(books: books);

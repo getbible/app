@@ -14,8 +14,10 @@ book/chapter requests follow the commentary's published coverage. Commentary's
 83-book coordinates do not restrict Bible v3's independently discovered books.
 
 `CommentaryController` owns the captured Study context, active module, loading,
-failure and request lifetime. A newer module/context or dismissal invalidates
-late responses. Compatible resource choices are remembered per Bible language;
+failure and request lifetime. A newer module/context, tab change, panel replacement
+or dismissal invalidates late responses. Widget teardown cancels synchronously
+without notifying a tree that is being rebuilt. Compatible resource choices are
+remembered per Bible language;
 preference writes are ordered, and a storage failure is visible without blocking
 the resource. A language mismatch requires explicit selection and is labelled
 with the actual source language. Missing coverage and a covered chapter with no

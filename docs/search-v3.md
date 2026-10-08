@@ -54,6 +54,9 @@ Retry-After intervals disable the Retry action until the requested pause has
 elapsed, in addition to the transport's bounded retry budget.
 The service pause survives clearing/closing Search and resubmitting another
 query or translation, so the Search action cannot bypass the server's pause.
+Reopening a paused search restores its Retry timer. Widget initialization,
+context replacement and disposal invalidate requests without notifying locked
+ancestor widgets; explicit user actions continue to notify normally.
 
 ## Original Scripture and accessibility
 
@@ -79,6 +82,7 @@ Run:
 ```bash
 flutter test test/online_search_test.dart test/search_panel_test.dart
 flutter test test/app_state_online_search_test.dart
+flutter test test/search_reader_navigation_test.dart
 ```
 
 The suites cover all request filters and encoding, explicit false/zero values,
@@ -91,6 +95,9 @@ The application-composition suite proves that Search reuses the injected reader
 transport, requests no Bible/corpus resource, and preserves private annotations
 and the persisted reader position. Failed result opening retains the search
 surface and presents its error.
+Composed reader regressions exercise successful Open, reopening/closing,
+dismissal during a pending search, and query replacement during delayed Open,
+including actual AppState/Provider/widget lifecycle ownership.
 Reader/platform integration and physical-device QA remain additional release
 gates; these focused tests do not establish store readiness.
 

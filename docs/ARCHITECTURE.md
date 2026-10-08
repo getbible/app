@@ -129,3 +129,9 @@ from a complete installed Bible is a later capability; this online adapter
 does not silently replace lookup with a cached whole chapter or start a bulk
 download. Dictionary, commentary, topic and note callers can reuse these typed
 requests and the same preview component when those workflows are implemented.
+
+## Study workflow boundaries
+
+The next implementation increment builds on the shipped Query preview to add online Search v3, one adaptive Study workspace, on-demand dictionaries and commentaries, read-only public topics with explicit private copying, and local study/sermon notebooks. These workflows retain the domain/data/application/presentation boundaries above.
+
+Each service owns a typed repository and request-scoped controller. Resource failures remain within Study while Scripture and private drafts stay usable. Public resource refreshes cannot write private annotations; copying a topic requires an explicit preview and idempotent provenance. Notes remain local, and only references or search text explicitly selected by the user may enter a public request. Per-feature tests and composed reader journeys must pass before this increment is marked complete.

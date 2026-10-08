@@ -4,15 +4,10 @@ import 'package:getbible_live/domain/models/cache.dart';
 import 'package:getbible_live/presentation/widgets/scripture_verification_badge.dart';
 
 void main() {
-  Future<void> pumpBadge(
-    WidgetTester tester,
-    CacheFreshness freshness,
-  ) async {
+  Future<void> pumpBadge(WidgetTester tester, CacheFreshness freshness) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: ScriptureVerificationBadge(freshness: freshness),
-        ),
+        home: Scaffold(body: ScriptureVerificationBadge(freshness: freshness)),
       ),
     );
   }

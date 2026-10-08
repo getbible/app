@@ -4,10 +4,7 @@ import 'package:getbible_live/domain/models/cache.dart';
 import 'package:getbible_live/presentation/reader_screen.dart';
 
 void main() {
-  Future<void> pumpNotice(
-    WidgetTester tester,
-    CacheFreshness freshness,
-  ) async {
+  Future<void> pumpNotice(WidgetTester tester, CacheFreshness freshness) async {
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
@@ -15,9 +12,7 @@ void main() {
             size: Size(240, 640),
             textScaler: TextScaler.linear(2),
           ),
-          child: Scaffold(
-            body: CacheStatusNotice(freshness: freshness),
-          ),
+          child: Scaffold(body: CacheStatusNotice(freshness: freshness)),
         ),
       ),
     );

@@ -27,10 +27,7 @@ void main() {
       isFalse,
     );
     expect(
-      controller.register(
-        -1,
-        start.add(const Duration(milliseconds: 3000)),
-      ),
+      controller.register(-1, start.add(const Duration(milliseconds: 3000))),
       isFalse,
     );
   });

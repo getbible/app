@@ -11,34 +11,33 @@ void main() {
   test('retries when a chapter hash rotates during download', () async {
     int shaRequest = 0;
     int chapterRequest = 0;
-    final List<String> hashes = <String>[
-      _sha('a'),
-      _sha('b'),
-      _sha('b'),
-    ];
+    final List<String> hashes = <String>[_sha('a'), _sha('b'), _sha('b')];
     final MockClient client = MockClient((http.Request request) async {
       if (request.url.path.endsWith('.sha')) {
         return http.Response(hashes[shaRequest++], 200);
       }
       chapterRequest++;
-      return http.Response(jsonEncode(<String, Object?>{
-        'translation': 'Test',
-        'abbreviation': 'tst',
-        'language': 'Test',
-        'direction': 'LTR',
-        'book_nr': 1,
-        'book_name': 'Genesis',
-        'chapter': 1,
-        'name': 'Genesis 1',
-        'verses': <Object?>[
-          <String, Object?>{
-            'chapter': 1,
-            'verse': 1,
-            'name': 'Genesis 1:1',
-            'text': 'In the beginning.',
-          },
-        ],
-      }), 200);
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'translation': 'Test',
+          'abbreviation': 'tst',
+          'language': 'Test',
+          'direction': 'LTR',
+          'book_nr': 1,
+          'book_name': 'Genesis',
+          'chapter': 1,
+          'name': 'Genesis 1',
+          'verses': <Object?>[
+            <String, Object?>{
+              'chapter': 1,
+              'verse': 1,
+              'name': 'Genesis 1:1',
+              'text': 'In the beginning.',
+            },
+          ],
+        }),
+        200,
+      );
     });
     final LocalDatabase database = await LocalDatabase.memory();
     final CachedBibleRepository repository = CachedBibleRepository(
@@ -63,24 +62,27 @@ void main() {
         final String value = _sha(String.fromCharCode(97 + shaRequest++));
         return http.Response(value, 200);
       }
-      return http.Response(jsonEncode(<String, Object?>{
-        'translation': 'Test',
-        'abbreviation': 'tst',
-        'language': 'Test',
-        'direction': 'LTR',
-        'book_nr': 1,
-        'book_name': 'Genesis',
-        'chapter': 1,
-        'name': 'Genesis 1',
-        'verses': <Object?>[
-          <String, Object?>{
-            'chapter': 1,
-            'verse': 1,
-            'name': 'Genesis 1:1',
-            'text': 'Transient content.',
-          },
-        ],
-      }), 200);
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'translation': 'Test',
+          'abbreviation': 'tst',
+          'language': 'Test',
+          'direction': 'LTR',
+          'book_nr': 1,
+          'book_name': 'Genesis',
+          'chapter': 1,
+          'name': 'Genesis 1',
+          'verses': <Object?>[
+            <String, Object?>{
+              'chapter': 1,
+              'verse': 1,
+              'name': 'Genesis 1:1',
+              'text': 'Transient content.',
+            },
+          ],
+        }),
+        200,
+      );
     });
     final LocalDatabase database = await LocalDatabase.memory();
     final CachedBibleRepository repository = CachedBibleRepository(
@@ -88,7 +90,10 @@ void main() {
       GetBibleApiClient(client: client),
     );
 
-    await expectLater(repository.getChapter('tst', 1, 1), throwsA(isA<Exception>()));
+    await expectLater(
+      repository.getChapter('tst', 1, 1),
+      throwsA(isA<Exception>()),
+    );
     expect(await database.readCache('chapter:tst:1:1'), isNull);
     await database.close();
   });

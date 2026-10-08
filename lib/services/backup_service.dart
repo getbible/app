@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import '../domain/models/backup.dart';
 
-String encodeBackup(BackupData backup) => const JsonEncoder.withIndent('  ').convert(backup.toJson());
+String encodeBackup(BackupData backup) =>
+    const JsonEncoder.withIndent('  ').convert(backup.toJson());
 
 BackupData decodeBackup(String source) {
   try {
@@ -10,6 +11,9 @@ BackupData decodeBackup(String source) {
   } on FormatException {
     rethrow;
   } catch (error) {
-    throw FormatException('The selected file is not a valid getBible backup.', error);
+    throw FormatException(
+      'The selected file is not a valid getBible backup.',
+      error,
+    );
   }
 }

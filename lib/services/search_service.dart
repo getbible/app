@@ -23,16 +23,18 @@ List<SearchVerse> _search(
     for (final WholeTranslationChapter chapter in book.chapters) {
       for (final Verse verse in chapter.verses) {
         if (_matches(verse.text, query, terms, options)) {
-          result.add(SearchVerse(
-            book: book.number,
-            bookName: book.name,
-            chapter: chapter.chapter,
-            verse: verse.verse,
-            reference: verse.name.isNotEmpty
-                ? verse.name
-                : '${book.name} ${chapter.chapter}:${verse.verse}',
-            text: verse.text,
-          ));
+          result.add(
+            SearchVerse(
+              book: book.number,
+              bookName: book.name,
+              chapter: chapter.chapter,
+              verse: verse.verse,
+              reference: verse.name.isNotEmpty
+                  ? verse.name
+                  : '${book.name} ${chapter.chapter}:${verse.verse}',
+              text: verse.text,
+            ),
+          );
         }
       }
     }
@@ -51,9 +53,11 @@ bool _matches(
   if (options.words == SearchWordMode.phrase) {
     if (options.match == SearchMatchMode.partial) return text.contains(query);
     if (queryWords.length > verseWords.length) return false;
-    for (int start = 0;
-        start <= verseWords.length - queryWords.length;
-        start++) {
+    for (
+      int start = 0;
+      start <= verseWords.length - queryWords.length;
+      start++
+    ) {
       bool equal = true;
       for (int offset = 0; offset < queryWords.length; offset++) {
         if (verseWords[start + offset] != queryWords[offset]) {
@@ -77,6 +81,6 @@ String _normalize(String value, SearchOptions options) =>
     options.caseSensitive ? value : value.toLowerCase();
 
 List<String> _words(String value) => RegExp(
-      r'[\p{L}\p{N}\p{M}]+',
-      unicode: true,
-    ).allMatches(value).map((RegExpMatch match) => match.group(0)!).toList();
+  r'[\p{L}\p{N}\p{M}]+',
+  unicode: true,
+).allMatches(value).map((RegExpMatch match) => match.group(0)!).toList();

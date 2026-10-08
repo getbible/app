@@ -7,7 +7,9 @@ import 'presentation/reader_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final AppState state = await AppState.create();
-  runApp(ChangeNotifierProvider.value(value: state, child: const GetBibleApp()));
+  runApp(
+    ChangeNotifierProvider.value(value: state, child: const GetBibleApp()),
+  );
 }
 
 class GetBibleApp extends StatelessWidget {

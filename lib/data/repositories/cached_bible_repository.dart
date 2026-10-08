@@ -198,12 +198,13 @@ final class CachedBibleRepository implements BibleRepository {
           checkedAt: now,
         );
       }
-      final (BibleChapter, String) consistent = await _downloadConsistentChapter(
-        abbreviation,
-        book,
-        chapter,
-        initialSha: sha,
-      );
+      final (BibleChapter, String) consistent =
+          await _downloadConsistentChapter(
+            abbreviation,
+            book,
+            chapter,
+            initialSha: sha,
+          );
       final BibleChapter fresh = consistent.$1;
       final String confirmedSha = consistent.$2;
       final DateTime now = _now();

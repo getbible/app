@@ -37,7 +37,9 @@ class ScriptureVerificationBadge extends StatelessWidget {
         icon: Icon(
           _verified ? Icons.verified_user_outlined : Icons.cloud_off_outlined,
         ),
-        title: Text(_verified ? 'Scripture verified' : 'Saved for offline reading'),
+        title: Text(
+          _verified ? 'Scripture verified' : 'Saved for offline reading',
+        ),
         content: Text(
           _verified
               ? 'This chapter was checked against the hash published by GetBible and matches the current source.'

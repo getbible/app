@@ -45,3 +45,36 @@ Missing browser-exposed headers imply conservative freshness. This bounded
 HTTP cache is separate from SQLite's saved Scripture and future explicit
 installations. Cancellation is request-scoped: dismissing one surface never
 closes another service's shared client.
+
+## Rich Scripture and private ranges
+
+`ScriptureTextMap` maps source word ranges onto the unchanged verse string.
+Published word ranges are 1-based inclusive; token-array ranges are 0-based
+inclusive. Neither is a character offset. Multiword tokens, punctuation,
+whitespace, combining characters and supplementary Unicode characters retain
+their original positions. Unlocated or incompatible source ranges are preserved
+in the model without being guessed into display coordinates.
+
+`ScriptureTextComposer` combines source emphasis, private marking colors and
+temporary emphasis as separate layers. Supported source emphasis includes
+italic/bold, divine-name styling and quotations explicitly attributed to Jesus;
+unknown source attributes remain preserved. The persisted `showSourceStyles`
+reader preference disables only the source visual layer. Native selectable text
+and copied verse content remain unchanged.
+
+Private selected-text records keep their translation, canonical verse identity,
+UTF-16 code-unit offsets with an exclusive end, and saved quote. A range is
+rendered only when its bounds and exact quote match the current verse. Source
+revision mismatch leaves the record stored, rather than shifting its offsets or
+coloring another phrase. Whole-verse annotations remain translation-neutral,
+and ranged removal leaves whole-verse, other-translation, other-verse and
+non-overlapping records intact.
+
+`ScriptureChapterLayout` follows emitted verse IDs for paragraph ranges and
+ordered headings before their anchor. Native paragraph selection maps each
+selected section back to its original verse string; generated verse-number
+markers and document separators are excluded from saved verse ranges. Copy
+omits generated verse markers and joins the selected original verse slices.
+Translation/book introductions and source titles render separately from verse
+coordinates, including introduction-only content with no invented Scripture
+verse.

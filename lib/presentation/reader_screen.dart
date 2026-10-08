@@ -12,9 +12,14 @@ import '../domain/models/cache.dart';
 import '../domain/models/passage.dart';
 import '../domain/models/search.dart';
 import '../services/markdown_service.dart';
+import '../services/scripture_layout.dart';
+import '../services/scripture_text.dart';
 import 'boundary_turn_controller.dart';
 import 'widgets/reader_translation_field.dart';
+import 'widgets/scripture_editorial.dart';
+import 'widgets/scripture_paragraph_selection.dart';
 import 'widgets/scripture_verification_badge.dart';
+import 'widgets/scripture_verse_text.dart';
 
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key});
@@ -548,60 +553,116 @@ class _ReaderBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final BibleChapter chapter = state.current!;
+    final ScriptureChapterLayout layout = ScriptureChapterLayout(chapter);
+    final List<(EditorialHeading?, Verse?)> rows =
+        <(EditorialHeading?, Verse?)>[
+          for (final ScriptureReadingBlock block in layout.blocks)
+            if (block is ScriptureHeadingBlock)
+              (block.heading, null)
+            else if (block is ScriptureParagraphBlock)
+              for (final Verse verse in block.verses) (null, verse),
+        ];
     final double maximumWidth =
         state.preferences.readingWidth == ReadingWidth.constrained
         ? 920
         : double.infinity;
-    if (state.preferences.layout == ReaderLayout.paragraph) {
-      return Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maximumWidth),
-          child: _ParagraphReader(
-            state: state,
-            controller: controller,
-            verseKeys: verseKeys,
-            onOpenVerseMenu: onOpenVerseMenu,
-          ),
-        ),
-      );
-    }
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maximumWidth),
-        child: ListView.builder(
-          controller: controller,
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
-          itemCount: chapter.verses.length + 1,
-          itemBuilder: (BuildContext context, int index) {
-            if (index == chapter.verses.length) {
-              return _ChapterFooter(state: state);
-            }
-            final Verse verse = chapter.verses[index];
-            final GlobalKey key = verseKeys.putIfAbsent(
-              verse.verse,
-              GlobalKey.new,
-            );
-            final String reference =
-                '${chapter.bookName} ${chapter.chapter}:${verse.verse}';
-            final VerseNote? note = state.notes
-                .where((VerseNote item) => item.verse == verse.verse)
-                .firstOrNull;
-            return _VerseLine(
-              key: key,
-              state: state,
-              verse: verse,
-              reference: reference,
-              note: note,
-              editing: editingNote == verse.verse,
-              onEditNote: onEditNote,
-              onOpenMenu: onOpenVerseMenu,
-            );
-          },
-        ),
+        child: state.preferences.layout == ReaderLayout.paragraph
+            ? _ParagraphReader(
+                state: state,
+                controller: controller,
+                verseKeys: verseKeys,
+                editingNote: editingNote,
+                onEditNote: onEditNote,
+                onOpenVerseMenu: onOpenVerseMenu,
+              )
+            : ListView.builder(
+                controller: controller,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+                itemCount: rows.length + 2,
+                itemBuilder: (BuildContext context, int index) {
+                  if (index == 0) return _ChapterIntroductions(state: state);
+                  if (index == rows.length + 1) {
+                    return _ChapterFooter(state: state);
+                  }
+                  final (EditorialHeading? heading, Verse? verse) =
+                      rows[index - 1];
+                  if (heading != null) {
+                    return ScriptureEditorialHeading(
+                      heading: heading,
+                      textStyle: _scriptureStyle(context, state),
+                    );
+                  }
+                  final Verse selected = verse!;
+                  final String reference =
+                      '${chapter.bookName} ${chapter.chapter}:${selected.verse}';
+                  final VerseNote? note = state.notes
+                      .where((VerseNote item) => item.verse == selected.verse)
+                      .firstOrNull;
+                  return _VerseLine(
+                    key: verseKeys.putIfAbsent(selected.verse, GlobalKey.new),
+                    state: state,
+                    verse: selected,
+                    reference: reference,
+                    note: note,
+                    editing: editingNote == selected.verse,
+                    onEditNote: onEditNote,
+                    onOpenMenu: onOpenVerseMenu,
+                  );
+                },
+              ),
       ),
+    );
+  }
+}
+
+TextStyle _scriptureStyle(BuildContext context, AppState state) => TextStyle(
+  fontFamily: _fontFamily(state.preferences.readerFont),
+  fontSize: state.preferences.textSize,
+  height: 1.55,
+  color: Theme.of(context).colorScheme.onSurface,
+);
+
+class _ChapterIntroductions extends StatelessWidget {
+  const _ChapterIntroductions({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final BibleChapter chapter = state.current!;
+    final bool firstChapter =
+        state.chapters.firstOrNull?.chapter == chapter.chapter;
+    final BibleBook? book = state.books
+        .where((BibleBook item) => item.number == chapter.bookNumber)
+        .firstOrNull;
+    final Translation? translation = state.currentTranslation;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (firstChapter &&
+            state.books.firstOrNull?.number == chapter.bookNumber &&
+            translation != null)
+          ScriptureIntroductionSection(
+            titles: translation.titles,
+            introduction: translation.introduction,
+            textStyle: _scriptureStyle(context, state),
+          ),
+        if (firstChapter && book != null && !chapter.isIntroduction)
+          ScriptureIntroductionSection(
+            titles: book.titles,
+            introduction: book.introduction,
+            textStyle: _scriptureStyle(context, state),
+          ),
+        ScriptureIntroductionSection(
+          titles: chapter.titles,
+          introduction: chapter.introduction,
+          textStyle: _scriptureStyle(context, state),
+        ),
+      ],
     );
   }
 }
@@ -611,89 +672,204 @@ class _ParagraphReader extends StatelessWidget {
     required this.state,
     required this.controller,
     required this.verseKeys,
+    required this.editingNote,
+    required this.onEditNote,
     required this.onOpenVerseMenu,
   });
 
   final AppState state;
   final ScrollController controller;
   final Map<int, GlobalKey> verseKeys;
+  final int? editingNote;
+  final ValueChanged<int?> onEditNote;
   final Future<void> Function(BuildContext, Verse, String) onOpenVerseMenu;
 
   @override
   Widget build(BuildContext context) {
     final BibleChapter chapter = state.current!;
-    final List<InlineSpan> content = <InlineSpan>[];
-    for (final Verse verse in chapter.verses) {
-      final String reference =
-          '${chapter.bookName} ${chapter.chapter}:${verse.verse}';
-      final Marking? whole = state.markings
-          .where(
-            (Marking item) => item.verse == verse.verse && item.isWholeVerse,
-          )
-          .firstOrNull;
-      final MarkingGroup? group = whole == null
-          ? null
-          : state.groups
-                .where((MarkingGroup item) => item.id == whole.groupId)
-                .firstOrNull;
-      content
-        ..add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Builder(
-              key: verseKeys.putIfAbsent(verse.verse, GlobalKey.new),
-              builder: (BuildContext anchor) => InkWell(
-                onTap: () => onOpenVerseMenu(anchor, verse, reference),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                    end: 6,
-                    top: 5,
-                    bottom: 5,
-                  ),
-                  child: Text(
-                    '${verse.verse}',
-                    style: TextStyle(
-                      fontSize: state.preferences.textSize * .55,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        )
-        ..add(
-          TextSpan(
-            text: '${verse.text} ',
-            style: TextStyle(
-              backgroundColor: group == null
-                  ? null
-                  : _hexColor(group.color).withAlpha(45),
-            ),
-          ),
-        );
-    }
+    final ScriptureChapterLayout layout = ScriptureChapterLayout(chapter);
     return ListView(
       controller: controller,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: <Widget>[
-        SelectableText.rich(
-          TextSpan(
-            style: TextStyle(
-              fontFamily: _fontFamily(state.preferences.readerFont),
-              fontSize: state.preferences.textSize,
-              height: 1.55,
-              color: Theme.of(context).colorScheme.onSurface,
+        _ChapterIntroductions(state: state),
+        for (final ScriptureReadingBlock block in layout.blocks)
+          if (block is ScriptureHeadingBlock)
+            ScriptureEditorialHeading(
+              heading: block.heading,
+              textStyle: _scriptureStyle(context, state),
+            )
+          else if (block is ScriptureParagraphBlock)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _paragraph(context, block.verses),
             ),
-            children: content,
-          ),
-        ),
         for (final VerseNote note in state.notes)
-          _SavedNote(note: note, onTap: () {}),
+          if (editingNote == note.verse)
+            _InlineNoteEditor(
+              state: state,
+              verse: note.verse,
+              reference: note.reference,
+              note: note,
+              onClose: () => onEditNote(null),
+            )
+          else
+            _SavedNote(note: note, onTap: () => onEditNote(note.verse)),
+        if (editingNote != null &&
+            !state.notes.any((VerseNote note) => note.verse == editingNote))
+          _InlineNoteEditor(
+            state: state,
+            verse: editingNote!,
+            reference: '${chapter.bookName} ${chapter.chapter}:$editingNote',
+            note: null,
+            onClose: () => onEditNote(null),
+          ),
         _ChapterFooter(state: state),
       ],
+    );
+  }
+
+  Widget _paragraph(BuildContext context, List<Verse> verses) {
+    final Passage origin = state.passage;
+    final String bookName = state.current!.bookName;
+    final ScriptureParagraphTextMap mapping = ScriptureParagraphTextMap(
+      verses,
+      versePrefix: (_) => '\uFFFC',
+    );
+    final List<InlineSpan> content = <InlineSpan>[];
+    for (int index = 0; index < verses.length; index++) {
+      final Verse verse = verses[index];
+      final String reference =
+          '${state.current!.bookName} ${state.current!.chapter}:${verse.verse}';
+      if (index > 0) content.add(const TextSpan(text: ' '));
+      content.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Builder(
+            key: verseKeys.putIfAbsent(verse.verse, GlobalKey.new),
+            builder: (BuildContext anchor) => InkWell(
+              onTap: () => onOpenVerseMenu(anchor, verse, reference),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  end: 6,
+                  top: 5,
+                  bottom: 5,
+                ),
+                child: Text(
+                  '${verse.verse}',
+                  style: TextStyle(
+                    fontSize: state.preferences.textSize * .55,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      content.add(
+        scriptureVerseSpan(
+          context: context,
+          verse: verse,
+          style: _scriptureStyle(context, state),
+          passage: state.passage,
+          markings: state.markings,
+          groups: state.groups,
+          showSourceStyles: state.preferences.showSourceStyles,
+        ),
+      );
+    }
+    return ScriptureParagraphSelection(
+      mapping: mapping,
+      child: SelectableText.rich(
+        TextSpan(style: _scriptureStyle(context, state), children: content),
+        contextMenuBuilder: (BuildContext context, EditableTextState editable) {
+          final TextSelection selection = editable.textEditingValue.selection;
+          final List<ScriptureVerseSelection> ranges = mapping.selections(
+            selection.start,
+            selection.end,
+          );
+          return AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: editable.contextMenuAnchors,
+            buttonItems: <ContextMenuButtonItem>[
+              for (final ContextMenuButtonItem button
+                  in editable.contextMenuButtonItems)
+                if (button.type == ContextMenuButtonType.copy &&
+                    ranges.isNotEmpty)
+                  ContextMenuButtonItem(
+                    type: ContextMenuButtonType.copy,
+                    onPressed: () {
+                      editable.hideToolbar();
+                      unawaited(
+                        Clipboard.setData(
+                          ClipboardData(
+                            text: ranges
+                                .map(
+                                  (ScriptureVerseSelection item) => item.quote,
+                                )
+                                .join(' '),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  button,
+              if (ranges.isNotEmpty && state.activeGroup != null)
+                ContextMenuButtonItem(
+                  label: 'Mark: ${state.activeGroup!.name}',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    unawaited(
+                      state.markTextSelections(
+                        origin,
+                        ranges,
+                        bookName,
+                        state.activeGroup!.id,
+                      ),
+                    );
+                  },
+                ),
+              if (ranges.isNotEmpty && state.groups.length > 1)
+                ContextMenuButtonItem(
+                  label: 'More marking groups…',
+                  onPressed: () async {
+                    editable.hideToolbar();
+                    final String? groupId = await showDialog<String>(
+                      context: context,
+                      builder: (BuildContext context) =>
+                          _MarkingGroupPicker(groups: state.groups),
+                    );
+                    if (context.mounted && groupId != null) {
+                      await state.markTextSelections(
+                        origin,
+                        ranges,
+                        bookName,
+                        groupId,
+                      );
+                    }
+                  },
+                ),
+              if (ranges.any(
+                (ScriptureVerseSelection item) => state.selectionHasMarking(
+                  item.verse.verse,
+                  item.range.start,
+                  item.range.end,
+                ),
+              ))
+                ContextMenuButtonItem(
+                  label: 'Remove highlighting',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    unawaited(state.removeTextSelections(origin, ranges));
+                  },
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -805,8 +981,14 @@ class _SelectableMarkedVerse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SelectableText.rich(
-      _markedText(context),
+    return ScriptureVerseText(
+      verse: verse,
+      style: _scriptureStyle(context, state).copyWith(height: 1.38),
+      passage: state.passage,
+      markings: state.markings,
+      groups: state.groups,
+      showSourceStyles: state.preferences.showSourceStyles,
+      includeWholeVerse: false,
       contextMenuBuilder:
           (BuildContext context, EditableTextState editableTextState) {
             final TextSelection selection =
@@ -881,59 +1063,6 @@ class _SelectableMarkedVerse extends StatelessWidget {
               buttonItems: buttons,
             );
           },
-    );
-  }
-
-  TextSpan _markedText(BuildContext context) {
-    final List<Marking> ranged =
-        state.markings
-            .where(
-              (Marking item) =>
-                  item.verse == verse.verse &&
-                  !item.isWholeVerse &&
-                  item.start! >= 0 &&
-                  item.end! <= verse.text.length,
-            )
-            .toList()
-          ..sort(
-            (Marking left, Marking right) =>
-                left.start!.compareTo(right.start!),
-          );
-    final Set<int> boundaries = <int>{0, verse.text.length};
-    for (final Marking marking in ranged) {
-      boundaries.add(marking.start!);
-      boundaries.add(marking.end!);
-    }
-    final List<int> offsets = boundaries.toList()..sort();
-    final List<InlineSpan> spans = <InlineSpan>[];
-    for (int index = 0; index < offsets.length - 1; index++) {
-      final int start = offsets[index];
-      final int end = offsets[index + 1];
-      final Marking? marking = ranged.reversed
-          .where((Marking item) => item.start! <= start && item.end! >= end)
-          .firstOrNull;
-      final MarkingGroup? group = marking == null
-          ? null
-          : state.groups
-                .where((MarkingGroup item) => item.id == marking.groupId)
-                .firstOrNull;
-      spans.add(
-        TextSpan(
-          text: verse.text.substring(start, end),
-          style: TextStyle(
-            backgroundColor: group == null ? null : _hexColor(group.color),
-          ),
-        ),
-      );
-    }
-    return TextSpan(
-      style: TextStyle(
-        fontFamily: _fontFamily(state.preferences.readerFont),
-        fontSize: state.preferences.textSize,
-        height: 1.38,
-        color: Theme.of(context).colorScheme.onSurface,
-      ),
-      children: spans,
     );
   }
 }
@@ -1926,6 +2055,15 @@ class _ReaderDrawer extends StatelessWidget {
             selected: <ReadingWidth>{state.preferences.readingWidth},
             onSelectionChanged: (Set<ReadingWidth> value) =>
                 unawaited(state.setReadingWidth(value.first)),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Source text styles'),
+            subtitle: const Text(
+              'Show emphasis provided by this Bible edition',
+            ),
+            value: state.preferences.showSourceStyles,
+            onChanged: (bool value) => unawaited(state.setSourceStyles(value)),
           ),
         ],
       ),

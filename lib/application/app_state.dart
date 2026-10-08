@@ -14,6 +14,7 @@ import '../domain/models/passage.dart';
 import '../domain/models/preferences.dart';
 import '../domain/models/search.dart';
 import '../services/daily_scripture_service.dart';
+import '../services/scripture_text.dart';
 import '../services/search_service.dart';
 
 export '../domain/models/preferences.dart'
@@ -435,6 +436,80 @@ final class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A native paragraph selection is saved as one transaction in its original
+  /// passage. Presentation-generated separators never enter stored ranges.
+  Future<void> markTextSelections(
+    Passage origin,
+    List<ScriptureVerseSelection> selections,
+    String bookName,
+    String groupId,
+  ) async {
+    if (origin != passage || selections.isEmpty) return;
+    final List<Marking> additions = <Marking>[];
+    for (final ScriptureVerseSelection selection in selections) {
+      final Verse? currentVerse = current?.verses
+          .where((Verse item) => item.verse == selection.verse.verse)
+          .firstOrNull;
+      if (currentVerse?.text != selection.verse.text ||
+          !ScriptureTextMap(
+            selection.verse.text,
+          ).isValidRange(selection.range)) {
+        return;
+      }
+      additions.add(
+        Marking(
+          id: const Uuid().v4(),
+          passage: origin,
+          verse: selection.verse.verse,
+          start: selection.range.start,
+          end: selection.range.end,
+          quote: selection.quote,
+          reference: '$bookName ${origin.chapter}:${selection.verse.verse}',
+          groupId: groupId,
+          createdAt: DateTime.now().toUtc(),
+        ),
+      );
+    }
+    await annotations.replaceMarkings(const <Marking>[], additions);
+    await selectActiveGroup(groupId);
+    await _refreshVisibleMarkings();
+    savedMarkings = await annotations.getMarkings();
+    notifyListeners();
+  }
+
+  Future<void> removeTextSelections(
+    Passage origin,
+    List<ScriptureVerseSelection> selections,
+  ) async {
+    if (origin != passage || selections.isEmpty) return;
+    final List<Marking> remove = markings
+        .where(
+          (Marking marking) =>
+              !marking.isWholeVerse &&
+              marking.matchesPassage(origin) &&
+              selections.any(
+                (ScriptureVerseSelection selection) =>
+                    marking.verse == selection.verse.verse &&
+                    marking.start! < selection.range.end &&
+                    marking.end! > selection.range.start,
+              ),
+        )
+        .toList(growable: false);
+    await annotations.replaceMarkings(remove, const <Marking>[]);
+    await _refreshVisibleMarkings();
+    savedMarkings = await annotations.getMarkings();
+    notifyListeners();
+  }
+
+  Future<void> _refreshVisibleMarkings() async {
+    final Passage origin = passage;
+    final int request = _passageRequest;
+    final List<Marking> visible = await annotations.getMarkingsForPassage(
+      origin,
+    );
+    if (request == _passageRequest && passage == origin) markings = visible;
+  }
+
   Future<void> removeWholeVerseMarking(int verse) async {
     final List<Marking> remove = markings
         .where((Marking item) => item.verse == verse && item.isWholeVerse)
@@ -559,6 +634,12 @@ final class AppState extends ChangeNotifier {
 
   Future<void> setLayout(ReaderLayout layout) async {
     preferences = preferences.copyWith(layout: layout);
+    notifyListeners();
+    await settings.savePreferences(preferences);
+  }
+
+  Future<void> setSourceStyles(bool enabled) async {
+    preferences = preferences.copyWith(showSourceStyles: enabled);
     notifyListeners();
     await settings.savePreferences(preferences);
   }

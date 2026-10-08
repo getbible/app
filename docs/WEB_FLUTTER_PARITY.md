@@ -81,3 +81,7 @@ Online Search now uses service-native paginated requests and preserves ranked or
 ## Native dictionary resources
 
 The native resource panel adds on-demand dictionaries and lexical lookup through typed service/controller boundaries. Original Scripture stays selectable; entry IDs and aliases come from published indexes, and large native indexes parse off the UI isolate. Eighteen focused checks cover cancellation, repeated definitions, source language, history and narrow RTL/200% layouts. See [Dictionaries](dictionaries.md).
+
+## Commentary resource increment
+
+Native commentary reading requests only discovered coverage and the chosen chapter. It distinguishes introductions from Scripture, includes earlier-anchored ranges and multiple source entries, and preserves source OSIS, attribution and v2 citation provenance. Thirteen focused checks cover sparse availability, request ownership, preferences and RTL/200% native layouts; six resource fixtures match the current live contract. See [Commentaries](commentaries.md).

@@ -1,0 +1,110 @@
+{
+  "query": {
+    "text": "faith hope",
+    "kind": "search",
+    "translation": {
+      "translation": "Fixture Bible",
+      "abbreviation": "tst",
+      "lang": "en",
+      "language": "English",
+      "direction": "LTR",
+      "encoding": "UTF-8"
+    },
+    "engine_version": 5,
+    "total": 2,
+    "returned": 2,
+    "offset": 0,
+    "limit": 2,
+    "has_more": false,
+    "sha": null
+  },
+  "results": {
+    "tst_1_1": {
+      "translation": "Fixture Bible",
+      "abbreviation": "tst",
+      "lang": "en",
+      "language": "English",
+      "direction": "RTL",
+      "encoding": "UTF-8",
+      "book_nr": 1,
+      "book_name": "Fixture Book",
+      "chapter": 1,
+      "name": "Fixture Book 1",
+      "ref": [
+        "Fixture Book 1"
+      ],
+      "verses": [
+        {
+          "verse": 1,
+          "name": "Fixture Book 1:1",
+          "text": "First  \nverse.",
+          "tokens": [
+            {
+              "token": "First",
+              "word_start": 1,
+              "word_end": 1,
+              "lemma": {
+                "strong": [
+                  "G3056"
+                ]
+              },
+              "future": {
+                "retained": true
+              }
+            }
+          ],
+          "spans": []
+        }
+      ]
+    },
+    "tst_2_3": {
+      "translation": "Fixture Bible",
+      "abbreviation": "tst",
+      "lang": "en",
+      "language": "English",
+      "direction": "LTR",
+      "encoding": "UTF-8",
+      "book_nr": 2,
+      "book_name": "Fixture Book",
+      "chapter": 3,
+      "name": "Fixture Book 3",
+      "ref": [
+        "Fixture Book 3"
+      ],
+      "verses": [
+        {
+          "verse": 8,
+          "name": "Fixture Book 3:8",
+          "text": "Second verse.",
+          "tokens": [],
+          "spans": []
+        }
+      ]
+    }
+  },
+  "matches": [
+    {
+      "reference": "Fixture Book 3:8",
+      "book_nr": 2,
+      "chapter": 3,
+      "verse": 8,
+      "score": 2.5,
+      "occurrences": 2,
+      "terms": [
+        "faith",
+        "hope"
+      ]
+    },
+    {
+      "reference": "Fixture Book 1:1",
+      "book_nr": 1,
+      "chapter": 1,
+      "verse": 1,
+      "score": 1,
+      "occurrences": 1,
+      "terms": [
+        "faith"
+      ]
+    }
+  ]
+}

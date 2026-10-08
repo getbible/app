@@ -6,19 +6,21 @@ import '../data/api/getbible_api_client.dart';
 import '../data/api/query_api_client.dart';
 import '../data/database/local_database.dart';
 import '../data/repositories/api_query_repository.dart';
+import '../data/repositories/api_search_repository.dart';
 import '../data/repositories/cached_bible_repository.dart';
 import '../data/repositories/sql_annotation_repository.dart';
 import '../data/repositories/sql_settings_repository.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
+import '../domain/models/online_search.dart';
 import '../domain/models/passage.dart';
 import '../domain/models/preferences.dart';
 import '../domain/models/search.dart';
 import '../services/daily_scripture_service.dart';
 import '../services/scripture_text.dart';
-import '../services/search_service.dart';
 import 'grouped_reference_lookup.dart';
+import 'online_search_controller.dart';
 
 export '../domain/models/preferences.dart'
     show AppearanceMode, ReaderLayout, ReadingWidth;
@@ -31,7 +33,10 @@ final class AppState extends ChangeNotifier {
     this.settings,
     this.referenceLookup,
     this._api,
-  );
+    this.onlineSearch,
+  ) {
+    onlineSearch.addListener(_searchChanged);
+  }
 
   /// Compose persistent reader and preview operations with one injectable HTTP
   /// boundary. Tests use the same composition as the app's startup.
@@ -56,6 +61,7 @@ final class AppState extends ChangeNotifier {
         ),
       ),
       client,
+      OnlineSearchController(repository: ApiSearchRepository(client.transport)),
     );
   }
 
@@ -65,6 +71,7 @@ final class AppState extends ChangeNotifier {
     return state;
   }
 
+  final OnlineSearchController onlineSearch;
   final GroupedReferenceLookup referenceLookup;
   final GetBibleApiClient _api;
 
@@ -89,13 +96,15 @@ final class AppState extends ChangeNotifier {
   UiStrings ui = UiStrings.english;
   bool loading = true;
   String? error;
-  bool searchLoading = false;
-  String? searchError;
-  List<SearchVerse> searchResults = const [];
-  List<SearchVerse> _allSearchResults = const [];
-  bool searchComplete = true;
   int _passageRequest = 0;
-  int _searchRequest = 0;
+
+  bool get searchLoading => onlineSearch.isLoading;
+  String? get searchError => onlineSearch.error?.toString();
+  List<SearchVerse> get searchResults => onlineSearch.results
+      .map((OnlineSearchHit hit) => hit.toSearchVerse())
+      .toList(growable: false);
+  bool get searchComplete => !onlineSearch.canLoadMore;
+  void _searchChanged() => notifyListeners();
 
   Translation? get currentTranslation => translations
       .where((Translation item) => item.abbreviation == passage.translation)
@@ -103,7 +112,7 @@ final class AppState extends ChangeNotifier {
 
   bool get isUiRtl => currentTranslation?.isRtl ?? false;
 
-  int get searchResultCount => _allSearchResults.length;
+  int get searchResultCount => onlineSearch.total;
 
   MarkingGroup? get activeGroup => groups
       .where((MarkingGroup item) => item.id == preferences.activeMarkingGroupId)
@@ -592,50 +601,16 @@ final class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> search(String query, SearchOptions options) async {
-    final int request = ++_searchRequest;
-    searchLoading = true;
-    searchError = null;
-    searchResults = const <SearchVerse>[];
-    _allSearchResults = const <SearchVerse>[];
-    searchComplete = false;
-    notifyListeners();
-    try {
-      final Translation? translation = currentTranslation;
-      if (translation == null) {
-        throw StateError('The selected translation is unavailable.');
-      }
-      final RepositoryResult<WholeTranslation> corpus = await bibles
-          .getWholeTranslation(translation);
-      final List<SearchVerse> results = await searchTranslation(
-        corpus.data,
+  /// Legacy callers share the same online controller as the native Search UI.
+  Future<void> search(String query, SearchOptions options) =>
+      onlineSearch.search(
+        passage.translation,
         query,
-        options,
+        criteria: OnlineSearchCriteria.fromOptions(options),
+        direction: current?.direction ?? currentTranslation?.direction ?? 'LTR',
       );
-      if (request != _searchRequest) return;
-      _allSearchResults = results;
-      searchResults = results.take(20).toList(growable: false);
-      searchComplete = searchResults.length >= results.length;
-    } catch (exception) {
-      if (request == _searchRequest) searchError = exception.toString();
-    } finally {
-      if (request == _searchRequest) {
-        searchLoading = false;
-        notifyListeners();
-      }
-    }
-  }
 
-  void loadMoreSearchResults() {
-    if (searchLoading || searchComplete) return;
-    final int requested = searchResults.length + 20;
-    final int nextLength = requested > _allSearchResults.length
-        ? _allSearchResults.length
-        : requested;
-    searchResults = _allSearchResults.take(nextLength).toList(growable: false);
-    searchComplete = nextLength >= _allSearchResults.length;
-    notifyListeners();
-  }
+  Future<void> loadMoreSearchResults() => onlineSearch.loadMore();
 
   Future<void> setAppearance(AppearanceMode mode) async {
     preferences = preferences.copyWith(appearanceMode: mode);
@@ -687,7 +662,8 @@ final class AppState extends ChangeNotifier {
 
   Future<void> close() async {
     _passageRequest++;
-    _searchRequest++;
+    onlineSearch.removeListener(_searchChanged);
+    onlineSearch.dispose();
     _api.close();
     await database.close();
   }

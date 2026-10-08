@@ -28,3 +28,7 @@ Status meanings: **Implemented** exists in source; **Partial** needs remaining U
 | Signed store distribution | External | Requires Apple/Google credentials and store review |
 
 This ledger is intentionally candid. “Ready for distribution” means every Partial row applicable to mobile is completed, automated checks pass, release artifacts build, and the manual QA matrix is signed off.
+
+## Search v3 increment
+
+Online Search now uses service-native paginated requests and preserves ranked original-text results. Filters, reference responses, revision consistency, cancellation, rate limits and native narrow RTL/200% layouts have 19 focused automated checks. See [Search v3](search-v3.md). Whole-translation search remains an explicit offline service, rather than the online reader path. Composed reader and platform evidence is recorded with the completed Study increment.

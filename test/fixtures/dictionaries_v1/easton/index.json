@@ -1,0 +1,29 @@
+{
+  "schema": "getbible-dictionary-index-v1",
+  "dictionary": "easton",
+  "language": "en",
+  "name": "English dictionary",
+  "entry_url_template": "{entry}.json",
+  "entry_count": 2,
+  "unique_key_count": 1,
+  "entries": [
+    {
+      "id": "kadesh",
+      "key": "Kadesh",
+      "search": "kadesh",
+      "aliases": [
+        "Kádésh",
+        "Kadesh"
+      ]
+    },
+    {
+      "id": "kadesh--2",
+      "key": "Kadesh",
+      "search": "kadesh",
+      "aliases": [
+        "Kadesh"
+      ],
+      "occurrence": 2
+    }
+  ]
+}

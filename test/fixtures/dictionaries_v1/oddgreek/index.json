@@ -1,0 +1,19 @@
+{
+  "schema": "getbible-dictionary-index-v1",
+  "dictionary": "oddgreek",
+  "language": "en",
+  "name": "Greek keys lexicon",
+  "entry_url_template": "{entry}.json",
+  "entry_count": 1,
+  "unique_key_count": 1,
+  "entries": [
+    {
+      "id": "published-lemma",
+      "key": "ἄλφα",
+      "search": "αλφα",
+      "aliases": [
+        "alpha"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "getbible-dictionary-entry-v1",
+  "dictionary": "swedish",
+  "language": "sv",
+  "id": "ord",
+  "key": "Ord",
+  "occurrence": 1,
+  "aliases": [
+    "Word"
+  ],
+  "text": "Ett ord."
+}

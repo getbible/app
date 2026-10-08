@@ -77,3 +77,7 @@ No Flutter release may be described as feature-equivalent while applicable rows 
 ## Search v3 increment
 
 Online Search now uses service-native paginated requests and preserves ranked original-text results. Filters, reference responses, revision consistency, cancellation, rate limits and native narrow RTL/200% layouts have 19 focused automated checks. See [Search v3](search-v3.md). Whole-translation search remains an explicit offline service, rather than the online reader path. Composed reader and platform evidence is recorded with the completed Study increment.
+
+## Native dictionary resources
+
+The native resource panel adds on-demand dictionaries and lexical lookup through typed service/controller boundaries. Original Scripture stays selectable; entry IDs and aliases come from published indexes, and large native indexes parse off the UI isolate. Eighteen focused checks cover cancellation, repeated definitions, source language, history and narrow RTL/200% layouts. See [Dictionaries](dictionaries.md).

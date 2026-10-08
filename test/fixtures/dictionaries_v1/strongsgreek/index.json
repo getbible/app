@@ -1,0 +1,38 @@
+{
+  "schema": "getbible-dictionary-index-v1",
+  "dictionary": "strongsgreek",
+  "language": "en",
+  "name": "Greek lexicon",
+  "entry_url_template": "{entry}.json",
+  "entry_count": 3,
+  "unique_key_count": 2,
+  "entries": [
+    {
+      "id": "G3056",
+      "key": "λόγος",
+      "search": "λογος",
+      "aliases": [
+        "G3056",
+        "Word"
+      ]
+    },
+    {
+      "id": "G3056--2",
+      "key": "λόγος",
+      "search": "λογος",
+      "aliases": [
+        "G3056",
+        "Word"
+      ],
+      "occurrence": 2
+    },
+    {
+      "id": "G4487",
+      "key": "ῥῆμα",
+      "search": "ρημα",
+      "aliases": [
+        "G4487"
+      ]
+    }
+  ]
+}

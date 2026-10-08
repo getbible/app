@@ -1,0 +1,13 @@
+{
+  "schema": "getbible-dictionary-entry-v1",
+  "dictionary": "strongsgreek",
+  "language": "en",
+  "id": "G3056--2",
+  "key": "λόγος",
+  "occurrence": 2,
+  "aliases": [
+    "G3056",
+    "Word"
+  ],
+  "text": "A distinct definition."
+}

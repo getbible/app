@@ -1,0 +1,63 @@
+{
+  "schema": "getbible-dictionaries-catalog-v1",
+  "version": 1,
+  "generated_at": "2026-10-08T12:00:00Z",
+  "base_url": "./",
+  "metadata_url_template": "{dictionary}/metadata.json",
+  "index_url_template": "{dictionary}/index.json",
+  "dictionary_url_template": "{dictionary}.json",
+  "entry_url_template": "{dictionary}/{entry}.json",
+  "module_count": 5,
+  "dictionaries": [
+    {
+      "id": "strongsgreek",
+      "name": "Greek lexicon",
+      "language": "en",
+      "license": "Public Domain",
+      "entry_count": 3,
+      "unique_key_count": 2,
+      "strong_prefix": "G",
+      "bytes": 1000
+    },
+    {
+      "id": "strongshebrew",
+      "name": "Hebrew lexicon",
+      "language": "en",
+      "license": "Public Domain",
+      "entry_count": 1,
+      "unique_key_count": 1,
+      "strong_prefix": "H",
+      "bytes": 1000
+    },
+    {
+      "id": "oddgreek",
+      "name": "Greek keys lexicon",
+      "language": "en",
+      "license": "Public Domain",
+      "entry_count": 1,
+      "unique_key_count": 1,
+      "strong_prefix": "G",
+      "bytes": 1000
+    },
+    {
+      "id": "easton",
+      "name": "English dictionary",
+      "language": "en",
+      "license": "Public Domain",
+      "entry_count": 2,
+      "unique_key_count": 1,
+      "strong_prefix": null,
+      "bytes": 1000
+    },
+    {
+      "id": "swedish",
+      "name": "Swedish dictionary",
+      "language": "sv",
+      "license": "Public Domain",
+      "entry_count": 1,
+      "unique_key_count": 1,
+      "strong_prefix": null,
+      "bytes": 1000
+    }
+  ]
+}

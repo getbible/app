@@ -1,0 +1,19 @@
+{
+  "schema": "getbible-dictionary-index-v1",
+  "dictionary": "swedish",
+  "language": "sv",
+  "name": "Swedish dictionary",
+  "entry_url_template": "{entry}.json",
+  "entry_count": 1,
+  "unique_key_count": 1,
+  "entries": [
+    {
+      "id": "ord",
+      "key": "Ord",
+      "search": "ord",
+      "aliases": [
+        "Word"
+      ]
+    }
+  ]
+}

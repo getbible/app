@@ -1,0 +1,19 @@
+{
+  "schema": "getbible-dictionary-index-v1",
+  "dictionary": "strongshebrew",
+  "language": "en",
+  "name": "Hebrew lexicon",
+  "entry_url_template": "{entry}.json",
+  "entry_count": 1,
+  "unique_key_count": 1,
+  "entries": [
+    {
+      "id": "H0430",
+      "key": "00430",
+      "search": "00430",
+      "aliases": [
+        "H0430"
+      ]
+    }
+  ]
+}

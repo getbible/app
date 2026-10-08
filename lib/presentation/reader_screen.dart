@@ -19,6 +19,7 @@ import '../services/scripture_text.dart';
 import 'boundary_turn_controller.dart';
 import 'widgets/reader_translation_field.dart';
 import 'widgets/reference_preview.dart';
+import 'widgets/search_panel.dart';
 import 'widgets/scripture_editorial.dart';
 import 'widgets/scripture_paragraph_selection.dart';
 import 'widgets/scripture_verification_badge.dart';
@@ -1733,228 +1734,37 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
   }
 }
 
-class _SearchDialog extends StatefulWidget {
+class _SearchDialog extends StatelessWidget {
   const _SearchDialog({required this.state, required this.onOpen});
-
   final AppState state;
   final ValueChanged<SearchVerse> onOpen;
-
   @override
-  State<_SearchDialog> createState() => _SearchDialogState();
-}
-
-class _SearchDialogState extends State<_SearchDialog> {
-  final TextEditingController _query = TextEditingController();
-  SearchWordMode _words = SearchWordMode.all;
-  SearchMatchMode _match = SearchMatchMode.exact;
-  SearchScope _scope = const SearchScope.all();
-  bool _caseSensitive = false;
-  bool _hasSearched = false;
-
-  @override
-  void dispose() {
-    _query.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog.fullscreen(
-      child: SafeArea(
-        child: Column(
-          children: <Widget>[
-            AppBar(
-              leading: IconButton(
-                tooltip: 'Close search',
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-              ),
-              title: Text(
-                'Search ${widget.state.current?.abbreviation.toUpperCase() ?? ''}',
-              ),
+  Widget build(BuildContext context) => Dialog.fullscreen(
+    child: SafeArea(
+      child: Column(
+        children: <Widget>[
+          AppBar(
+            title: Text('Search ${state.passage.translation.toUpperCase()}'),
+            leading: IconButton(
+              tooltip: 'Close search',
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: <Widget>[
-                  TextField(
-                    controller: _query,
-                    autofocus: true,
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: 'Search the Bible',
-                      suffixIcon: IconButton(
-                        tooltip: 'Search',
-                        onPressed: _search,
-                        icon: const Icon(Icons.search),
-                      ),
-                    ),
-                    onSubmitted: (_) => _search(),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: <Widget>[
-                      DropdownButton<SearchWordMode>(
-                        value: _words,
-                        items: const <DropdownMenuItem<SearchWordMode>>[
-                          DropdownMenuItem(
-                            value: SearchWordMode.all,
-                            child: Text('All words'),
-                          ),
-                          DropdownMenuItem(
-                            value: SearchWordMode.any,
-                            child: Text('Any word'),
-                          ),
-                          DropdownMenuItem(
-                            value: SearchWordMode.phrase,
-                            child: Text('Exact phrase'),
-                          ),
-                        ],
-                        onChanged: (SearchWordMode? value) =>
-                            setState(() => _words = value ?? _words),
-                      ),
-                      DropdownButton<SearchMatchMode>(
-                        value: _match,
-                        items: const <DropdownMenuItem<SearchMatchMode>>[
-                          DropdownMenuItem(
-                            value: SearchMatchMode.exact,
-                            child: Text('Exact word'),
-                          ),
-                          DropdownMenuItem(
-                            value: SearchMatchMode.partial,
-                            child: Text('Partial word'),
-                          ),
-                        ],
-                        onChanged: (SearchMatchMode? value) =>
-                            setState(() => _match = value ?? _match),
-                      ),
-                      DropdownButton<SearchScope>(
-                        value: _scope,
-                        items: <DropdownMenuItem<SearchScope>>[
-                          const DropdownMenuItem(
-                            value: SearchScope.all(),
-                            child: Text('Whole Bible'),
-                          ),
-                          const DropdownMenuItem(
-                            value: SearchScope.oldTestament(),
-                            child: Text('Old Testament'),
-                          ),
-                          const DropdownMenuItem(
-                            value: SearchScope.newTestament(),
-                            child: Text('New Testament'),
-                          ),
-                          for (final BibleBook book in widget.state.books)
-                            DropdownMenuItem(
-                              value: SearchScope.book(book.number),
-                              child: Text(book.name),
-                            ),
-                        ],
-                        onChanged: (SearchScope? value) =>
-                            setState(() => _scope = value ?? _scope),
-                      ),
-                      FilterChip(
-                        label: const Text('Case sensitive'),
-                        selected: _caseSensitive,
-                        onSelected: (bool value) =>
-                            setState(() => _caseSensitive = value),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          ),
+          Expanded(
+            child: SearchPanel(
+              controller: state.onlineSearch,
+              translation: state.passage.translation,
+              books: state.books,
+              direction: state.current?.direction ?? 'LTR',
+              showSourceStyles: state.preferences.showSourceStyles,
+              onOpen: (hit) async => onOpen(hit.toSearchVerse()),
             ),
-            Expanded(
-              child: AnimatedBuilder(
-                animation: widget.state,
-                builder: (BuildContext context, Widget? child) {
-                  if (widget.state.searchLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (widget.state.searchError != null) {
-                    return Center(child: Text(widget.state.searchError!));
-                  }
-                  if (_hasSearched && widget.state.searchResultCount == 0) {
-                    return const Center(
-                      child: Text('0 results. Try a different search.'),
-                    );
-                  }
-                  if (widget.state.searchResults.isEmpty) {
-                    return const Center(child: Text('Enter a search above.'));
-                  }
-                  return Column(
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(
-                            '${widget.state.searchResultCount} ${widget.state.searchResultCount == 1 ? 'result' : 'results'}',
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: NotificationListener<ScrollNotification>(
-                          onNotification: (ScrollNotification notice) {
-                            if (notice.metrics.extentAfter < 240) {
-                              widget.state.loadMoreSearchResults();
-                            }
-                            return false;
-                          },
-                          child: ListView.builder(
-                            itemCount:
-                                widget.state.searchResults.length +
-                                (widget.state.searchComplete ? 0 : 1),
-                            itemBuilder: (BuildContext context, int index) {
-                              if (index == widget.state.searchResults.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(20),
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              }
-                              final SearchVerse result =
-                                  widget.state.searchResults[index];
-                              return ListTile(
-                                title: Text(result.reference),
-                                subtitle: Text(result.text),
-                                onTap: () => widget.onOpen(result),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
-  void _search() {
-    if (_query.text.trim().isEmpty) return;
-    setState(() => _hasSearched = true);
-    unawaited(
-      widget.state.search(
-        _query.text,
-        SearchOptions(
-          words: _words,
-          match: _match,
-          caseSensitive: _caseSensitive,
-          scope: _scope,
-          locale: widget.state.currentTranslation?.lang ?? 'und',
-        ),
-      ),
-    );
-  }
+    ),
+  );
 }
 
 class _ReaderDrawer extends StatelessWidget {

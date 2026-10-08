@@ -3,7 +3,9 @@ import 'package:uuid/uuid.dart';
 
 import '../core/ui_strings.dart';
 import '../data/api/getbible_api_client.dart';
+import '../data/api/query_api_client.dart';
 import '../data/database/local_database.dart';
+import '../data/repositories/api_query_repository.dart';
 import '../data/repositories/cached_bible_repository.dart';
 import '../data/repositories/sql_annotation_repository.dart';
 import '../data/repositories/sql_settings_repository.dart';
@@ -16,6 +18,7 @@ import '../domain/models/search.dart';
 import '../services/daily_scripture_service.dart';
 import '../services/scripture_text.dart';
 import '../services/search_service.dart';
+import 'grouped_reference_lookup.dart';
 
 export '../domain/models/preferences.dart'
     show AppearanceMode, ReaderLayout, ReadingWidth;
@@ -26,11 +29,12 @@ final class AppState extends ChangeNotifier {
     this.bibles,
     this.annotations,
     this.settings,
+    this.referenceLookup,
     this._api,
   );
 
-  /// Compose persistent reader operations with one injectable HTTP boundary.
-  /// Tests use the same composition as the app's startup.
+  /// Compose persistent reader and preview operations with one injectable HTTP
+  /// boundary. Tests use the same composition as the app's startup.
   factory AppState.fromDatabase(
     LocalDatabase database, {
     GetBibleApiClient? api,
@@ -45,6 +49,12 @@ final class AppState extends ChangeNotifier {
       repository,
       SqlAnnotationRepository(database),
       SqlSettingsRepository(database),
+      GroupedReferenceLookup(
+        bibleRepository: repository,
+        queryRepository: ApiQueryRepository(
+          QueryApiClient(transport: client.transport),
+        ),
+      ),
       client,
     );
   }
@@ -55,6 +65,7 @@ final class AppState extends ChangeNotifier {
     return state;
   }
 
+  final GroupedReferenceLookup referenceLookup;
   final GetBibleApiClient _api;
 
   final LocalDatabase database;

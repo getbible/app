@@ -6,16 +6,19 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../application/app_state.dart';
+import '../application/reference_preview_controller.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
 import '../domain/models/passage.dart';
+import '../domain/models/reference.dart';
 import '../domain/models/search.dart';
 import '../services/markdown_service.dart';
 import '../services/scripture_layout.dart';
 import '../services/scripture_text.dart';
 import 'boundary_turn_controller.dart';
 import 'widgets/reader_translation_field.dart';
+import 'widgets/reference_preview.dart';
 import 'widgets/scripture_editorial.dart';
 import 'widgets/scripture_paragraph_selection.dart';
 import 'widgets/scripture_verification_badge.dart';
@@ -36,6 +39,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _boundaryRecordedForGesture = false;
   bool _showChrome = true;
   int? _editingNote;
+  bool _previewOpen = false;
 
   @override
   void initState() {
@@ -60,7 +64,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final AppState state = context.watch<AppState>();
     return Scaffold(
       key: _scaffoldKey,
-      drawer: _ReaderDrawer(state: state),
+      drawer: _ReaderDrawer(
+        state: state,
+        onReferencePreview: _showReferencePreview,
+      ),
       endDrawer: _StudyDrawer(state: state, onOpenPassage: _openPassage),
       appBar: _showChrome
           ? _ReaderAppBar(
@@ -94,7 +101,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
         children: <Widget>[
           Column(
             children: <Widget>[
-              if (_showChrome) _ChapterHeading(state: state),
+              if (_showChrome)
+                _ChapterHeading(
+                  state: state,
+                  onPreview: () => _showReferencePreview(),
+                ),
               if (state.legacyScripture)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -183,7 +194,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _turn(AppState state, int direction) async {
-    if (state.loading ||
+    if (_previewOpen ||
+        state.loading ||
         _editingNote != null ||
         ModalRoute.of(context)?.isCurrent != true ||
         _scaffoldKey.currentState?.isDrawerOpen == true ||
@@ -282,6 +294,57 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
+  Future<void> _showReferencePreview([ReferenceRequest? request]) async {
+    if (_previewOpen) return;
+    final AppState state = context.read<AppState>();
+    final FocusNode? previousFocus = FocusManager.instance.primaryFocus;
+    final ReferencePreviewController controller = ReferencePreviewController(
+      lookup: state.referenceLookup,
+    );
+    _previewOpen = true;
+    _boundaryTurns.clear();
+    try {
+      await showAdaptiveReferencePreview(
+        context: context,
+        controller: controller,
+        selectedTranslation: state.passage.translation,
+        translationName: state.currentTranslation?.translation,
+        selectedTranslationDirection:
+            state.current?.direction ??
+            state.currentTranslation?.direction ??
+            'LTR',
+        showSourceStyles: state.preferences.showSourceStyles,
+        initialRequest: request,
+        labels: ReferencePreviewLabels(copy: state.ui('copy')),
+        onOpenInReader: (Passage selected) async {
+          if (_editingNote != null) {
+            throw const ReferenceLookupException(
+              'Save or close the note editor before opening another reference.',
+            );
+          }
+          final ReferenceResult? citation = controller.result;
+          bool ownsNavigation() =>
+              controller.isVisible && identical(controller.result, citation);
+          await state.loadPassage(selected, ownsRequest: ownsNavigation);
+          if (!mounted || !ownsNavigation()) return;
+          if (state.error != null || state.passage != selected) {
+            throw StateError(
+              state.error ?? 'The selected verse could not be opened.',
+            );
+          }
+          await _scrollToVerse(selected.verse);
+          if (!ownsNavigation() || state.passage != selected) return;
+        },
+      );
+    } finally {
+      controller.dispose();
+      _previewOpen = false;
+      if (mounted && previousFocus?.context != null) {
+        previousFocus!.requestFocus();
+      }
+    }
+  }
+
   Future<void> _showVerseMenu(
     BuildContext anchorContext,
     Verse verse,
@@ -313,6 +376,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
               title: Text('More marking groups…'),
             ),
           ),
+        const PopupMenuItem<String>(
+          value: '__preview__',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.find_in_page_outlined),
+            title: Text('Reference preview'),
+          ),
+        ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: '__note__',
@@ -341,7 +412,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
       ],
     );
     if (choice == null || !mounted) return;
-    if (choice == '__note__') {
+    if (choice == '__preview__') {
+      await _showReferencePreview(
+        StructuredReferenceRequest(
+          translation: state.passage.translation,
+          translationName: state.currentTranslation?.translation,
+          sourceLabel: reference,
+          translationDirection:
+              state.current?.direction ?? state.currentTranslation?.direction,
+          selections: <ReferenceSelection>[
+            ReferenceSelection.verse(
+              state.passage.copyWith(verse: verse.verse),
+            ),
+          ],
+        ),
+      );
+    } else if (choice == '__note__') {
       setState(() => _editingNote = verse.verse);
     } else if (choice == '__share__') {
       await showDialog<void>(
@@ -501,9 +587,10 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 class _ChapterHeading extends StatelessWidget {
-  const _ChapterHeading({required this.state});
+  const _ChapterHeading({required this.state, required this.onPreview});
 
   final AppState state;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -513,9 +600,15 @@ class _ChapterHeading extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Expanded(
-            child: Text(
-              chapter.name,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            child: TextButton(
+              style: TextButton.styleFrom(
+                alignment: AlignmentDirectional.centerStart,
+              ),
+              onPressed: onPreview,
+              child: Text(
+                chapter.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -1865,9 +1958,10 @@ class _SearchDialogState extends State<_SearchDialog> {
 }
 
 class _ReaderDrawer extends StatelessWidget {
-  const _ReaderDrawer({required this.state});
+  const _ReaderDrawer({required this.state, required this.onReferencePreview});
 
   final AppState state;
+  final Future<void> Function() onReferencePreview;
 
   @override
   Widget build(BuildContext context) => Drawer(
@@ -1939,6 +2033,15 @@ class _ReaderDrawer extends StatelessWidget {
                   ),
                 );
               }
+            },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.find_in_page_outlined),
+            title: const Text('Reference preview'),
+            onTap: () {
+              Navigator.of(context).pop();
+              unawaited(onReferencePreview());
             },
           ),
           const Divider(height: 32),

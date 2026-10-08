@@ -9,6 +9,7 @@ The current default branch of `getbible/app.getbible.life`, its README/tests, an
 | Product contract | Web authority | Flutter authority |
 |---|---|---|
 | GetBible API parsing | `lib/getbible.ts` | `lib/data/api/`, `lib/domain/models/bible.dart` |
+| Scripture reference preview | Existing web reference/navigation behavior; Flutter v3 extension | `QueryRepository`, `GroupedReferenceLookup`, `ReferencePreviewController`, `ReferencePreview` |
 | Hash/cache invalidation | `lib/cache.ts` | `CachedBibleRepository`, `LocalDatabase` |
 | Reader restoration | `lib/reader-state.ts` | settings repository and `AppState` |
 | Marking overlap/identity | `lib/markings.ts` | annotation models/repository |
@@ -38,6 +39,36 @@ Synchronize the compact locale files from a sibling web checkout with:
 dart run tool/sync_web_locales.dart ../app.getbible.life
 flutter test test/localization_contract_test.dart
 ```
+
+## Intentional v3 extensions
+
+Rich Bible v3 source styling is also an intentional presentation extension.
+Native line/paragraph text keeps the web-compatible UTF-16 end-exclusive private
+range and exact-quote contract. Source word/token indexes are mapped separately;
+turning source styles off does not edit verse text or private annotations.
+Changed source quotes stay stored without highlighting unrelated replacement
+text. Full localization, platform selection and screen-reader parity remain
+release gates rather than claims derived from rich-text widget tests.
+
+Flutter's shared reference preview uses the public Query v3 REST service while
+preserving the web baseline's annotation, selected-text coordinate and reading
+position rules. The separate React application retains its existing API
+implementation; this extension does not claim that repository was upgraded.
+
+Previewing a citation requires no translation installation and does not change
+the persisted reader position. Structured references use book names discovered
+in the selected Bible and retain the original source label. Missing translation,
+book or verse coverage is shown without substituting Scripture. Rich verse
+metadata and contributing references remain intact, while full-chapter layout
+is loaded only for explicit reader navigation.
+
+The preview provides native Copy, exact-verse Open, bounded back history,
+cancellation on replacement/dismissal, and adaptive compact/wide presentation.
+The dedicated Query unit/widget suites verify this behavior, including Unicode,
+RTL, large text, all-or-error batching and late Open route ownership. New labels
+are injectable; complete locale adoption and integration with dictionaries,
+commentaries, public topics and personal note citations remain later feature
+work. Browser/device runtime and side-by-side QA are still release gates.
 
 ## Release gate
 

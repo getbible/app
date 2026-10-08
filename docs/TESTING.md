@@ -27,6 +27,81 @@ inside the exact 244 logical-pixel field reported by the web target at 200%
 text scaling. It also opens the compact verification badge and checks both the
 hash-verified and saved-offline explanations.
 
+### Rich Scripture and annotation preservation
+
+The focused suites are `scripture_text_test.dart`, `scripture_layout_test.dart`,
+`scripture_verse_text_test.dart`, `scripture_paragraph_selection_test.dart` and
+`scripture_annotation_compatibility_test.dart`. They exercise multiword and
+unlocated tokens, source word/token coordinates, overlapping source/private
+layers, source-style toggling, Unicode whitespace, emoji/UTF-16, combining
+characters, RTL and continuous scripts. Native selection and Copy retain the
+original verse text in line and paragraph layouts; paragraph markers and joining
+separators do not enter private saved quotes/ranges. Changed quotes remain saved
+without coloring unrelated text. Ordered editorial headings and paragraph
+ranges use emitted verse IDs, while rich/plain introduction and verse widgets
+are checked at 200% text scale.
+
+The shared reader workflow in `test/support/reader_upgrade_journey.dart` runs
+through `test/reader_upgrade_test.dart` and
+`integration_test/reader_upgrade_test.dart`. It complements the focused widgets
+with the composed reader/application/repository workflow. Run its integration
+entry point on an available configured device or browser and record that target:
+
+```bash
+flutter test test/reader_upgrade_test.dart
+flutter test integration_test/reader_upgrade_test.dart -d <device-id>
+```
+
+These automated journeys do not substitute for physical-device selection,
+clipboard, screen-reader or browser-CORS evidence. Source-style controls must
+also be checked beside personal colors, note drafts and native selection during
+manual phone/tablet and desktop QA.
+
+### Query v3 reference preview
+
+Run the focused contract and native-widget suites with:
+
+```bash
+flutter test test/reference_lookup_test.dart test/reference_preview_test.dart
+```
+
+`reference_lookup_test.dart` covers compact Query envelopes, exact source verse
+IDs, absent optional chapter metadata, lossless lexical/source fields and `ref`
+arrays, translation/coordinate validation, Unicode-safe single-segment URL
+encoding, and HTTP 404 without fallback. Structured fixtures exercise individual
+and ranged verses, noncontiguous and multi-chapter selections, discovered book
+names with source-language labels, and simultaneous 512-character/eight-reference/
+200-verse batching bounds. The aggregate stays unavailable if any batch fails
+or a requested coordinate is missing. Oversized text and unavailable books have
+explicit outcomes. The committed `test/fixtures/query_v3_compact.json` fixture
+also round-trips without adding absent source fields and has been checked
+against the published Query v3 OpenAPI Scripture schema.
+
+Fresh-cache regression cases return malformed JSON or invalid Scripture with
+`Cache-Control: max-age=600`, then corrected Scripture. Retry must fetch the
+corrected response, and subsequent lookup may reuse only the valid cache body.
+Cancellation tests replace and dismiss requests before late completion;
+citation-history tests prove bounded retention and reuse of loaded back entries.
+
+`reference_preview_test.dart` covers displayed reference/translation, exact raw
+Copy, exact-verse Open, typed input retaining the selected Bible, RTL fallback
+when compact metadata omits direction, loading/unavailable/retry states, HTTP
+input errors distinct from offline failures, failed Open, 200% text on a narrow
+surface, compact and wide presentation, and focus/scroll preservation on close.
+Route-race regressions delay Open, then dismiss the preview or select another
+citation: completion must not dismiss another route or the newer citation.
+
+For device/browser QA, open Reference preview from the chapter heading or
+navigation drawer and from a verse context menu. Try a range and multiple
+references; verify the selected translation and original source label. Close
+with the close control, back/Escape and sheet dismissal, confirming that the
+reader's passage, scroll, focus and private annotations remain unchanged.
+Open a distant verse and confirm its exact source ID is visible after navigation.
+Exercise RTL, large text, keyboard input/selection, Copy, offline failure,
+404, rate limit and retry, and confirm no chapter turn fires while the preview
+is open. Widget tests do not establish actual browser CORS, physical-device
+clipboard behavior or offline installed-Bible resolution.
+
 ## Primary manual journeys
 
 1. Clean install opens daily/KJV behavior and changes translation.

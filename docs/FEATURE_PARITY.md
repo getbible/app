@@ -4,10 +4,12 @@ Status meanings: **Implemented** exists in source; **Partial** needs remaining U
 
 | Area | Status | Implementation / remaining gate |
 |---|---|---|
-| Typed API v2 and dynamic indexes | Implemented | `GetBibleApiClient`, `CachedBibleRepository` |
+| Typed Bible v3 and dynamic indexes | Implemented core | `GetBibleApiClient`, lossless source models and `CachedBibleRepository`; discovered extended book IDs, introduction-only content, exact-byte SHA activation and versioned legacy fallback. Live/device verification remains separate. |
+| Query v3 reference previews | Implemented core | Selected-translation text/coordinate lookup, atomic bounded batches, native rich Scripture, Copy, exact-verse Open, bounded citation history and cancellable compact/wide routes; source fixtures and unit/widget tests pass. Device/browser runtime verification and later study-resource callers remain separate gates. |
 | SQLite notes/markings/preferences/cache | Implemented | `LocalDatabase` and SQL repositories |
 | SHA verification and offline chapter fallback | Implemented | Three freshness states shown by reader |
 | Native line/paragraph reader | Implemented | `ReaderScreen`; no WebView |
+| Rich Scripture and original-text range mapping | Implemented core | Source headings/paragraphs, titles/introductions, reversible source styling and layered private markings render natively. UTF-16 end-exclusive ranges and exact quotes preserve selection/Copy; mismatched saved quotes stay stored without coloring replacement text. Rich/plain, Unicode/RTL and 200% text suites exist; device/screen-reader QA remains required. |
 | Translation/book/chapter selection | Implemented | Dynamic selectors |
 | Last passage persistence | Implemented | Exact verse restoration/centering needs expanded widget integration |
 | Swipe and cross-book navigation | Implemented core | Shared cross-book turn operation, horizontal swipe, Alt+arrow shortcuts, arrows/mobile row, and tested deliberate double-boundary intent; device gesture QA remains |

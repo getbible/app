@@ -1,0 +1,30 @@
+{
+  "kjv_43_3": {
+    "book_nr": 43,
+    "chapter": 3,
+    "ref": ["John 3:16", "Johannes 3:16"],
+    "future_metadata": "retained",
+    "verses": [
+      {
+        "verse": 16,
+        "name": "John 3:16",
+        "text": "  Scripture\ntext  ",
+        "paragraph": true,
+        "tokens": [
+          {
+            "token": "the world",
+            "lemma": {
+              "strong": ["G3588", "G2889"],
+              "lemma.TR": ["τον", "κοσμον"]
+            },
+            "src": [6, 7],
+            "word_start": 5,
+            "word_end": 6
+          }
+        ],
+        "spans": [],
+        "source_extension": {"nested": [1, 2]}
+      }
+    ]
+  }
+}

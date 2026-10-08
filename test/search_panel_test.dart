@@ -179,6 +179,51 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets(
+    'failed Open keeps the selected search and displays a recoverable error',
+    (WidgetTester tester) async {
+      final OnlineSearchController controller = OnlineSearchController(
+        repository: _Repository(),
+      );
+      addTearDown(controller.dispose);
+      int attempts = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchPanel(
+              controller: controller,
+              translation: 'tst',
+              books: const <BibleBook>[],
+              initialQuery: 'faith',
+              onOpen: (_) async {
+                attempts += 1;
+                if (attempts == 1) {
+                  throw StateError('Requested verse unavailable');
+                }
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open Fixture 1:70'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchPanel), findsOneWidget);
+      expect(
+        find.textContaining('Requested verse unavailable'),
+        findsOneWidget,
+      );
+      expect(controller.request!.text, 'faith');
+      expect(controller.results.single.verse.verse, 70);
+      await tester.tap(find.text('Open Fixture 1:70'));
+      await tester.pumpAndSettle();
+      expect(attempts, 2);
+      expect(find.textContaining('Requested verse unavailable'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }
 
 OnlineSearchPage _page({bool reference = false}) => OnlineSearchPage(

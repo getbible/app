@@ -369,6 +369,54 @@ void main() {
     },
   );
 
+  test(
+    'Retry-After service pause survives repeated submission, changed filters, clear and close',
+    () async {
+      DateTime now = DateTime.utc(2026);
+      final _Repository repository = _Repository(<Future<OnlineSearchPage>>[
+        Future<OnlineSearchPage>.error(
+          RateLimitException(
+            Uri.parse('https://search.getbible.net/v3/tst'),
+            retryAfter: const Duration(seconds: 30),
+          ),
+        ),
+        Future<OnlineSearchPage>.value(_page(<int>[70], total: 1)),
+      ]);
+      final OnlineSearchController controller = OnlineSearchController(
+        repository: repository,
+        now: () => now,
+      );
+      addTearDown(controller.dispose);
+      await controller.search('tst', 'faith');
+      await controller.search('tst', 'faith');
+      expect(repository.requests, hasLength(1));
+      expect(controller.error, isA<RateLimitException>());
+      expect(controller.canRetry, false);
+      controller.clear();
+      await controller.search(
+        'tst',
+        'narrower faith',
+        criteria: OnlineSearchCriteria(books: <int>[1]),
+      );
+      controller.cancel();
+      await controller.search('another', 'hope');
+      expect(repository.requests, hasLength(1));
+      expect(
+        controller.retryAt,
+        DateTime.utc(2026).add(const Duration(seconds: 30)),
+      );
+      expect(controller.request!.text, 'hope');
+      now = now.add(const Duration(seconds: 30));
+      await controller.retry();
+      expect(repository.requests, hasLength(2));
+      expect(repository.requests.last.translation, 'another');
+      expect(repository.requests.last.text, 'hope');
+      expect(controller.results.single.verse.verse, 70);
+      expect(controller.error, isNull);
+      expect(controller.retryAt, isNull);
+    },
+  );
+
   test('bounds apply before HTTP and advanced inputs are immutable', () {
     final List<int> books = <int>[1];
     final OnlineSearchCriteria criteria = OnlineSearchCriteria(books: books);

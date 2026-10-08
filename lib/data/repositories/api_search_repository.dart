@@ -108,7 +108,7 @@ final class ApiSearchRepository implements SearchRepository {
         OnlineSearchHit(
           translation: request.translation,
           book: match.book,
-          bookName: chapter.bookName ?? match.reference,
+          bookName: chapter.bookName ?? '',
           chapter: match.chapter,
           verse: verse,
           reference: match.reference,

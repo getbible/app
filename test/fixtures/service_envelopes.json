@@ -1,0 +1,249 @@
+{
+  "dictionaries": {
+    "schema": "getbible-dictionaries-catalog-v1",
+    "version": 1,
+    "generated_at": "2026-10-08T10:00:00Z",
+    "base_url": "https://dictionaries.getbible.net/v1/",
+    "metadata_url_template": "{dictionary}/metadata.json",
+    "index_url_template": "{dictionary}/index.json",
+    "dictionary_url_template": "{dictionary}.json",
+    "entry_url_template": "{dictionary}/{entry}.json",
+    "module_count": 1,
+    "dictionaries": [
+      {
+        "id": "fixture-lexicon",
+        "name": "Fixture lexicon",
+        "language": "en",
+        "license": "Public Domain",
+        "entry_count": 0,
+        "unique_key_count": 0,
+        "strong_prefix": null,
+        "bytes": 0
+      }
+    ]
+  },
+  "commentaries": {
+    "schema": "getbible-commentaries-catalog-v1",
+    "version": 1,
+    "generated_at": "2026-10-08T10:00:00Z",
+    "base_url": "https://commentaries.getbible.net/v1/",
+    "metadata_url_template": "{commentary}/metadata.json",
+    "books_url_template": "{commentary}/books.json",
+    "commentary_url_template": "{commentary}.json",
+    "book_url_template": "{commentary}/{book}.json",
+    "chapter_url_template": "{commentary}/{book}/{chapter}.json",
+    "module_count": 1,
+    "commentaries": [
+      {
+        "id": "fixture-commentary",
+        "name": "Fixture Commentary",
+        "language": "en",
+        "license": "Public Domain",
+        "book_count": 0,
+        "chapter_count": 0,
+        "entry_count": 0,
+        "bytes": 0
+      }
+    ]
+  },
+  "bookmarks": {
+    "schema_version": 1,
+    "topics": [
+      {
+        "id": "fixture-topic",
+        "name": "Fixture Topic",
+        "color": "#123456",
+        "aliases": [],
+        "default": false,
+        "verses": 0
+      }
+    ]
+  },
+  "search": {
+    "query": {
+      "text": "faith hope",
+      "kind": "search",
+      "translation": {
+        "translation": "Fixture Bible",
+        "abbreviation": "tst",
+        "lang": "en",
+        "language": "English",
+        "direction": "LTR",
+        "encoding": "UTF-8"
+      },
+      "engine_version": 5,
+      "total": 2,
+      "returned": 2,
+      "offset": 0,
+      "limit": 2,
+      "has_more": false,
+      "sha": null
+    },
+    "results": {
+      "tst_1_1": {
+        "translation": "Fixture Bible",
+        "abbreviation": "tst",
+        "lang": "en",
+        "language": "English",
+        "direction": "LTR",
+        "encoding": "UTF-8",
+        "book_nr": 1,
+        "book_name": "Fixture Book",
+        "chapter": 1,
+        "name": "Fixture Book 1",
+        "ref": [
+          "Fixture Book 1"
+        ],
+        "verses": [
+          {
+            "verse": 1,
+            "name": "Fixture Book 1:1",
+            "text": "First  \nverse.",
+            "tokens": [],
+            "spans": []
+          }
+        ]
+      },
+      "tst_2_3": {
+        "translation": "Fixture Bible",
+        "abbreviation": "tst",
+        "lang": "en",
+        "language": "English",
+        "direction": "LTR",
+        "encoding": "UTF-8",
+        "book_nr": 2,
+        "book_name": "Fixture Book",
+        "chapter": 3,
+        "name": "Fixture Book 3",
+        "ref": [
+          "Fixture Book 3"
+        ],
+        "verses": [
+          {
+            "verse": 8,
+            "name": "Fixture Book 3:8",
+            "text": "Second verse.",
+            "tokens": [],
+            "spans": []
+          }
+        ]
+      }
+    },
+    "matches": [
+      {
+        "reference": "Fixture Book 3:8",
+        "book_nr": 2,
+        "chapter": 3,
+        "verse": 8,
+        "score": 2.5,
+        "occurrences": 2,
+        "terms": [
+          "faith",
+          "hope"
+        ]
+      },
+      {
+        "reference": "Fixture Book 1:1",
+        "book_nr": 1,
+        "chapter": 1,
+        "verse": 1,
+        "score": 1,
+        "occurrences": 1,
+        "terms": [
+          "faith"
+        ]
+      }
+    ]
+  },
+  "search_reference": {
+    "query": {
+      "text": "Fixture Book 1:1",
+      "kind": "reference",
+      "translation": "tst",
+      "engine_version": 5,
+      "total": 1,
+      "returned": 1
+    },
+    "results": {
+      "tst_1_1": {
+        "translation": "Fixture Bible",
+        "abbreviation": "tst",
+        "lang": "en",
+        "language": "English",
+        "direction": "LTR",
+        "encoding": "UTF-8",
+        "book_nr": 1,
+        "book_name": "Fixture Book",
+        "chapter": 1,
+        "name": "Fixture Book 1",
+        "ref": [
+          "Fixture Book 1"
+        ],
+        "verses": [
+          {
+            "verse": 1,
+            "name": "Fixture Book 1:1",
+            "text": "First verse.",
+            "tokens": [],
+            "spans": []
+          }
+        ]
+      }
+    },
+    "matches": [
+      {
+        "reference": "Fixture Book 1:1",
+        "book_nr": 1,
+        "chapter": 1,
+        "verse": 1
+      }
+    ]
+  },
+  "search_empty": {
+    "query": {
+      "text": "no matches",
+      "kind": "search",
+      "translation": "tst",
+      "engine_version": 5,
+      "total": 0,
+      "returned": 0,
+      "offset": 0,
+      "limit": 20,
+      "has_more": false,
+      "sha": null
+    },
+    "results": {},
+    "matches": []
+  },
+  "search_compact": {
+    "query": {
+      "text": "fixture",
+      "kind": "search",
+      "translation": {},
+      "engine_version": 5,
+      "total": 1,
+      "returned": 1
+    },
+    "results": {
+      "tst_101_1": {
+        "book_nr": 101,
+        "chapter": 1,
+        "verses": [
+          {
+            "verse": 1,
+            "text": "Introduction  \\n",
+            "name": "Fixture 1:1"
+          }
+        ]
+      }
+    },
+    "matches": [
+      {
+        "reference": "Fixture introduction",
+        "book_nr": 101,
+        "chapter": 1,
+        "verse": 1
+      }
+    ]
+  }
+}

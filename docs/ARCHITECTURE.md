@@ -27,3 +27,21 @@ SQLite is the system of record. Drift supplies cross-platform executors and back
 ## Security and privacy boundaries
 
 No secrets are required. Imported JSON is hostile input and must be size-bounded, decoded, fully validated, merged in memory, then committed transactionally. URLs are constructed from validated translation identifiers and positive numeric passage fields.
+
+## Public service boundaries
+
+`ApiTransport` is the shared HTTP boundary for the Bible, Query, Search,
+Dictionary, Commentary and public Bookmark services. `ApiConfiguration` injects
+independent versioned roots; adapters retain each service's native envelope.
+`ServiceEnvelopeAdapters` validates discovery/study/search documents into typed
+contracts, without adding HTTP or JSON parsing to widgets.
+
+Transport validates status before decoding, bounds streamed response bytes and
+request duration, and retries only transient failures within a finite budget.
+Typed failures retain HTTP status and Retry-After. Cache policy accounts for
+Cache-Control, validators, Date/Age and Expires; no-store bodies are not retained,
+no-cache responses are revalidated, and 304 requires an eligible saved body.
+Missing browser-exposed headers imply conservative freshness. This bounded
+HTTP cache is separate from SQLite's saved Scripture and future explicit
+installations. Cancellation is request-scoped: dismissing one surface never
+closes another service's shared client.

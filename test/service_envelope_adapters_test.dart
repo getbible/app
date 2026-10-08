@@ -239,4 +239,35 @@ void main() {
       expect(requests.length, 3);
     },
   );
+  test(
+    'catalogue schema rejection evicts only the malformed cached body',
+    () async {
+      int requests = 0;
+      final ApiTransport transport = ApiTransport(
+        client: MockClient((_) async {
+          requests += 1;
+          return http.Response(
+            jsonEncode(
+              requests == 1
+                  ? <String, Object?>{'schema': 'invalid'}
+                  : fixtures['dictionaries'],
+            ),
+            200,
+            headers: {'cache-control': 'max-age=600'},
+          );
+        }),
+      );
+      final ApiStudyResourcesRepository repository =
+          ApiStudyResourcesRepository(transport);
+      await expectLater(
+        repository.getDictionaries(),
+        throwsA(isA<ApiFormatException>()),
+      );
+      expect(
+        (await repository.getDictionaries()).modules.single.id,
+        'fixture-lexicon',
+      );
+      expect(requests, 2);
+    },
+  );
 }

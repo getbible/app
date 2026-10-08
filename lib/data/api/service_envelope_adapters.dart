@@ -271,35 +271,51 @@ final class ApiStudyResourcesRepository implements StudyResourcesRepository {
   @override
   Future<DictionaryCatalogue> getDictionaries({
     RequestCancellation? cancellation,
-  }) async => ServiceEnvelopeAdapters.dictionaries(
-    await transport.getJson(
-      ApiService.dictionaries,
-      '/v1/dictionaries.json',
-      cancellation: cancellation,
-    ),
+  }) => _load(
+    ApiService.dictionaries,
+    '/v1/dictionaries.json',
+    ServiceEnvelopeAdapters.dictionaries,
+    cancellation,
   );
 
   @override
   Future<CommentaryCatalogue> getCommentaries({
     RequestCancellation? cancellation,
-  }) async => ServiceEnvelopeAdapters.commentaries(
-    await transport.getJson(
-      ApiService.commentaries,
-      '/v1/commentaries.json',
-      cancellation: cancellation,
-    ),
+  }) => _load(
+    ApiService.commentaries,
+    '/v1/commentaries.json',
+    ServiceEnvelopeAdapters.commentaries,
+    cancellation,
   );
 
   @override
   Future<PublicTopicCatalogue> getPublicTopics({
     RequestCancellation? cancellation,
-  }) async => ServiceEnvelopeAdapters.publicTopics(
-    await transport.getJson(
-      ApiService.bookmarks,
-      'topics.json',
-      cancellation: cancellation,
-    ),
+  }) => _load(
+    ApiService.bookmarks,
+    'topics.json',
+    ServiceEnvelopeAdapters.publicTopics,
+    cancellation,
   );
+
+  Future<T> _load<T>(
+    ApiService service,
+    String path,
+    T Function(Object?) parse,
+    RequestCancellation? cancellation,
+  ) async {
+    final ApiResponse response = await transport.get(
+      service,
+      path,
+      cancellation: cancellation,
+    );
+    try {
+      return parse(response.json);
+    } on ApiFormatException {
+      transport.discardResponse(response);
+      rethrow;
+    }
+  }
 }
 
 T _parse<T>(T Function() parser) {

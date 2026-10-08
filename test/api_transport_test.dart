@@ -735,4 +735,100 @@ void main() {
       3,
     );
   });
+  test('discard invalid schema removes only its cached response', () async {
+    final Map<String, int> requests = <String, int>{};
+    final ApiTransport transport = ApiTransport(
+      client: MockClient((http.Request request) async {
+        final int revision = requests.update(
+          request.url.path,
+          (int value) => value + 1,
+          ifAbsent: () => 1,
+        );
+        return http.Response(
+          '{"revision":$revision}',
+          200,
+          headers: {'cache-control': 'max-age=600'},
+        );
+      }),
+    );
+    final ApiResponse invalid = await transport.get(
+      ApiService.query,
+      'tst/invalid',
+    );
+    await transport.get(ApiService.bible, 'translations.json');
+    transport.discardResponse(invalid);
+    expect(
+      (await transport.getJson(ApiService.query, 'tst/invalid'))['revision'],
+      2,
+    );
+    expect(
+      (await transport.getJson(
+        ApiService.bible,
+        'translations.json',
+      ))['revision'],
+      1,
+    );
+    expect(requests['/v3/translations.json'], 1);
+  });
+
+  test('fresh-cache copy can discard its original snapshot', () async {
+    int requests = 0;
+    final ApiTransport transport = ApiTransport(
+      client: MockClient((_) async {
+        requests += 1;
+        return http.Response(
+          '{"revision":$requests}',
+          200,
+          headers: {'cache-control': 'max-age=600'},
+        );
+      }),
+    );
+    await transport.get(ApiService.query, 'tst/invalid');
+    final ApiResponse copied = await transport.get(
+      ApiService.query,
+      'tst/invalid',
+    );
+    expect(copied.source, ApiResponseSource.freshCache);
+    transport.discardResponse(copied);
+    expect(
+      (await transport.getJson(ApiService.query, 'tst/invalid'))['revision'],
+      2,
+    );
+  });
+
+  test(
+    'discarding an older response never evicts a newer cached response',
+    () async {
+      int requests = 0;
+      final ApiTransport transport = ApiTransport(
+        clock: () => start,
+        client: MockClient((_) async {
+          requests += 1;
+          return http.Response(
+            '{"revision":$requests}',
+            200,
+            headers: {'cache-control': 'max-age=600'},
+          );
+        }),
+      );
+      final ApiResponse old = await transport.get(
+        ApiService.query,
+        'tst/reference',
+      );
+      await transport.get(
+        ApiService.query,
+        'tst/reference',
+        forceRefresh: true,
+      );
+      transport.discardResponse(old);
+      expect(
+        (await transport.getJson(
+          ApiService.query,
+          'tst/reference',
+        ))['revision'],
+        2,
+      );
+      expect(requests, 2);
+    },
+  );
 }

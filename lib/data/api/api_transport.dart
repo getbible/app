@@ -139,8 +139,22 @@ final class ApiResponse {
     this.source = ApiResponseSource.network,
     this.accept = 'application/json',
   }) : bytes = Uint8List.fromList(bytes).asUnmodifiableView(),
-       headers = Map<String, String>.unmodifiable(_lowercaseHeaders(headers));
+       headers = Map<String, String>.unmodifiable(_lowercaseHeaders(headers)),
+       _cacheIdentity = Object();
 
+  ApiResponse._withSource(ApiResponse value, this.source)
+    : service = value.service,
+      version = value.version,
+      serializationVersion = value.serializationVersion,
+      uri = value.uri,
+      bytes = value.bytes,
+      headers = value.headers,
+      receivedAt = value.receivedAt,
+      cachePolicy = value.cachePolicy,
+      accept = value.accept,
+      _cacheIdentity = value._cacheIdentity;
+
+  final Object _cacheIdentity;
   final ApiService service;
   final String version;
   final int serializationVersion;
@@ -239,7 +253,7 @@ final class ApiTransport {
     try {
       return response.json;
     } on ApiFormatException {
-      _remove(_key(response));
+      discardResponse(response);
       rethrow;
     }
   }
@@ -267,7 +281,7 @@ final class ApiTransport {
     try {
       return response.text;
     } on ApiFormatException {
-      _remove(_key(response));
+      discardResponse(response);
       rethrow;
     }
   }
@@ -519,18 +533,19 @@ final class ApiTransport {
   );
 
   ApiResponse _copy(ApiResponse value, {required ApiResponseSource source}) =>
-      ApiResponse(
-        service: value.service,
-        version: value.version,
-        serializationVersion: value.serializationVersion,
-        uri: value.uri,
-        bytes: value.bytes,
-        headers: value.headers,
-        receivedAt: value.receivedAt,
-        cachePolicy: value.cachePolicy,
-        accept: value.accept,
-        source: source,
-      );
+      ApiResponse._withSource(value, source);
+
+  /// Discard one malformed representation without evicting unrelated services
+  /// or a newer response that completed while this representation was parsed.
+  /// Fresh-cache copies keep the identity of their original cached snapshot.
+  void discardResponse(ApiResponse response) {
+    final String key = _key(response);
+    final ApiResponse? cached = _cache[key];
+    if (cached != null &&
+        identical(cached._cacheIdentity, response._cacheIdentity)) {
+      _remove(key);
+    }
+  }
 
   String _requestKey(
     ApiService service,

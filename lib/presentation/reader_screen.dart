@@ -90,6 +90,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
           Column(
             children: <Widget>[
               if (_showChrome) _ChapterHeading(state: state),
+              if (state.legacyScripture)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    'Saved legacy Scripture (API v2). Connect to refresh this passage from v3.',
+                  ),
+                ),
+              if (state.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    state.error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
               Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
@@ -158,6 +178,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _turn(AppState state, int direction) async {
+    if (state.loading ||
+        _editingNote != null ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        _scaffoldKey.currentState?.isDrawerOpen == true ||
+        _scaffoldKey.currentState?.isEndDrawerOpen == true) {
+      return;
+    }
     if ((direction < 0 && !state.canGoPrevious) ||
         (direction > 0 && !state.canGoNext)) {
       return;
@@ -186,15 +213,67 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _scrollToVerse(int? verse) async {
     if (verse == null) return;
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (!mounted) return;
-    final BuildContext? target = _verseKeys[verse]?.currentContext;
-    if (target != null && target.mounted) {
-      await Scrollable.ensureVisible(
-        target,
-        alignment: 0.2,
-        duration: const Duration(milliseconds: 260),
+    final AppState state = context.read<AppState>();
+    final BibleChapter? chapter = state.current;
+    final Passage origin = state.passage;
+    bool ownsScroll() =>
+        mounted && identical(state.current, chapter) && state.passage == origin;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!ownsScroll() || !_scrollController.hasClients) return;
+    final List<Verse> verses = chapter?.verses ?? const <Verse>[];
+    final int targetIndex = verses.indexWhere(
+      (Verse item) => item.verse == verse,
+    );
+    if (targetIndex < 0) return;
+    // A lazy chapter list has no element for a distant verse yet. First place
+    // its estimated row in view, then realize adjacent viewports until the
+    // actual keyed verse is mounted. Original source IDs may be noncontiguous.
+    if (_verseKeys[verse]?.currentContext == null && verses.length > 1) {
+      final ScrollPosition position = _scrollController.position;
+      _scrollController.jumpTo(
+        position.maxScrollExtent * targetIndex / (verses.length - 1),
       );
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    final Set<int> visitedOffsets = <int>{};
+    while (ownsScroll()) {
+      final BuildContext? target = _verseKeys[verse]?.currentContext;
+      if (target != null &&
+          target.mounted &&
+          target.findRenderObject()?.attached == true) {
+        if (!mounted || !ownsScroll()) return;
+        final bool reducedMotion =
+            state.preferences.reduceMotion ||
+            MediaQuery.disableAnimationsOf(context);
+        await Scrollable.ensureVisible(
+          target,
+          alignment: 0.2,
+          duration: reducedMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 260),
+        );
+        return;
+      }
+      if (!_scrollController.hasClients) return;
+      final List<int> realized = <int>[
+        for (int index = 0; index < verses.length; index++)
+          if (_verseKeys[verses[index].verse]?.currentContext != null) index,
+      ];
+      final ScrollPosition position = _scrollController.position;
+      final int direction = realized.isNotEmpty && targetIndex < realized.first
+          ? -1
+          : 1;
+      final double next =
+          (position.pixels + direction * position.viewportDimension * .8).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          );
+      // Stop at a boundary or a repeated offset rather than guessing a maximum
+      // introduction length. Every iteration either reveals the target or
+      // advances to a previously unseen part of this chapter.
+      if (next == position.pixels || !visitedOffsets.add(next.round())) return;
+      _scrollController.jumpTo(next);
+      await WidgetsBinding.instance.endOfFrame;
     }
   }
 
@@ -269,8 +348,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
       await state.removeWholeVerseMarking(verse.verse);
     } else if (choice == '__groups__') {
       final String? groupId = await _showMarkingGroupPicker(context, state);
-      if (groupId != null)
+      if (groupId != null) {
         await state.markWholeVerse(verse, reference, groupId);
+      }
     } else {
       await state.markWholeVerse(verse, reference, choice);
     }
@@ -398,7 +478,9 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         IconButton(
           tooltip: state.ui('openAsMarkdown'),
-          onPressed: onMarkdown,
+          onPressed: state.current?.verses.isNotEmpty == true
+              ? onMarkdown
+              : null,
           icon: const Icon(Icons.menu_book_outlined),
         ),
         Padding(
@@ -425,16 +507,18 @@ class _ChapterHeading extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
       child: Row(
         children: <Widget>[
-          Text(
-            chapter.name,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          Expanded(
+            child: Text(
+              chapter.name,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
           const SizedBox(width: 12),
           Text(
             chapter.abbreviation.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall,
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           ScriptureVerificationBadge(
             freshness: state.freshness ?? CacheFreshness.cachedUnverified,
           ),
@@ -581,7 +665,7 @@ class _ParagraphReader extends StatelessWidget {
         )
         ..add(
           TextSpan(
-            text: '${verse.text.trim()} ',
+            text: '${verse.text} ',
             style: TextStyle(
               backgroundColor: group == null
                   ? null
@@ -1671,7 +1755,7 @@ class _ReaderDrawer extends StatelessWidget {
             value: state.passage.translation,
             translations: state.translations,
             onChanged: (String? value) {
-              if (value != null)
+              if (value != null) {
                 unawaited(
                   state.loadPassage(
                     Passage(
@@ -1681,6 +1765,7 @@ class _ReaderDrawer extends StatelessWidget {
                     ),
                   ),
                 );
+              }
             },
           ),
           const SizedBox(height: 12),
@@ -1697,16 +1782,7 @@ class _ReaderDrawer extends StatelessWidget {
                 )
                 .toList(),
             onChanged: (int? value) {
-              if (value != null)
-                unawaited(
-                  state.loadPassage(
-                    Passage(
-                      translation: state.passage.translation,
-                      book: value,
-                      chapter: 1,
-                    ),
-                  ),
-                );
+              if (value != null) unawaited(state.openBook(value));
             },
           ),
           const SizedBox(height: 12),
@@ -1720,17 +1796,20 @@ class _ReaderDrawer extends StatelessWidget {
                 .map(
                   (ChapterInfo item) => DropdownMenuItem(
                     value: item.chapter,
-                    child: Text('${item.chapter}'),
+                    child: Text(
+                      item.isIntroduction ? 'Introduction' : '${item.chapter}',
+                    ),
                   ),
                 )
                 .toList(),
             onChanged: (int? value) {
-              if (value != null)
+              if (value != null) {
                 unawaited(
                   state.loadPassage(
                     state.passage.copyWith(chapter: value, clearVerse: true),
                   ),
                 );
+              }
             },
           ),
           const Divider(height: 32),
@@ -2054,7 +2133,7 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
     final String reference = verses.length == 1
         ? '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}'
         : '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}\u2013${verses.last.verse}';
-    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text.trim()}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
+    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
   }
 
   String get _value => _markdown

@@ -6,6 +6,7 @@ import 'package:getbible_live/core/errors.dart';
 import 'package:getbible_live/core/json.dart';
 import 'package:getbible_live/data/api/api_transport.dart';
 import 'package:getbible_live/data/api/service_envelope_adapters.dart';
+import 'package:getbible_live/domain/models/bible.dart';
 import 'package:getbible_live/domain/models/service_envelopes.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -157,6 +158,19 @@ void main() {
     expect(compact.chapters.values.single.bookNumber, 101);
     expect(compact.chapters.values.single.chapter, 1);
     expect(compact.chapters.values.single.verses.single.verse, 1);
+    final Verse verse = compact.chapters.values.single.verses.single;
+    expect(verse.chapter, 1);
+    expect(verse.toJson().containsKey('chapter'), isFalse);
+    final JsonMap source = requireJsonMap(
+      fixtures['search_compact'],
+      'compact search',
+    );
+    final JsonMap results = requireJsonMap(source['results'], 'results');
+    final JsonMap chapter = requireJsonMap(results.values.single, 'chapter');
+    expect(
+      jsonDecode(jsonEncode(verse.toJson())),
+      requireJsonList(chapter['verses'], 'verses').single,
+    );
     final SearchEnvelope contextual = ServiceEnvelopeAdapters.search(
       fixtures['search_compact'],
       selectedTranslation: 'tst',

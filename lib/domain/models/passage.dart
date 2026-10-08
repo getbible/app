@@ -43,7 +43,8 @@ final class Passage {
   Passage validated() {
     if (!RegExp(r'^[a-z0-9_-]+$').hasMatch(translation) ||
         book < 1 ||
-        chapter < 1 ||
+        chapter < 0 ||
+        (chapter == 0 && verse != null) ||
         (verse != null && verse! < 1)) {
       throw const FormatException('The passage reference is invalid.');
     }

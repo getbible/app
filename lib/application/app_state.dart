@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/ui_strings.dart';
-
 import '../data/api/getbible_api_client.dart';
 import '../data/database/local_database.dart';
 import '../data/repositories/cached_bible_repository.dart';
@@ -21,19 +20,41 @@ export '../domain/models/preferences.dart'
     show AppearanceMode, ReaderLayout, ReadingWidth;
 
 final class AppState extends ChangeNotifier {
-  AppState._(this.database, this.bibles, this.annotations, this.settings);
+  AppState._(
+    this.database,
+    this.bibles,
+    this.annotations,
+    this.settings,
+    this._api,
+  );
 
-  static Future<AppState> create() async {
-    final LocalDatabase database = await LocalDatabase.open();
-    final AppState state = AppState._(
+  /// Compose persistent reader operations with one injectable HTTP boundary.
+  /// Tests use the same composition as the app's startup.
+  factory AppState.fromDatabase(
+    LocalDatabase database, {
+    GetBibleApiClient? api,
+  }) {
+    final GetBibleApiClient client = api ?? GetBibleApiClient();
+    final CachedBibleRepository repository = CachedBibleRepository(
       database,
-      CachedBibleRepository(database, GetBibleApiClient()),
+      client,
+    );
+    return AppState._(
+      database,
+      repository,
       SqlAnnotationRepository(database),
       SqlSettingsRepository(database),
+      client,
     );
-    await state.initialize();
+  }
+
+  static Future<AppState> create({bool initialize = true}) async {
+    final AppState state = AppState.fromDatabase(await LocalDatabase.open());
+    if (initialize) await state.initialize();
     return state;
   }
+
+  final GetBibleApiClient _api;
 
   final LocalDatabase database;
   final CachedBibleRepository bibles;
@@ -47,6 +68,7 @@ final class AppState extends ChangeNotifier {
   List<ChapterInfo> chapters = const [];
   BibleChapter? current;
   CacheFreshness? freshness;
+  bool legacyScripture = false;
   List<MarkingGroup> groups = const [];
   List<Marking> markings = const [];
   List<VerseNote> notes = const [];
@@ -98,14 +120,20 @@ final class AppState extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    preferences = await settings.getPreferences();
-    final LastReadingPosition? last = await settings.getLastReadingPosition();
-    groups = await annotations.getGroups();
-    if (last != null) {
-      passage = last.passage;
-      await loadPassage(passage);
-    } else {
-      await openDailyScripture();
+    try {
+      preferences = await settings.getPreferences();
+      final LastReadingPosition? last = await settings.getLastReadingPosition();
+      groups = await annotations.getGroups();
+      if (last != null) {
+        passage = last.passage;
+        await loadPassage(passage);
+      } else {
+        await openDailyScripture();
+      }
+    } catch (exception) {
+      error = exception.toString();
+      loading = false;
+      notifyListeners();
     }
   }
 
@@ -149,50 +177,122 @@ final class AppState extends ChangeNotifier {
     );
   }
 
-  Future<void> loadPassage(Passage next) async {
-    final int request = ++_passageRequest;
+  Future<void> loadPassage(Passage next, {bool Function()? ownsRequest}) =>
+      _loadPassage(next, ++_passageRequest, ownsRequest: ownsRequest);
+
+  Future<void> _loadPassage(
+    Passage next,
+    int request, {
+    bool Function()? ownsRequest,
+  }) async {
     loading = true;
     error = null;
     notifyListeners();
     try {
       final RepositoryResult<List<Translation>> translationResult = await bibles
           .getTranslations();
-      translations = translationResult.data;
       final RepositoryResult<List<BibleBook>> bookResult = await bibles
           .getBooks(next.translation);
-      if (request != _passageRequest) return;
-      books = bookResult.data;
+      if (request != _passageRequest || ownsRequest?.call() == false) return;
+      if (!bookResult.data.any((BibleBook item) => item.number == next.book)) {
+        throw const FormatException(
+          'That book is not available in this translation.',
+        );
+      }
       final RepositoryResult<List<ChapterInfo>> chapterIndexResult =
           await bibles.getChapters(next.translation, next.book);
-      if (request != _passageRequest) return;
-      chapters = chapterIndexResult.data;
-      if (!chapters.any((ChapterInfo item) => item.chapter == next.chapter)) {
+      if (request != _passageRequest || ownsRequest?.call() == false) return;
+      if (!chapterIndexResult.data.any(
+        (ChapterInfo item) => item.chapter == next.chapter,
+      )) {
         throw const FormatException(
           'That chapter is not available in this translation.',
         );
       }
       final RepositoryResult<BibleChapter> chapterResult = await bibles
           .getChapter(next.translation, next.book, next.chapter);
-      if (request != _passageRequest) return;
+      if (request != _passageRequest || ownsRequest?.call() == false) return;
+      if (next.verse != null &&
+          !chapterResult.data.verses.any(
+            (Verse item) => item.verse == next.verse,
+          )) {
+        throw const FormatException(
+          'That verse is not available in this translation.',
+        );
+      }
+      final List<Marking> nextMarkings = await annotations
+          .getMarkingsForPassage(next);
+      final List<VerseNote> nextNotes = await annotations.getNotesForPassage(
+        next,
+      );
+      final List<Marking> nextSavedMarkings = await annotations.getMarkings();
+      final List<VerseNote> nextSavedNotes = await annotations.getNotes();
+      final String? language = translationResult.data
+          .where((Translation item) => item.abbreviation == next.translation)
+          .firstOrNull
+          ?.lang;
+      final UiStrings nextUi = await UiStrings.load(language);
+      if (request != _passageRequest || ownsRequest?.call() == false) return;
+      translations = translationResult.data;
+      books = bookResult.data;
+      chapters = chapterIndexResult.data;
       passage = next;
       current = chapterResult.data;
-      ui = await UiStrings.load(currentTranslation?.lang);
+      ui = nextUi;
       freshness = chapterResult.freshness;
-      markings = await annotations.getMarkingsForPassage(next);
-      notes = await annotations.getNotesForPassage(next);
-      savedMarkings = await annotations.getMarkings();
-      savedNotes = await annotations.getNotes();
+      legacyScripture = chapterResult.isLegacy;
+      markings = nextMarkings;
+      notes = nextNotes;
+      savedMarkings = nextSavedMarkings;
+      savedNotes = nextSavedNotes;
       await settings.saveLastReadingPosition(
         LastReadingPosition(
           passage: next,
-          verse: next.verse ?? 1,
+          verse:
+              next.verse ?? chapterResult.data.verses.firstOrNull?.verse ?? 0,
           updatedAt: DateTime.now().toUtc(),
         ),
       );
     } catch (exception) {
-      error = exception.toString();
+      if (request == _passageRequest && ownsRequest?.call() != false) {
+        error = exception.toString();
+      }
     } finally {
       if (request == _passageRequest) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// A book opens at its discovered first chapter or its introduction node.
+  Future<void> openBook(int book, {bool atEnd = false}) async {
+    final int request = ++_passageRequest;
+    final String translation = passage.translation;
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final RepositoryResult<List<ChapterInfo>> result = await bibles
+          .getChapters(translation, book);
+      if (request != _passageRequest) return;
+      if (result.data.isEmpty) {
+        throw const FormatException(
+          'This book has no published chapters or introduction.',
+        );
+      }
+      await _loadPassage(
+        Passage(
+          translation: translation,
+          book: book,
+          chapter: (atEnd ? result.data.last : result.data.first).chapter,
+        ),
+        request,
+      );
+    } catch (exception) {
+      if (request == _passageRequest) error = exception.toString();
+    } finally {
+      if (request == _passageRequest && loading) {
         loading = false;
         notifyListeners();
       }
@@ -217,16 +317,7 @@ final class AppState extends ChangeNotifier {
           ),
         );
       } else if (bookIndex > 0) {
-        final BibleBook previousBook = books[bookIndex - 1];
-        final RepositoryResult<List<ChapterInfo>> previousChapters =
-            await bibles.getChapters(passage.translation, previousBook.number);
-        await loadPassage(
-          Passage(
-            translation: passage.translation,
-            book: previousBook.number,
-            chapter: previousChapters.data.last.chapter,
-          ),
-        );
+        await openBook(books[bookIndex - 1].number, atEnd: true);
       }
       return;
     }
@@ -238,13 +329,7 @@ final class AppState extends ChangeNotifier {
         ),
       );
     } else if (bookIndex < books.length - 1) {
-      await loadPassage(
-        Passage(
-          translation: passage.translation,
-          book: books[bookIndex + 1].number,
-          chapter: 1,
-        ),
-      );
+      await openBook(books[bookIndex + 1].number);
     }
   }
 
@@ -431,8 +516,9 @@ final class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final Translation? translation = currentTranslation;
-      if (translation == null)
+      if (translation == null) {
         throw StateError('The selected translation is unavailable.');
+      }
       final RepositoryResult<WholeTranslation> corpus = await bibles
           .getWholeTranslation(translation);
       final List<SearchVerse> results = await searchTranslation(
@@ -507,5 +593,10 @@ final class AppState extends ChangeNotifier {
     await settings.savePreferences(preferences);
   }
 
-  Future<void> close() => database.close();
+  Future<void> close() async {
+    _passageRequest++;
+    _searchRequest++;
+    _api.close();
+    await database.close();
+  }
 }

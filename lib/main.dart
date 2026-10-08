@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,10 +8,11 @@ import 'presentation/reader_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final AppState state = await AppState.create();
+  final AppState state = await AppState.create(initialize: false);
   runApp(
     ChangeNotifierProvider.value(value: state, child: const GetBibleApp()),
   );
+  unawaited(state.initialize());
 }
 
 class GetBibleApp extends StatelessWidget {

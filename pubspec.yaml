@@ -1,5 +1,5 @@
 name: getbible_live
-description: A local-first, cross-platform Flutter Bible reader powered by GetBible API v2.
+description: A local-first, cross-platform Flutter Bible reader powered by GetBible v3 Bible and Query services.
 publish_to: none
 version: 1.0.0+1
 
@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.44.6'
 
 dependencies:
+  crypto: 3.0.7
   drift:
     git:
       url: https://github.com/simolus3/drift.git

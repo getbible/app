@@ -169,10 +169,8 @@ abstract final class ServiceEnvelopeAdapters {
           chapter: chapter,
           verses: List<Verse>.unmodifiable(
             requireJsonList(record['verses'], 'search verses').map(
-              (Object? verse) => Verse.fromJson(<String, Object?>{
-                'chapter': chapter,
-                ...requireJsonMap(verse, 'search verse'),
-              }),
+              (Object? verse) =>
+                  Verse.fromJson(verse, fallbackChapter: chapter),
             ),
           ),
           abbreviation: _nullableString(

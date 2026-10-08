@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS cache_entries(cache_key TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, sha TEXT NOT NULL DEFAULT "", payload TEXT NOT NULL, checked_at INTEGER NOT NULL, cached_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS cache_entries_kind ON cache_entries(kind);
+CREATE TABLE IF NOT EXISTS marking_groups(id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, sort_order INTEGER NOT NULL, is_starter INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS markings(id TEXT PRIMARY KEY NOT NULL, translation TEXT NOT NULL, book_nr INTEGER NOT NULL, chapter_nr INTEGER NOT NULL, verse_nr INTEGER NOT NULL, start_offset INTEGER, end_offset INTEGER, quote TEXT NOT NULL, reference TEXT NOT NULL, group_id TEXT NOT NULL REFERENCES marking_groups(id) ON DELETE CASCADE, created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS markings_canonical ON markings(book_nr, chapter_nr, verse_nr);
+CREATE INDEX IF NOT EXISTS markings_translation ON markings(translation, book_nr, chapter_nr, verse_nr);
+CREATE INDEX IF NOT EXISTS markings_group ON markings(group_id, book_nr, chapter_nr, verse_nr);
+CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY NOT NULL, canonical_key TEXT NOT NULL UNIQUE, translation TEXT NOT NULL, book_nr INTEGER NOT NULL, chapter_nr INTEGER NOT NULL, verse_nr INTEGER NOT NULL, reference TEXT NOT NULL, text TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS notes_order ON notes(book_nr, chapter_nr, verse_nr);
+CREATE TABLE IF NOT EXISTS settings(setting_key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
+ALTER TABLE cache_entries ADD COLUMN fresh_until INTEGER;
+ALTER TABLE cache_entries ADD COLUMN must_revalidate INTEGER NOT NULL DEFAULT 1;

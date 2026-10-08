@@ -199,7 +199,7 @@ void main() {
       await old.close();
       final database = await LocalDatabase.fromExecutor(NativeDatabase(file));
       addTearDown(database.close);
-      expect(localDatabaseSchemaVersion, 2);
+      expect(localDatabaseSchemaVersion, 3);
       expect(await database.readCache('chapter:fx:900000123:3'), isNull);
       final legacy = await database.readCache(
         ScriptureCacheIdentity.legacy.key('chapter:fx:900000123:3'),

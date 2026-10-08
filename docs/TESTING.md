@@ -163,3 +163,42 @@ Before a release, run the Flutter app beside `https://app.getbible.life/` using 
 Visually inspect the launcher, splash, task-switcher/window icon, browser favicon/PWA icon, and in-app wordmark on light and dark system surfaces. `sha256sum -c assets/branding/BRAND_ASSETS.sha256` must pass before testing release artifacts.
 
 Do not declare physical-device behavior verified from widget tests alone.
+
+## Recorded Study increment validation
+
+Implementation source `76254ab46555a6f5b41fd9b63673001b843e944e` was checked on
+Flutter 3.44.6 / Dart 3.12.2. [CI run 37838406451](https://github.com/getbible/app/actions/runs/37838406451)
+passed both jobs for this source. Later documentation changes do not replace
+the requirement for green CI on the head being reviewed.
+
+| Gate | Recorded result |
+|---|---|
+| Whole-tree formatting and static analysis | 151 Dart files formatting-clean; no analyzer issues |
+| Unit and widget suite | 266 tests passed |
+| Native Linux reader integration | Passed, including actual OS clipboard and exact-verse navigation |
+| Native Linux Study integration | Passed, including explicit topic copying and offline private-notebook reopening |
+| Web / Linux release and Android debug | Passed in the source commit's CI |
+| Approved branding | Exact asset checksums passed |
+| Current public schemas | 41/41 fixture cases passed against official live Query, Search, Dictionary, Commentary and Bookmark OpenAPI contracts |
+| Real public documents | 13 downloaded resource documents accepted by production adapters; no UI/live-browser claim |
+| Independent final review | Nine additional focused regressions passed; no blocking finding |
+
+Contract fingerprints were rechecked against the public `/openapi.json`
+documents. Real resource checks included Strong's Greek and Abbott-Smith
+published indexes, a selected dictionary definition, sparse Abbott commentary
+coverage/chapter data, and a public topic/reverse lookup/locales. No bulk corpus
+download was required for these workflows.
+
+A 6,917,748-byte published dictionary index with 114,712 entries was exercised
+on this Linux worker. Native parsing uses a compute worker; cooperative
+filtering/cancellation continued to yield. This JIT measurement is evidence for
+the chosen implementation, not a phone/browser performance guarantee.
+Five service OPTIONS requests returned successful CORS preflights and exposed
+cache/retry headers; actual deployed-browser CORS remains a separate gate.
+
+Available-host Android release APK/AAB validation uses the normal production
+commands in [deployment](DEPLOYMENT.md), without signing identities. Signing,
+install/upgrade, Apple/Windows host builds, physical-device gestures and
+accessibility, full locale adoption, complete offline installations and private
+notebook portability retain their later roadmap/release gates. Local test
+artifacts and server-header checks do not close those gates.

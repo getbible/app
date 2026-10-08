@@ -25,6 +25,26 @@ flutter build ios --release --no-codesign
 
 For distribution, archive in Xcode, sign with an Apple Distribution identity, upload to App Store Connect, test through TestFlight, and submit after metadata/privacy review.
 
+## Desktop and web targets
+
+Validate Windows on Windows and macOS on macOS; a Linux or web build does not
+validate those runners. The macOS debug/profile and release sandbox entitlements
+include `com.apple.security.network.client` for public HTTPS Scripture, Search
+and Study requests. Exercise actual HTTPS in the sandbox before distributing a
+signed archive. Windows packaging/signing, macOS notarization and store-specific
+entitlements remain release work on the relevant host.
+
+Linux release validation uses `flutter build linux --release`. Web validation
+uses `flutter build web --release --base-href /flutter/` for the retained path;
+verify deployed URLs, browser CORS and storage behavior separately. A server's
+successful CORS preflight is supporting evidence, not a browser-runtime test.
+
+Native Study uses no embedded browser, additional account service or telemetry.
+Complete notebook portability, installed offline resources, full localization,
+device accessibility and store metadata remain roadmap steps 12–17. Development
+builds and unsigned Android release outputs are validation artifacts; they are
+not a signed store submission.
+
 ## GitHub release
 
 Tag only a green, reviewed commit. A release workflow should produce checksums and unsigned/test artifacts; store-signed artifacts should come from protected CI environments or store pipelines. Release notes must enumerate user-visible changes, migrations, known limitations, and backup compatibility.

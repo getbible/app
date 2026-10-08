@@ -10,20 +10,31 @@ import '../application/reference_preview_controller.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
+import '../domain/models/online_search.dart';
 import '../domain/models/passage.dart';
 import '../domain/models/reference.dart';
 import '../domain/models/search.dart';
+import '../domain/models/study_context.dart';
 import '../services/markdown_service.dart';
 import '../services/scripture_layout.dart';
 import '../services/scripture_text.dart';
+import '../services/search_match_emphasis.dart';
 import 'boundary_turn_controller.dart';
+import 'widgets/commentary_panel.dart';
+import 'widgets/dictionary_panel.dart';
+import 'widgets/my_annotations_panel.dart';
+import 'widgets/native_scripture_text.dart';
+import 'widgets/notes_panel.dart';
 import 'widgets/reader_translation_field.dart';
 import 'widgets/reference_preview.dart';
-import 'widgets/search_panel.dart';
 import 'widgets/scripture_editorial.dart';
 import 'widgets/scripture_paragraph_selection.dart';
+import 'widgets/scripture_study_actions.dart';
 import 'widgets/scripture_verification_badge.dart';
 import 'widgets/scripture_verse_text.dart';
+import 'widgets/search_panel.dart';
+import 'widgets/study_workspace.dart';
+import 'widgets/topics_panel.dart';
 
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key});
@@ -40,7 +51,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _boundaryRecordedForGesture = false;
   bool _showChrome = true;
   int? _editingNote;
+  bool _openingDaily = false;
   bool _previewOpen = false;
+  BibleChapter? _arrivalChapter;
+  int? _arrivalVerse;
+  List<ScriptureTextEmphasis> _arrivalEmphasis =
+      const <ScriptureTextEmphasis>[];
+  StudyContext? _studyContext;
+  StudyTab _studyTab = StudyTab.markings;
+  bool _studyModal = false;
+  bool _compactStudyScheduled = false;
+  FocusNode? _readerFocusBeforeStudy;
 
   @override
   void initState() {
@@ -63,25 +84,65 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   Widget build(BuildContext context) {
     final AppState state = context.watch<AppState>();
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: _ReaderDrawer(
-        state: state,
-        onReferencePreview: _showReferencePreview,
+    return PopScope<void>(
+      canPop: _studyContext == null || _studyModal,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _studyContext != null && !_studyModal) _closeStudy();
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: _ReaderDrawer(
+          state: state,
+          onReferencePreview: _showReferencePreview,
+          navigationEnabled: _editingNote == null && !_openingDaily,
+        ),
+
+        appBar: _showChrome
+            ? _ReaderAppBar(
+                state: state,
+                onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+                onStudy: () => _openStudy(),
+                onSearch: () => _showSearch(context, state),
+                onHome: () => unawaited(_openDaily(state)),
+                onTurn: (int direction) => unawaited(_turn(state, direction)),
+                onMarkdown: () => _showMarkdown(context, state),
+              )
+            : null,
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bool wide = constraints.maxWidth >= 1100;
+              if (!wide &&
+                  _studyContext != null &&
+                  !_studyModal &&
+                  !_compactStudyScheduled) {
+                _compactStudyScheduled = true;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _compactStudyScheduled = false;
+                  if (mounted &&
+                      _studyContext != null &&
+                      !_studyModal &&
+                      MediaQuery.sizeOf(context).width < 1100) {
+                    unawaited(_showCompactStudy());
+                  }
+                });
+              }
+              return Row(
+                children: [
+                  Expanded(child: _body(context, state)),
+                  if (wide && _studyContext != null && !_studyModal) ...[
+                    const VerticalDivider(width: 1),
+                    SizedBox(
+                      width: (constraints.maxWidth * .42).clamp(420, 560),
+                      child: _studyWorkspace(state),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
       ),
-      endDrawer: _StudyDrawer(state: state, onOpenPassage: _openPassage),
-      appBar: _showChrome
-          ? _ReaderAppBar(
-              state: state,
-              onMenu: () => _scaffoldKey.currentState?.openDrawer(),
-              onStudy: () => _scaffoldKey.currentState?.openEndDrawer(),
-              onSearch: () => _showSearch(context, state),
-              onHome: () => unawaited(state.openDailyScripture()),
-              onTurn: (int direction) => unawaited(_turn(state, direction)),
-              onMarkdown: () => _showMarkdown(context, state),
-            )
-          : null,
-      body: SafeArea(child: _body(context, state)),
     );
   }
 
@@ -153,14 +214,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (ScrollNotification notice) =>
                             _onScrollNotification(notice, state),
-                        child: _ReaderBody(
-                          state: state,
-                          controller: _scrollController,
-                          verseKeys: _verseKeys,
-                          editingNote: _editingNote,
-                          onEditNote: (int? verse) =>
-                              setState(() => _editingNote = verse),
-                          onOpenVerseMenu: _showVerseMenu,
+                        child: ScriptureStudyActions(
+                          emphasisFor: (verse) =>
+                              identical(state.current, _arrivalChapter) &&
+                                  verse.verse == _arrivalVerse
+                              ? _arrivalEmphasis
+                              : const <ScriptureTextEmphasis>[],
+                          onWord: (verse, range) => _openStudy(
+                            verse: verse,
+                            range: range,
+                            tab: StudyTab.dictionary,
+                          ),
+                          onSearch: (text) => unawaited(
+                            _showSearch(
+                              context,
+                              state,
+                              initialQuery: text,
+                              phrase: true,
+                            ),
+                          ),
+                          onNote: (verse) => _editVerseNote(verse.verse),
+                          child: _ReaderBody(
+                            state: state,
+                            controller: _scrollController,
+                            verseKeys: _verseKeys,
+                            editingNote: _editingNote,
+                            onEditNote: _editVerseNote,
+                            onOpenVerseMenu: _showVerseMenu,
+                          ),
                         ),
                       ),
                     ),
@@ -195,7 +276,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _turn(AppState state, int direction) async {
-    if (_previewOpen ||
+    if (_studyContext != null ||
+        _previewOpen ||
+        _openingDaily ||
         state.loading ||
         _editingNote != null ||
         ModalRoute.of(context)?.isCurrent != true ||
@@ -213,21 +296,62 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (!_showChrome) setState(() => _showChrome = true);
   }
 
+  Future<void> _openDaily(AppState state) async {
+    if (_openingDaily) return;
+    if (_editingNote != null) {
+      _noteNavigationNotice();
+      return;
+    }
+    // Daily reference discovery happens before AppState's chapter load. Own
+    // that interval too, so a new inline draft cannot be rebound by its result.
+    setState(() => _openingDaily = true);
+    try {
+      await state.openDailyScripture();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('The daily passage could not be opened. $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingDaily = false);
+    }
+  }
+
+  void _editVerseNote(int? verse) {
+    if (verse != null && (_openingDaily || context.read<AppState>().loading)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Wait for the passage to finish opening before editing a verse note.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_editingNote != null && verse != null && verse != _editingNote) {
+      _noteNavigationNotice();
+      return;
+    }
+    setState(() => _editingNote = verse);
+  }
+
+  void _noteNavigationNotice() => ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Save or close the verse note before opening another passage.',
+      ),
+    ),
+  );
+
   Future<void> _showMarkdown(BuildContext context, AppState state) =>
       showDialog<void>(
         context: context,
         builder: (BuildContext context) =>
             _ScriptureShareDialog(state: state, initialVerse: null),
       );
-
-  Future<void> _openPassage(Passage passage) async {
-    final AppState state = context.read<AppState>();
-    await Navigator.of(context).maybePop();
-    if (!mounted) return;
-    await state.loadPassage(passage);
-    if (!mounted) return;
-    await _scrollToVerse(passage.verse);
-  }
 
   Future<void> _scrollToVerse(int? verse) async {
     if (verse == null) return;
@@ -302,18 +426,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final ReferencePreviewController controller = ReferencePreviewController(
       lookup: state.referenceLookup,
     );
+    final String previewTranslation =
+        request?.translation ?? state.passage.translation;
+    final Translation? previewBible = state.translations
+        .where((item) => item.abbreviation == previewTranslation)
+        .firstOrNull;
     _previewOpen = true;
     _boundaryTurns.clear();
     try {
       await showAdaptiveReferencePreview(
         context: context,
         controller: controller,
-        selectedTranslation: state.passage.translation,
-        translationName: state.currentTranslation?.translation,
+        selectedTranslation: previewTranslation,
+        translationName: request?.translationName ?? previewBible?.translation,
         selectedTranslationDirection:
-            state.current?.direction ??
-            state.currentTranslation?.direction ??
-            'LTR',
+            request?.translationDirection ?? previewBible?.direction ?? 'LTR',
         showSourceStyles: state.preferences.showSourceStyles,
         initialRequest: request,
         labels: ReferencePreviewLabels(copy: state.ui('copy')),
@@ -385,6 +512,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
             title: Text('Reference preview'),
           ),
         ),
+        for (final (String value, String label) in <(String, String)>[
+          ('__commentary__', 'Verse commentary'),
+          ('__topics__', 'Verse topics'),
+        ])
+          PopupMenuItem<String>(value: value, child: Text(label)),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: '__note__',
@@ -428,8 +560,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
           ],
         ),
       );
+    } else if (choice == '__commentary__' || choice == '__topics__') {
+      _openStudy(
+        verse: verse,
+        tab: choice == '__commentary__' ? StudyTab.commentary : StudyTab.topics,
+      );
     } else if (choice == '__note__') {
-      setState(() => _editingNote = verse.verse);
+      _editVerseNote(verse.verse);
     } else if (choice == '__share__') {
       await showDialog<void>(
         context: context,
@@ -457,26 +594,268 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _MarkingGroupPicker(groups: state.groups),
   );
 
-  Future<void> _showSearch(BuildContext context, AppState state) async {
+  Future<void> _showSearch(
+    BuildContext context,
+    AppState state, {
+    String initialQuery = '',
+    bool phrase = false,
+    StudyContext? sourceContext,
+  }) async {
+    final FocusNode? previousFocus = FocusManager.instance.primaryFocus;
+    final String translation =
+        sourceContext?.translation ?? state.passage.translation;
     await showDialog<void>(
       context: context,
-      builder: (BuildContext context) => _SearchDialog(
-        state: state,
-        onOpen: (SearchVerse result) async {
-          Navigator.of(context).pop();
-          await state.loadPassage(
-            Passage(
-              translation: state.passage.translation,
-              book: result.book,
-              chapter: result.chapter,
-              verse: result.verse,
-            ),
-          );
-          await _scrollToVerse(result.verse);
-        },
+      builder: (dialogContext) => Dialog.fullscreen(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: Text('Search ${translation.toUpperCase()}'),
+                leading: IconButton(
+                  tooltip: 'Close search',
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+              Expanded(
+                child: SearchPanel(
+                  controller: state.onlineSearch,
+                  translation: translation,
+                  books: sourceContext?.availableBooks ?? state.books,
+                  initialQuery: initialQuery,
+                  initialPhrase: phrase,
+                  direction:
+                      sourceContext?.direction ??
+                      state.current?.direction ??
+                      'LTR',
+                  showSourceStyles: state.preferences.showSourceStyles,
+                  onOpen: (OnlineSearchHit hit) async {
+                    if (_editingNote != null) {
+                      throw const ReferenceLookupException(
+                        'Save or close the verse note before opening another passage.',
+                      );
+                    }
+                    final Passage target = Passage(
+                      translation: hit.translation,
+                      book: hit.book,
+                      chapter: hit.chapter,
+                      verse: hit.verse.verse,
+                    );
+                    final OnlineSearchRequest? searchOperation =
+                        state.onlineSearch.request;
+                    bool ownsNavigation() =>
+                        mounted &&
+                        dialogContext.mounted &&
+                        identical(
+                          state.onlineSearch.request,
+                          searchOperation,
+                        ) &&
+                        ModalRoute.of(dialogContext)?.isCurrent == true;
+                    await state.loadPassage(
+                      target,
+                      ownsRequest: ownsNavigation,
+                    );
+                    if (!ownsNavigation()) return;
+                    if (state.passage != target || state.error != null) {
+                      throw ReferenceLookupException(
+                        state.error ??
+                            'This search result is unavailable in the selected Bible.',
+                      );
+                    }
+                    final criteria = state.onlineSearch.request?.criteria;
+                    setState(() {
+                      _arrivalChapter = state.current;
+                      _arrivalVerse = hit.verse.verse;
+                      _arrivalEmphasis = searchMatchEmphasis(
+                        hit.verse,
+                        hit.terms,
+                        caseSensitive: criteria?.caseSensitive ?? false,
+                        match: criteria?.match ?? SearchMatchMode.partial,
+                      );
+                    });
+                    await _scrollToVerse(target.verse);
+                    if (!ownsNavigation() || !dialogContext.mounted) return;
+                    Navigator.of(dialogContext).pop();
+                    if (_studyContext != null) _closeStudy();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+    state.onlineSearch.cancel();
+    if (mounted && previousFocus?.context != null) {
+      previousFocus!.requestFocus();
+    }
   }
+
+  StudyContext _captureStudy(
+    AppState state, {
+    Verse? verse,
+    ScriptureTextRange? range,
+  }) => StudyContext(
+    passage: verse == null
+        ? state.passage.copyWith(clearVerse: true)
+        : state.passage.copyWith(verse: verse.verse),
+    bookName: state.current?.bookName ?? '',
+    language: state.currentTranslation?.lang ?? 'en',
+    translationName: state.currentTranslation?.translation,
+    direction:
+        state.current?.direction ??
+        state.currentTranslation?.direction ??
+        'LTR',
+    verse: verse,
+    selectionStart: range?.start,
+    selectionEnd: range?.end,
+    availableBooks: List<BibleBook>.unmodifiable(state.books),
+  );
+
+  void _openStudy({
+    Verse? verse,
+    ScriptureTextRange? range,
+    StudyTab tab = StudyTab.markings,
+  }) {
+    if (_previewOpen || _studyModal) return;
+    final AppState state = context.read<AppState>();
+    _readerFocusBeforeStudy ??= FocusManager.instance.primaryFocus;
+    _boundaryTurns.clear();
+    setState(() {
+      _studyContext = _captureStudy(state, verse: verse, range: range);
+      _studyTab = tab;
+    });
+    if (MediaQuery.sizeOf(context).width < 1100) unawaited(_showCompactStudy());
+  }
+
+  Future<void> _showCompactStudy() async {
+    if (!mounted || _studyContext == null || _studyModal) return;
+    _studyModal = true;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (sheetContext) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .92,
+            child: _studyWorkspace(context.read<AppState>()),
+          ),
+        ),
+      );
+    } finally {
+      _studyModal = false;
+      if (mounted) _finishStudy();
+    }
+  }
+
+  void _closeStudy() {
+    if (_studyModal) {
+      Navigator.of(context).pop();
+    } else {
+      _finishStudy();
+    }
+  }
+
+  void _finishStudy() {
+    // Private notebook drafts belong to their controller, so closing this
+    // surface cannot discard edits. Resource requests are cancelled separately.
+    context.read<AppState>().study.dismissResources();
+    unawaited(context.read<AppState>().study.notebooks.flush());
+    setState(() => _studyContext = null);
+    final FocusNode? focus = _readerFocusBeforeStudy;
+    _readerFocusBeforeStudy = null;
+    if (focus?.context != null) focus!.requestFocus();
+  }
+
+  Future<void> _openStudyPassage(Passage passage) async {
+    final AppState state = context.read<AppState>();
+    if (_editingNote != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Save or close the verse note before opening another passage.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_studyContext != null) _closeStudy();
+    await state.loadPassage(passage);
+    if (!mounted) return;
+    if (state.passage != passage || state.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            state.error ?? 'This passage is unavailable in the selected Bible.',
+          ),
+        ),
+      );
+      return;
+    }
+    await _scrollToVerse(passage.verse);
+  }
+
+  Widget _studyWorkspace(AppState state) {
+    final StudyContext captured = _studyContext!;
+    return StudyWorkspace(
+      context: captured,
+      initialTab: _studyTab,
+      onClose: _closeStudy,
+      onSearchSelection: captured.selectedText == null
+          ? null
+          : () => unawaited(
+              _showSearch(
+                context,
+                state,
+                initialQuery: captured.selectedText!,
+                phrase: true,
+                sourceContext: captured,
+              ),
+            ),
+      panelBuilder: (context, tab) => _studyPanel(state, captured, tab),
+    );
+  }
+
+  Widget _studyPanel(AppState state, StudyContext captured, StudyTab tab) =>
+      switch (tab) {
+        StudyTab.markings => MyAnnotationsPanel(
+          state: state,
+          onOpenPassage: (passage) => unawaited(_openStudyPassage(passage)),
+        ),
+        StudyTab.verseNotes => MyAnnotationsPanel(
+          state: state,
+          showNotes: true,
+          onOpenPassage: (passage) => unawaited(_openStudyPassage(passage)),
+        ),
+        StudyTab.dictionary => DictionaryPanel(
+          controller: state.study.dictionary,
+          context: captured,
+          onPreviewReference: _showReferencePreview,
+        ),
+        StudyTab.commentary => CommentaryPanel(
+          controller: state.study.commentary,
+          context: captured,
+          onPreviewReference: _showReferencePreview,
+        ),
+        StudyTab.topics => TopicsPanel(
+          controller: state.study.topics,
+          context: captured,
+          onPreviewReference: _showReferencePreview,
+          onPrivateCopyCommitted: state.refreshAnnotations,
+        ),
+        StudyTab.notes => NotesPanel(
+          controller: state.study.notebooks,
+          context: captured,
+          onPreviewReference: _showReferencePreview,
+          onOpenPassage: _openStudyPassage,
+        ),
+      };
 }
 
 class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -503,10 +882,11 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool compact = MediaQuery.sizeOf(context).width < 720;
+    final bool compact = MediaQuery.sizeOf(context).width <= 720;
     return AppBar(
       toolbarHeight: 62,
       leading: IconButton(
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         tooltip: state.ui('openBibleNavigation'),
         onPressed: onMenu,
         icon: const Icon(Icons.menu),
@@ -520,20 +900,25 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
             height: 24,
           ),
           const SizedBox(width: 8),
-          InkWell(
-            onTap: onHome,
-            borderRadius: BorderRadius.circular(6),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-              child: Text(
-                'getBible.Life',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+          Flexible(
+            child: InkWell(
+              onTap: onHome,
+              borderRadius: BorderRadius.circular(6),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                child: Text(
+                  'getBible.Life',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+                ),
               ),
             ),
           ),
           if (!compact) ...<Widget>[
             const SizedBox(width: 18),
             Expanded(
+              flex: 2,
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: onSearch,
@@ -554,21 +939,29 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
       actions: <Widget>[
         if (compact)
           IconButton(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             tooltip: state.ui('searchThisTranslation'),
             onPressed: onSearch,
             icon: const Icon(Icons.search),
           ),
+        // Compact readers already have the persistent chapter navigation row.
+        // Keep this toolbar's actions reachable without duplicating its arrows.
+        if (!compact) ...<Widget>[
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            tooltip: state.ui('previousChapter'),
+            onPressed: state.canGoPrevious ? () => onTurn(-1) : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            tooltip: state.ui('nextChapter'),
+            onPressed: state.canGoNext ? () => onTurn(1) : null,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
         IconButton(
-          tooltip: state.ui('previousChapter'),
-          onPressed: state.canGoPrevious ? () => onTurn(-1) : null,
-          icon: const Icon(Icons.chevron_left),
-        ),
-        IconButton(
-          tooltip: state.ui('nextChapter'),
-          onPressed: state.canGoNext ? () => onTurn(1) : null,
-          icon: const Icon(Icons.chevron_right),
-        ),
-        IconButton(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           tooltip: state.ui('openAsMarkdown'),
           onPressed: state.current?.verses.isNotEmpty == true
               ? onMarkdown
@@ -577,10 +970,20 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         Padding(
           padding: const EdgeInsetsDirectional.only(end: 10),
-          child: OutlinedButton(
-            onPressed: onStudy,
-            child: Text(state.ui('study')),
-          ),
+          child: compact
+              ? IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  tooltip: state.ui('study'),
+                  onPressed: onStudy,
+                  icon: const Icon(Icons.school_outlined),
+                )
+              : OutlinedButton(
+                  onPressed: onStudy,
+                  child: Text(state.ui('study')),
+                ),
         ),
       ],
     );
@@ -872,13 +1275,23 @@ class _ParagraphReader extends StatelessWidget {
           markings: state.markings,
           groups: state.groups,
           showSourceStyles: state.preferences.showSourceStyles,
+          emphasis:
+              ScriptureStudyActions.maybeOf(
+                context,
+              )?.emphasisFor?.call(verse) ??
+              const <ScriptureTextEmphasis>[],
         ),
       );
     }
     return ScriptureParagraphSelection(
       mapping: mapping,
-      child: SelectableText.rich(
-        TextSpan(style: _scriptureStyle(context, state), children: content),
+      child: NativeScriptureText(
+        span: TextSpan(
+          style: _scriptureStyle(context, state),
+          children: content,
+        ),
+        mapping: mapping,
+        onWordTap: ScriptureStudyActions.maybeOf(context)?.onWord,
         contextMenuBuilder: (BuildContext context, EditableTextState editable) {
           final TextSelection selection = editable.textEditingValue.selection;
           final List<ScriptureVerseSelection> ranges = mapping.selections(
@@ -911,6 +1324,36 @@ class _ParagraphReader extends StatelessWidget {
                   )
                 else
                   button,
+              if (ranges.isNotEmpty) ...[
+                ContextMenuButtonItem(
+                  label: 'Search selected phrase',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    ScriptureStudyActions.maybeOf(
+                      context,
+                    )?.onSearch(ranges.map((item) => item.quote).join(' '));
+                  },
+                ),
+                ContextMenuButtonItem(
+                  label: 'Study selected word',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    final selected = ranges.first;
+                    ScriptureStudyActions.maybeOf(
+                      context,
+                    )?.onWord(selected.verse, selected.range);
+                  },
+                ),
+                ContextMenuButtonItem(
+                  label: 'Add or edit verse note',
+                  onPressed: () {
+                    editable.hideToolbar();
+                    ScriptureStudyActions.maybeOf(
+                      context,
+                    )?.onNote(ranges.first.verse);
+                  },
+                ),
+              ],
               if (ranges.isNotEmpty && state.activeGroup != null)
                 ContextMenuButtonItem(
                   label: 'Mark: ${state.activeGroup!.name}',
@@ -1082,7 +1525,11 @@ class _SelectableMarkedVerse extends StatelessWidget {
       markings: state.markings,
       groups: state.groups,
       showSourceStyles: state.preferences.showSourceStyles,
+      emphasis:
+          ScriptureStudyActions.maybeOf(context)?.emphasisFor?.call(verse) ??
+          const <ScriptureTextEmphasis>[],
       includeWholeVerse: false,
+      onWordTap: ScriptureStudyActions.maybeOf(context)?.onWord,
       contextMenuBuilder:
           (BuildContext context, EditableTextState editableTextState) {
             final TextSelection selection =
@@ -1094,6 +1541,34 @@ class _SelectableMarkedVerse extends StatelessWidget {
                 selection.end <= verse.text.length;
             final List<ContextMenuButtonItem> buttons = <ContextMenuButtonItem>[
               ...editableTextState.contextMenuButtonItems,
+              if (valid) ...[
+                ContextMenuButtonItem(
+                  label: 'Search selected phrase',
+                  onPressed: () {
+                    editableTextState.hideToolbar();
+                    ScriptureStudyActions.maybeOf(context)?.onSearch(
+                      verse.text.substring(selection.start, selection.end),
+                    );
+                  },
+                ),
+                ContextMenuButtonItem(
+                  label: 'Study selected word',
+                  onPressed: () {
+                    editableTextState.hideToolbar();
+                    ScriptureStudyActions.maybeOf(context)?.onWord(
+                      verse,
+                      ScriptureTextRange(selection.start, selection.end),
+                    );
+                  },
+                ),
+                ContextMenuButtonItem(
+                  label: 'Add or edit verse note',
+                  onPressed: () {
+                    editableTextState.hideToolbar();
+                    ScriptureStudyActions.maybeOf(context)?.onNote(verse);
+                  },
+                ),
+              ],
               if (valid && state.activeGroup != null)
                 ContextMenuButtonItem(
                   label: 'Mark: ${state.activeGroup!.name}',
@@ -1181,9 +1656,21 @@ class _InlineNoteEditor extends StatefulWidget {
 }
 
 class _InlineNoteEditorState extends State<_InlineNoteEditor> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.note?.text ?? '',
-  );
+  late final TextEditingController _controller;
+  late final String _canonicalKey;
+  late final String _reference;
+  late final int _sourceVerse;
+  late final bool _hadNote;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.note?.text ?? '');
+    _canonicalKey = widget.state.passage.canonicalKey;
+    _reference = widget.reference;
+    _sourceVerse = widget.verse;
+    _hadNote = widget.note != null;
+  }
 
   @override
   void dispose() {
@@ -1204,7 +1691,7 @@ class _InlineNoteEditorState extends State<_InlineNoteEditor> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    widget.reference,
+                    _reference,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -1227,12 +1714,13 @@ class _InlineNoteEditorState extends State<_InlineNoteEditor> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: <Widget>[
-                if (widget.note != null)
+                if (_hadNote)
                   IconButton(
                     tooltip: 'Delete note',
                     onPressed: () async {
-                      await widget.state.deleteVerseNote(widget.verse);
-                      widget.onClose();
+                      if (!_canWriteToSource()) return;
+                      await widget.state.deleteVerseNote(_sourceVerse);
+                      if (mounted) widget.onClose();
                     },
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -1251,12 +1739,30 @@ class _InlineNoteEditorState extends State<_InlineNoteEditor> {
 
   Future<void> _save() async {
     if (_controller.text.trim().isEmpty) return;
+    if (!_canWriteToSource()) return;
     await widget.state.saveVerseNote(
-      widget.verse,
-      widget.reference,
+      _sourceVerse,
+      _reference,
       _controller.text,
     );
-    widget.onClose();
+    if (mounted) widget.onClose();
+  }
+
+  /// The visible draft belongs to its original canonical passage, even if an
+  /// external navigation updates this editor's inherited reader state.
+  bool _canWriteToSource() {
+    if (widget.state.passage.canonicalKey != _canonicalKey ||
+        widget.verse != _sourceVerse) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Return to $_reference before changing this retained verse-note draft.',
+          ),
+        ),
+      );
+      return false;
+    }
+    return true;
   }
 }
 
@@ -1287,491 +1793,16 @@ class _SavedNote extends StatelessWidget {
   );
 }
 
-class _StudyDrawer extends StatefulWidget {
-  const _StudyDrawer({required this.state, required this.onOpenPassage});
-
-  final AppState state;
-  final ValueChanged<Passage> onOpenPassage;
-
-  @override
-  State<_StudyDrawer> createState() => _StudyDrawerState();
-}
-
-class _StudyDrawerState extends State<_StudyDrawer> {
-  int _tab = 0;
-  String? _selectedGroup;
-  String _groupQuery = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final AppState state = widget.state;
-    final double screenWidth = MediaQuery.sizeOf(context).width;
-    final double drawerWidth = screenWidth <= 720
-        ? (screenWidth - 24).clamp(300, 480).toDouble()
-        : (screenWidth * 0.48).clamp(430, 680).toDouble();
-    return Drawer(
-      width: drawerWidth,
-      child: SafeArea(
-        child: Column(
-          children: <Widget>[
-            ListTile(
-              title: const Text(
-                'Study tools',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              trailing: IconButton(
-                tooltip: 'Close Study tools',
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-              ),
-            ),
-            SegmentedButton<int>(
-              segments: const <ButtonSegment<int>>[
-                ButtonSegment<int>(value: 0, label: Text('Markings')),
-                ButtonSegment<int>(value: 1, label: Text('Notes')),
-              ],
-              selected: <int>{_tab},
-              onSelectionChanged: (Set<int> value) =>
-                  setState(() => _tab = value.first),
-            ),
-            const Divider(),
-            Expanded(child: _tab == 0 ? _markings(state) : _notes(state)),
-            if (_tab == 0)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: OutlinedButton.icon(
-                  onPressed: () => showDialog<void>(
-                    context: context,
-                    builder: (BuildContext context) =>
-                        _ManageGroupsDialog(state: state),
-                  ),
-                  icon: const Icon(Icons.palette_outlined),
-                  label: const Text('Manage groups'),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _markings(AppState state) {
-    if (_selectedGroup != null) {
-      final MarkingGroup? group = state.groups
-          .where((MarkingGroup item) => item.id == _selectedGroup)
-          .firstOrNull;
-      final List<Marking> items =
-          state.savedMarkings
-              .where((Marking item) => item.groupId == _selectedGroup)
-              .toList()
-            ..sort(compareMarkings);
-      return Column(
-        children: <Widget>[
-          ListTile(
-            leading: const Icon(Icons.arrow_back),
-            title: Text(group?.name ?? 'Markings'),
-            onTap: () => setState(() => _selectedGroup = null),
-          ),
-          Expanded(
-            child: items.isEmpty
-                ? const Center(child: Text('No markings in this group yet.'))
-                : ListView.builder(
-                    itemCount: items.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final Marking marking = items[index];
-                      return ListTile(
-                        title: Text(marking.reference),
-                        subtitle: Text(
-                          marking.quote,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => widget.onOpenPassage(
-                          Passage(
-                            translation: state.passage.translation,
-                            book: marking.passage.book,
-                            chapter: marking.passage.chapter,
-                            verse: marking.verse,
-                          ),
-                        ),
-                        trailing: Wrap(
-                          spacing: 0,
-                          children: <Widget>[
-                            IconButton(
-                              tooltip: 'Open ${marking.reference}',
-                              icon: const Icon(Icons.open_in_new, size: 20),
-                              onPressed: () => widget.onOpenPassage(
-                                Passage(
-                                  translation: state.passage.translation,
-                                  book: marking.passage.book,
-                                  chapter: marking.passage.chapter,
-                                  verse: marking.verse,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Delete marking at ${marking.reference}',
-                              icon: const Icon(Icons.delete_outline, size: 20),
-                              onPressed: () => _deleteMarking(state, marking),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      );
-    }
-    final String query = _groupQuery.trim().toLowerCase();
-    final List<MarkingGroup> visible = state.groups
-        .where(
-          (MarkingGroup group) =>
-              query.isEmpty || group.name.toLowerCase().contains(query),
-        )
-        .toList(growable: false);
-    return Column(
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-          child: TextField(
-            decoration: const InputDecoration(
-              hintText: 'Find a marking group',
-              prefixIcon: Icon(Icons.search),
-              isDense: true,
-            ),
-            onChanged: (String value) => setState(() => _groupQuery = value),
-          ),
-        ),
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 220,
-              mainAxisExtent: 82,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-            ),
-            itemCount: visible.length,
-            itemBuilder: (BuildContext context, int index) {
-              final MarkingGroup group = visible[index];
-              final int count = state.savedMarkings
-                  .where((Marking item) => item.groupId == group.id)
-                  .length;
-              final bool selected =
-                  state.preferences.activeMarkingGroupId == group.id;
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                color: selected
-                    ? Theme.of(context).colorScheme.secondaryContainer
-                    : null,
-                child: InkWell(
-                  onTap: () {
-                    unawaited(state.selectActiveGroup(group.id));
-                    setState(() => _selectedGroup = group.id);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: <Widget>[
-                        Container(
-                          width: 18,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _hexColor(group.color),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                group.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '$count ${count == 1 ? 'marking' : 'markings'}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (selected) const Icon(Icons.check_circle, size: 18),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _deleteMarking(AppState state, Marking marking) async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Delete this marking?'),
-        content: Text('Remove the saved marking at ${marking.reference}?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await state.deleteSavedMarking(marking.id);
-  }
-
-  Widget _notes(AppState state) {
-    final List<VerseNote> notes = <VerseNote>[...state.savedNotes]
-      ..sort(compareNotes);
-    if (notes.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'No verse notes yet. Select a verse and choose Add note to create one.',
-          ),
-        ),
-      );
-    }
-    return ListView.builder(
-      itemCount: notes.length,
-      itemBuilder: (BuildContext context, int index) {
-        final VerseNote note = notes[index];
-        return ListTile(
-          title: Text(note.reference),
-          subtitle: Text(
-            note.text,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () => widget.onOpenPassage(
-            Passage(
-              translation: state.passage.translation,
-              book: note.passage.book,
-              chapter: note.passage.chapter,
-              verse: note.verse,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ManageGroupsDialog extends StatefulWidget {
-  const _ManageGroupsDialog({required this.state});
-
-  final AppState state;
-
-  @override
-  State<_ManageGroupsDialog> createState() => _ManageGroupsDialogState();
-}
-
-class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
-  String? _editingId;
-  final TextEditingController _name = TextEditingController();
-  final TextEditingController _color = TextEditingController(text: '#FDE68A');
-  String? _error;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _color.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Marking groups'),
-      content: SizedBox(
-        width: 520,
-        height: MediaQuery.sizeOf(context).height * 0.7,
-        child: Column(
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _name,
-                    decoration: const InputDecoration(labelText: 'Group name'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 116,
-                  child: TextField(
-                    controller: _color,
-                    decoration: const InputDecoration(labelText: 'Color'),
-                  ),
-                ),
-                IconButton(
-                  tooltip: _editingId == null ? 'Add group' : 'Save group',
-                  onPressed: _save,
-                  icon: Icon(_editingId == null ? Icons.add : Icons.check),
-                ),
-              ],
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            const Divider(height: 24),
-            Expanded(
-              child: AnimatedBuilder(
-                animation: widget.state,
-                builder: (BuildContext context, Widget? child) =>
-                    ListView.builder(
-                      itemCount: widget.state.groups.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final MarkingGroup group = widget.state.groups[index];
-                        return ListTile(
-                          leading: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: _hexColor(group.color),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          title: Text(group.name),
-                          subtitle: Text(group.color),
-                          onTap: () => setState(() {
-                            _editingId = group.id;
-                            _name.text = group.name;
-                            _color.text = group.color;
-                            _error = null;
-                          }),
-                          trailing: IconButton(
-                            tooltip: 'Delete ${group.name}',
-                            onPressed: widget.state.groups.length <= 1
-                                ? null
-                                : () => _delete(group),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        );
-                      },
-                    ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _save() async {
-    try {
-      await widget.state.saveMarkingGroup(
-        id: _editingId,
-        name: _name.text,
-        color: _color.text,
-      );
-      if (!mounted) return;
-      setState(() {
-        _editingId = null;
-        _name.clear();
-        _color.text = '#FDE68A';
-        _error = null;
-      });
-    } on FormatException catch (error) {
-      setState(() => _error = error.toString());
-    }
-  }
-
-  Future<void> _delete(MarkingGroup group) async {
-    final int count = widget.state.savedMarkings
-        .where((Marking item) => item.groupId == group.id)
-        .length;
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Delete marking group?'),
-        content: Text(
-          'Delete “${group.name}” and its $count saved markings? This cannot be undone.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await widget.state.deleteMarkingGroup(group.id);
-  }
-}
-
-class _SearchDialog extends StatelessWidget {
-  const _SearchDialog({required this.state, required this.onOpen});
-  final AppState state;
-  final ValueChanged<SearchVerse> onOpen;
-  @override
-  Widget build(BuildContext context) => Dialog.fullscreen(
-    child: SafeArea(
-      child: Column(
-        children: <Widget>[
-          AppBar(
-            title: Text('Search ${state.passage.translation.toUpperCase()}'),
-            leading: IconButton(
-              tooltip: 'Close search',
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
-            ),
-          ),
-          Expanded(
-            child: SearchPanel(
-              controller: state.onlineSearch,
-              translation: state.passage.translation,
-              books: state.books,
-              direction: state.current?.direction ?? 'LTR',
-              showSourceStyles: state.preferences.showSourceStyles,
-              onOpen: (hit) async => onOpen(hit.toSearchVerse()),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class _ReaderDrawer extends StatelessWidget {
-  const _ReaderDrawer({required this.state, required this.onReferencePreview});
+  const _ReaderDrawer({
+    required this.state,
+    required this.onReferencePreview,
+    required this.navigationEnabled,
+  });
 
   final AppState state;
   final Future<void> Function() onReferencePreview;
+  final bool navigationEnabled;
 
   @override
   Widget build(BuildContext context) => Drawer(
@@ -1784,22 +1815,31 @@ class _ReaderDrawer extends StatelessWidget {
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 18),
+          if (!navigationEnabled)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Save or close the verse note before changing the passage. Passage controls are temporarily unavailable.',
+              ),
+            ),
           ReaderTranslationField(
             value: state.passage.translation,
             translations: state.translations,
-            onChanged: (String? value) {
-              if (value != null) {
-                unawaited(
-                  state.loadPassage(
-                    Passage(
-                      translation: value,
-                      book: state.passage.book,
-                      chapter: state.passage.chapter,
-                    ),
-                  ),
-                );
-              }
-            },
+            onChanged: navigationEnabled
+                ? (String? value) {
+                    if (value != null) {
+                      unawaited(
+                        state.loadPassage(
+                          Passage(
+                            translation: value,
+                            book: state.passage.book,
+                            chapter: state.passage.chapter,
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
@@ -1814,9 +1854,11 @@ class _ReaderDrawer extends StatelessWidget {
                   ),
                 )
                 .toList(),
-            onChanged: (int? value) {
-              if (value != null) unawaited(state.openBook(value));
-            },
+            onChanged: navigationEnabled
+                ? (int? value) {
+                    if (value != null) unawaited(state.openBook(value));
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
@@ -1835,15 +1877,20 @@ class _ReaderDrawer extends StatelessWidget {
                   ),
                 )
                 .toList(),
-            onChanged: (int? value) {
-              if (value != null) {
-                unawaited(
-                  state.loadPassage(
-                    state.passage.copyWith(chapter: value, clearVerse: true),
-                  ),
-                );
-              }
-            },
+            onChanged: navigationEnabled
+                ? (int? value) {
+                    if (value != null) {
+                      unawaited(
+                        state.loadPassage(
+                          state.passage.copyWith(
+                            chapter: value,
+                            clearVerse: true,
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                : null,
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,

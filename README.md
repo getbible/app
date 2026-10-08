@@ -4,7 +4,7 @@ Cross-platform Flutter implementation of [getBible.Life](https://app.getbible.li
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
-> Development status: the repository contains shared typed HTTP service boundaries, lossless Bible v3 models and versioned caches, native rich Scripture, reusable Query v3 reference previews, local annotations, existing search/backup/Markdown services, tests, and CI. API search and the dictionary/commentary/topic study workflows are later work. Store publication still requires complete feature-parity verification, physical-device QA, signing identities, and store-console access. See [feature parity](docs/FEATURE_PARITY.md).
+> Development status: the reader provides lossless Bible v3 Scripture, online Search v3, reusable Query v3 previews, an adaptive Study workspace with dictionaries, commentaries and public topics, and separate local study/sermon notebooks. Canonical inline verse notes and personal markings retain their established identities. Complete offline installations, notebook backup portability, full localization and platform/store release gates remain later work. See [feature parity](docs/FEATURE_PARITY.md).
 
 ## Supported targets
 
@@ -57,11 +57,49 @@ Missing or incompatible references display an error without substituting a
 default passage. Complete installed-Bible offline reference resolution is later
 work.
 
-`ApiConfiguration` also provides independent versioned roots for Search,
-Dictionaries, Commentaries and public Bookmarks. Their typed service boundaries
-do not imply that the corresponding later study screens or API-search workflow
-are complete. See [API/cache behavior](docs/API_AND_CACHE.md) and
-[architecture](docs/ARCHITECTURE.md) for the implemented ownership and limits.
+## Search and Study
+
+Online search uses `https://search.getbible.net/v3` for the active Bible and
+loads additional pages only when needed. It preserves all/any/phrase and
+whole-word/substring modes, case sensitivity, testament or selected-book scope,
+diacritics, exclusions, proximity and canonical/relevance order. Reference
+queries display the complete resolved selection. Searching does not download
+a whole translation or silently switch to local corpus search.
+
+Tap a Scripture word to open its dictionary context, or use native selection
+to search the exact selected phrase. Copy, markings and inline note controls
+remain available. Verse context actions open commentary or related public
+topics; the chapter context opens chapter commentary. Study appears beside
+Scripture on wide windows and in a keyboard-aware sheet on compact screens.
+Closing restores reader focus and preserves its passage and scroll position.
+
+Dictionary lookup retains source lexical IDs, lemmas, morphology and
+transliteration, resolves the selected resource's published index, and reads
+definitions on demand. Commentary uses published book/chapter coverage and
+retains ranged and introduction entries. Resource choices display their actual
+source language; unavailable coverage has an explicit state. Dictionary,
+commentary, topic and notebook citations reuse the same selected-Bible Query
+preview and do not navigate the reader until Open is chosen.
+
+Public topics are separate from private marking groups. Follow and Hide are
+local choices. **Copy to my markings** previews an explicit independent private
+copy with collision-safe identities and duplicate-safe repeated copying.
+Public updates cannot edit that private copy or personal notes.
+
+**Notebooks** provides local titled documents with ordered text blocks and
+optional attributed Scripture quotations. Autosave, durable draft journals,
+Retry and conflict recovery preserve drafts across ordinary navigation and
+restart. Canonical one-note-per-verse editing remains inline and works across
+translations. Schema 3 adds notebook storage without converting existing notes.
+The current reader backup exports verse notes and markings; notebooks, draft
+journals and new Study settings/copy provenance are not yet included. Complete
+portability is roadmap step 12. A forced exit before a pending save completes
+can still lose its last uncommitted edit.
+
+See [API/cache behavior](docs/API_AND_CACHE.md),
+[architecture](docs/ARCHITECTURE.md), [dictionaries](docs/dictionaries.md),
+[commentaries](docs/commentaries.md), [public topics](docs/public-topics.md)
+and [notebooks](docs/notebooks.md) for ownership, persistence and limitations.
 
 ## Test the application
 
@@ -90,7 +128,7 @@ flutter test
 flutter build apk --debug
 ```
 
-CI runs the same checks and uploads an unsigned debug APK plus a compiled web build. Consult [testing](docs/TESTING.md) before merging reader, storage, backup, or cache changes.
+CI runs the same checks, both native Linux reader/Study journeys and release web/Linux builds. It uploads a development debug APK and a compiled web build. Consult [testing](docs/TESTING.md) before merging reader, storage, backup, or cache changes.
 
 ## Release builds
 
@@ -115,22 +153,28 @@ The code is divided into domain models/contracts, data adapters, application sta
 
 ```text
 lib/
-  application/       lifecycle and reader state
+  application/       reader lifecycle and independently owned Study controllers
   core/              errors, JSON validation, starter groups
-  data/api/          shared transport, service configuration, Bible/Query v3 adapters
+  data/api/          shared transport and service-specific typed adapters
   data/database/     local SQLite schema and platform executors
   data/repositories/ cache and persistence implementations
   domain/models/     versioned data contracts
   domain/repositories/abstract persistence contracts
-  presentation/      native Flutter reader UI
-  services/          backup, search, Markdown
+  presentation/      native reader, Search and adaptive Study UI
+  services/          Scripture mapping, backup and Markdown operations
 ```
 
 See [architecture](docs/ARCHITECTURE.md) and [data contracts](docs/DATA_AND_BACKUPS.md).
 
 ## Privacy
 
-Notes, markings, preferences, cached Scripture, and reading position are stored locally. The app has no accounts, advertising, analytics, or tracking. Network traffic retrieves Scripture, metadata, daily passages and explicitly requested reference previews. Query requests contain the selected translation and entered Scripture reference or selected coordinates expressed with discovered book names; private notes and markings are not uploaded. See [privacy policy draft](docs/PRIVACY.md).
+Verse notes, notebooks, draft journals, markings, preferences, cached Scripture
+and reading position stay on the device. The app has no accounts, advertising,
+analytics or tracking. Online Search sends the entered or explicitly selected
+query and chosen filters. Query previews send only the selected Bible and
+requested Scripture citation; Study requests retrieve public resources and
+coordinates. Private notebook/note bodies and markings are not uploaded. See
+the [privacy policy draft](docs/PRIVACY.md).
 
 ## Branding
 
@@ -142,6 +186,10 @@ All platform launchers, favicons, splash artwork, window icons, and in-app ident
 - [Architecture](docs/ARCHITECTURE.md)
 - [API and cache workflow](docs/API_AND_CACHE.md)
 - [Data and backup compatibility](docs/DATA_AND_BACKUPS.md)
+- [On-demand dictionaries](docs/dictionaries.md)
+- [Chapter and verse commentaries](docs/commentaries.md)
+- [Public topics and private copies](docs/public-topics.md)
+- [Personal study and sermon notebooks](docs/notebooks.md)
 - [Feature-parity ledger](docs/FEATURE_PARITY.md)
 - [Web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md)
 - [Source-backed parity audit (July 2026)](docs/PARITY_AUDIT_2026-07.md)

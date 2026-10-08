@@ -13,7 +13,7 @@ class ReaderTranslationField extends StatelessWidget {
 
   final List<Translation> translations;
   final String value;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<String?>? onChanged;
 
   @override
   Widget build(BuildContext context) {

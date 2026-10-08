@@ -84,6 +84,12 @@ class _ReferencePreviewState extends State<ReferencePreview> {
   String? _actionError;
   ReferenceRequest? _actionRequest;
 
+  String? _translationNameFor(ReferenceRequest? request) =>
+      request?.translationName ??
+      (request == null || request.translation == widget.selectedTranslation
+          ? widget.translationName
+          : null);
+
   @override
   void dispose() {
     _input.dispose();
@@ -93,12 +99,18 @@ class _ReferencePreviewState extends State<ReferencePreview> {
   void _submit() {
     final String reference = _input.text;
     if (reference.trim().isEmpty) return;
+    final ReferenceRequest? source = widget.controller.request;
     unawaited(
       widget.controller.open(
         TextReferenceRequest(
-          translation: widget.selectedTranslation,
-          translationName: widget.translationName,
-          translationDirection: widget.selectedTranslationDirection,
+          translation: source?.translation ?? widget.selectedTranslation,
+          translationName: _translationNameFor(source),
+          translationDirection:
+              source?.translationDirection ??
+              (source == null ||
+                      source.translation == widget.selectedTranslation
+                  ? widget.selectedTranslationDirection
+                  : 'LTR'),
           reference: reference,
         ),
       ),
@@ -152,8 +164,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
       final ReferenceRequest? request = state.request;
       final ReferenceResult? result = state.result;
       final String translation =
-          request?.translationName ??
-          widget.translationName ??
+          _translationNameFor(request) ??
           (request?.translation ?? widget.selectedTranslation).toUpperCase();
       return SafeArea(
         child: Column(

@@ -4,6 +4,7 @@ import '../../domain/models/annotations.dart';
 import '../../domain/models/bible.dart';
 import '../../domain/models/passage.dart';
 import '../../services/scripture_text.dart';
+import 'native_scripture_text.dart';
 
 /// The verse's original text remains Flutter's native selectable document.
 ///
@@ -25,6 +26,7 @@ class ScriptureVerseText extends StatelessWidget {
     this.contextMenuBuilder,
     this.onSelectionChanged,
     this.focusNode,
+    this.onWordTap,
   });
 
   final Verse verse;
@@ -39,6 +41,7 @@ class ScriptureVerseText extends StatelessWidget {
   final EditableTextContextMenuBuilder? contextMenuBuilder;
   final SelectionChangedCallback? onSelectionChanged;
   final FocusNode? focusNode;
+  final void Function(Verse, ScriptureTextRange)? onWordTap;
 
   @override
   Widget build(BuildContext context) {
@@ -53,20 +56,14 @@ class ScriptureVerseText extends StatelessWidget {
       showSourceStyles: showSourceStyles,
       includeWholeVerse: includeWholeVerse,
     );
-    if (contextMenuBuilder == null) {
-      return SelectableText.rich(
-        span,
-        textDirection: textDirection,
-        onSelectionChanged: onSelectionChanged,
-        focusNode: focusNode,
-      );
-    }
-    return SelectableText.rich(
-      span,
+    return NativeScriptureText(
+      span: span,
+      mapping: ScriptureParagraphTextMap(<Verse>[verse]),
       textDirection: textDirection,
       contextMenuBuilder: contextMenuBuilder,
       onSelectionChanged: onSelectionChanged,
       focusNode: focusNode,
+      onWordTap: onWordTap,
     );
   }
 }

@@ -46,7 +46,10 @@ final class ApiDictionaryRepository implements DictionaryRepository {
       cancellation: cancellation,
     );
     try {
-      final _DictionaryIndexInput input = _DictionaryIndexInput(response.bytes, module);
+      final _DictionaryIndexInput input = _DictionaryIndexInput(
+        response.bytes,
+        module,
+      );
       // Tiny indexes do not justify isolate setup; large published dictionaries
       // build their normalized search keys away from the native UI isolate.
       final Future<DictionaryIndex> parsing = response.bytes.length < 256 * 1024

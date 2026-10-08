@@ -26,6 +26,7 @@ final class NotebookController extends ChangeNotifier {
   final String _editorId;
   final Map<String, NotebookSummary> _summaries = <String, NotebookSummary>{};
   final Map<String, Notebook> _drafts = <String, Notebook>{};
+  final Map<String, int> _journaledRevisions = <String, int>{};
   final Map<String, int?> _draftBases = <String, int?>{};
   final Map<String, String> _draftOwners = <String, String>{};
   final Map<String, NotebookDraft> _recoveredOrigins =
@@ -67,6 +68,13 @@ final class NotebookController extends ChangeNotifier {
   bool get isDirty => _drafts.containsKey(_selectedId);
   bool get hasUnsavedDrafts =>
       _drafts.isNotEmpty || _additionalDrafts.isNotEmpty;
+
+  /// A failed activation may still have a durable recoverable journal. Closing
+  /// must be refused only when a current private revision has no durable copy.
+  bool get hasUndurableDrafts => _drafts.entries.any(
+    (MapEntry<String, Notebook> entry) =>
+        _journaledRevisions[entry.key] != entry.value.revision,
+  );
   Object? get error => _errors[_selectedId] ?? _loadError;
   int get unsavedCount => _drafts.length + _additionalDrafts.length;
   List<NotebookDraft> get additionalRecoveredDrafts =>
@@ -100,6 +108,7 @@ final class NotebookController extends ChangeNotifier {
           continue;
         }
         _drafts[draft.id] = draft;
+        _journaledRevisions[draft.id] = draft.revision;
         // A recovered journal belongs to its original writer. Every new
         // controller forks its own journal; two tabs must never adopt a shared
         // crashed-writer identity and replace each other's private revisions.
@@ -322,6 +331,7 @@ final class NotebookController extends ChangeNotifier {
           expectedRevision: _draftBases[id],
           editorId: _draftOwners[id]!,
         );
+        _journaledRevisions[id] = snapshot.revision;
         if (_conflicts.contains(id)) {
           // A conflict prevents activation, never durable private editing.
           // Persist its fork and retain the explicit-copy recovery action.
@@ -338,6 +348,7 @@ final class NotebookController extends ChangeNotifier {
         await _retireRecoveredOrigin(id);
         if (_drafts[id]?.revision == snapshot.revision) {
           _drafts.remove(id);
+          _journaledRevisions.remove(id);
           _draftBases.remove(id);
           _draftOwners.remove(id);
           if (_selectedId == id) _loaded = snapshot;
@@ -373,6 +384,7 @@ final class NotebookController extends ChangeNotifier {
         (NotebookDraft draft) => draft.notebook.id == id,
       );
       _drafts.remove(id);
+      _journaledRevisions.remove(id);
       _draftBases.remove(id);
       _draftOwners.remove(id);
       _recoveredOrigins.remove(id);
@@ -446,6 +458,7 @@ final class NotebookController extends ChangeNotifier {
       if (_draftOwners[retained.id] == stored.editorId) {
         await _retireRecoveredOrigin(retained.id);
         _drafts.remove(retained.id);
+        _journaledRevisions.remove(retained.id);
         _draftBases.remove(retained.id);
         _draftOwners.remove(retained.id);
         _conflicts.remove(retained.id);

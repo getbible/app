@@ -52,6 +52,8 @@ the prior request token. A late request cannot replace or append to current
 results. Closing never closes the shared transport. Rate-limit/temporary-error
 Retry-After intervals disable the Retry action until the requested pause has
 elapsed, in addition to the transport's bounded retry budget.
+The service pause survives clearing/closing Search and resubmitting another
+query or translation, so the Search action cannot bypass the server's pause.
 
 ## Original Scripture and accessibility
 
@@ -76,6 +78,7 @@ Run:
 
 ```bash
 flutter test test/online_search_test.dart test/search_panel_test.dart
+flutter test test/app_state_online_search_test.dart
 ```
 
 The suites cover all request filters and encoding, explicit false/zero values,
@@ -84,6 +87,10 @@ rich lexical fields, relevance ordering, compact direction fallback, a
 pagination/deduplication, source/engine rotation, cancellation, repeated input,
 rate-limit retry, zero results, the offset ceiling, malformed-cache recovery,
 original Unicode emphasis, and a 320-pixel RTL panel at 200% text scaling.
+The application-composition suite proves that Search reuses the injected reader
+transport, requests no Bible/corpus resource, and preserves private annotations
+and the persisted reader position. Failed result opening retains the search
+surface and presents its error.
 Reader/platform integration and physical-device QA remain additional release
 gates; these focused tests do not establish store readiness.
 

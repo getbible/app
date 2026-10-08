@@ -7,12 +7,18 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 final class ReaderApiFixture {
-  ReaderApiFixture({this.lastVerse = 3}) {
+  ReaderApiFixture({
+    this.lastVerse = 3,
+    this.firstVerseText = ' First verse. ',
+    this.resourceResponse,
+  }) {
     api = GetBibleApiClient(client: MockClient(_respond));
   }
 
   static const int extendedBook = 1000000042;
   final int lastVerse;
+  final String firstVerseText;
+  final Future<http.Response?> Function(http.Request)? resourceResponse;
   Completer<void>? delayedIndex;
   final Completer<void> indexStarted = Completer<void>();
   final List<String> paths = <String>[];
@@ -21,6 +27,11 @@ final class ReaderApiFixture {
   Future<http.Response> _respond(http.Request request) async {
     final String path = request.url.path;
     paths.add(path);
+    if (request.url.host != 'api.getbible.net' &&
+        request.url.host != 'query.getbible.net') {
+      final http.Response? resource = await resourceResponse?.call(request);
+      if (resource != null) return resource;
+    }
     if (request.url.host == 'query.getbible.net') {
       final String reference = request.url.pathSegments.last;
       final RegExpMatch? selection = RegExp(
@@ -178,7 +189,7 @@ final class ReaderApiFixture {
             'chapter': chapter,
             'verse': verse,
             'name': 'Fixture $chapter:$verse',
-            'text': verse == 1 ? ' First verse. ' : 'Verse $verse original.',
+            'text': verse == 1 ? firstVerseText : 'Verse $verse original.',
           },
     ],
   });

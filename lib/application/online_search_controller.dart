@@ -30,6 +30,8 @@ final class OnlineSearchController extends ChangeNotifier {
   OnlineSearchPage? _firstPage;
   Object? _error;
   DateTime? _retryAt;
+  DateTime? _servicePauseUntil;
+  HttpStatusException? _servicePauseError;
   int _nextOffset = 0;
   bool _hasMore = false;
   bool _loading = false;
@@ -62,6 +64,7 @@ final class OnlineSearchController extends ChangeNotifier {
     int pageSize = 25,
     String direction = 'LTR',
   }) async {
+    if (_disposed) return;
     // Even repeated effective inputs replace the previous interaction's token.
     clear();
     try {
@@ -104,6 +107,18 @@ final class OnlineSearchController extends ChangeNotifier {
   Future<void> _load({required bool first}) async {
     final OnlineSearchRequest? original = _request;
     if (original == null || _disposed) return;
+    if (_servicePauseUntil != null && _now().isBefore(_servicePauseUntil!)) {
+      // Retry-After applies to the service, not just the Retry button. Editing
+      // filters, clearing the surface or submitting again cannot bypass it.
+      _error = _servicePauseError;
+      _retryAt = _servicePauseUntil;
+      _loading = false;
+      _loadingMore = false;
+      notifyListeners();
+      return;
+    }
+    _servicePauseUntil = null;
+    _servicePauseError = null;
     final RequestCancellation token = _owner.begin();
     final OnlineSearchRequest pageRequest = first
         ? original
@@ -141,6 +156,8 @@ final class OnlineSearchController extends ChangeNotifier {
       _error = error;
       if (error is HttpStatusException && error.retryAfter != null) {
         _retryAt = _now().add(error.retryAfter!);
+        _servicePauseUntil = _retryAt;
+        _servicePauseError = error;
       }
     } finally {
       if (_owner.owns(token) && !_disposed) {
@@ -168,6 +185,7 @@ final class OnlineSearchController extends ChangeNotifier {
     _identities.clear();
     _error = null;
     _retryAt = null;
+    // Keep a server-requested pause independently from the current query.
     _nextOffset = 0;
     _hasMore = false;
     _loading = false;

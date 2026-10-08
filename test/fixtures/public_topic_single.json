@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "authority-of-the-bible",
+  "name": "Authority of the Bible",
+  "color": "#93c5fd",
+  "aliases": [
+    "Bible authority"
+  ],
+  "default": true,
+  "names": {
+    "en": "Authority of the Bible",
+    "af": "Gesag van die Bybel"
+  },
+  "verses": [
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      3
+    ],
+    [
+      43,
+      3,
+      16
+    ]
+  ]
+}

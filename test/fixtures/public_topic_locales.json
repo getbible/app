@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "locales": [
+    {
+      "code": "en",
+      "name": "English",
+      "topics": 2
+    },
+    {
+      "code": "af",
+      "name": "Afrikaans",
+      "topics": 1
+    }
+  ]
+}

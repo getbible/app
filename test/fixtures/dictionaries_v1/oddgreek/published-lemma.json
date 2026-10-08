@@ -1,0 +1,12 @@
+{
+  "schema": "getbible-dictionary-entry-v1",
+  "dictionary": "oddgreek",
+  "language": "en",
+  "id": "published-lemma",
+  "key": "ἄλφα",
+  "occurrence": 1,
+  "aliases": [
+    "alpha"
+  ],
+  "text": "Advertised prefix, but no token-addressable entry."
+}

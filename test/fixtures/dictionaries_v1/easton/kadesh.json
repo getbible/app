@@ -1,0 +1,13 @@
+{
+  "schema": "getbible-dictionary-entry-v1",
+  "dictionary": "easton",
+  "language": "en",
+  "id": "kadesh",
+  "key": "Kadesh",
+  "occurrence": 1,
+  "aliases": [
+    "Kádésh",
+    "Kadesh"
+  ],
+  "text": "A place. <b>Plain text</b>\n\nPreserved paragraphs."
+}

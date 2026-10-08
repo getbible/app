@@ -1,0 +1,41 @@
+{
+  "schema": "getbible-dictionary-metadata-v1",
+  "id": "swedish",
+  "module": "swedish",
+  "name": "Swedish dictionary",
+  "language": "sv",
+  "version": "1.0",
+  "license": "Public Domain",
+  "driver": "RawLD",
+  "source_type": "dictionary",
+  "entry_count": 1,
+  "unique_key_count": 1,
+  "strong_prefix": null,
+  "bytes": 1000,
+  "index_url": "index.json",
+  "entry_url_template": "{entry}.json",
+  "source": "CrossWire SWORD",
+  "source_module_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=swedish",
+  "text_source": "Fixture source",
+  "copyright": "Public domain fixture",
+  "copyright_holder": "",
+  "copyright_contact": {
+    "name": "",
+    "email": "",
+    "address": ""
+  },
+  "distribution_notes": "Fixture only",
+  "about": "A study test fixture.",
+  "conversion_note": "Converted to plain text.",
+  "references": {
+    "api": "getbible-v2",
+    "versification": "KJV",
+    "translations": [
+      "kjv"
+    ],
+    "names": "kjv",
+    "language": "en",
+    "librarian": [],
+    "aliases": []
+  }
+}

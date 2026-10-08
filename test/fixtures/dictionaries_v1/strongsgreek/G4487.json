@@ -1,0 +1,18 @@
+{
+  "schema": "getbible-dictionary-entry-v1",
+  "dictionary": "strongsgreek",
+  "language": "en",
+  "id": "G4487",
+  "key": "ῥῆμα",
+  "occurrence": 1,
+  "aliases": [
+    "G4487"
+  ],
+  "text": "A saying.",
+  "backlinks": [
+    {
+      "id": "G3056",
+      "key": "λόγος"
+    }
+  ]
+}

@@ -2,8 +2,9 @@
 
 The reader requests pages from `https://search.getbible.net/v3/{translation}?q=...`.
 Opening Search or searching a selected phrase does not install, download or scan
-a whole translation. The existing local search service is reserved for the
-explicit installed-Bible capability in the later offline-resource increment.
+a whole translation. Online is the default. The explicit **Installed Bible
+(offline)** choice searches only a deliberately installed and verified Bible;
+it never downloads a Bible or falls back to HTTP.
 
 ## Ownership
 
@@ -107,3 +108,49 @@ on 8 October 2026. The contract SHA-256 is
 `6f657fb26f16046bc307da855b6c4ba593ea5fba5ad0dee2bdee2157d15b7f9c`.
 `test/fixtures/search_v3_rich.json` records the positive rich envelope used by
 the repository regression suite.
+
+
+## Installed Bible search
+
+The source selector makes the choice explicit. `InstalledSearchRepository` reads
+immutable installed-generation records through the same typed search boundary.
+SQLite narrows literal candidates in its database worker; the adapter processes
+100 rows at a time, yields between batches and retains only the requested page.
+It does not load or scan every installed translation in memory. Search receives
+original rich verses, including lexical information and source direction.
+A removal or revision change during a search requires restarting that search.
+The server's Retry-After pause remains attached to Online search and does not
+prevent an independent local operation.
+
+Offline capabilities are deliberately visible:
+
+| Criterion | Installed behavior |
+|---|---|
+| All / Any / Phrase | Supported, using Unicode letters/numbers/marks as words. |
+| Exact / Partial word | Supported; partial phrase matches the unchanged substring. |
+| Case sensitive | Supported; insensitive matching uses Unicode lowercase. |
+| Bible / Old / New / selected books | Supported; Old uses established IDs 1–39 and New 40–66. Whole Bible and individual selection include all installed extended IDs. |
+| Exclusions | Supported, one word per comma-separated exclusion, matching the selected word mode. |
+| Diacritics | Exact only; spelling and combining sequences are not normalized. |
+| Result order | Canonical book/chapter/verse order only. |
+| Proximity / relevance / diacritic folding / Deuterocanon scope | Explicit validation error; choose Online to use these features. |
+
+Selecting Installed sets the visible diacritics/order fields to their supported
+values and clears proximity. Unsupported criteria submitted programmatically are
+also rejected. Extended source IDs are not guessed to belong to a testament;
+choose their individual books instead of Deuterocanon scope. A missing installation displays an installation instruction; it
+is never represented as a successful zero-match corpus. For continuous scripts
+without spaces, Partial word can find a substring within the source word group. The query is bounded to
+50 words, 500 characters and the shared 100-result/10,000-offset pagination limit.
+
+References resolve against the installed Bible's published names and actual
+verse identities: `John3:16`, `John 3:16,18-21`, whole chapters and up to eight
+semicolon-separated selections. Unknown aliases, missing verses inside a range,
+introduction-only chapters and selections exceeding 200 verses are errors.
+Full-text filters do not alter a successfully resolved reference. The complete
+selected reference is shown regardless of the page size.
+
+The native worker, actual SQLite restart, rich-text preservation, interrupted
+revision/update, request isolation, reference bounds and offline search are
+exercised in `test/installed_bible_test.dart`. Browser execution of the same
+compiled resource worker is a separate smoke-test gate.

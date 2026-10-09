@@ -7,6 +7,7 @@ import '../../domain/models/public_topic.dart';
 import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
 import '../../domain/models/study_context.dart';
+import 'study_offline_status.dart';
 
 /// Native public-topic browsing. Scripture text is requested only through the
 /// shared selected-Bible preview; following/hiding never creates annotations.
@@ -16,12 +17,14 @@ final class TopicsPanel extends StatefulWidget {
     required this.controller,
     required this.context,
     required this.onPreviewReference,
+    this.onSetUpOffline,
     this.onPrivateCopyCommitted,
   });
 
   final TopicsController controller;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
+  final VoidCallback? onSetUpOffline;
   final Future<void> Function()? onPrivateCopyCommitted;
 
   @override
@@ -106,6 +109,10 @@ final class _TopicsPanelState extends State<TopicsPanel> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                StudyOfflineStatus(
+                  installed: controller.isInstalled,
+                  onSetUpOffline: widget.onSetUpOffline,
+                ),
                 Text(
                   'Public topics · ${widget.context.label}',
                   style: Theme.of(context).textTheme.titleMedium,
@@ -296,6 +303,15 @@ final class _TopicsPanelState extends State<TopicsPanel> {
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: StudyOfflineStatus(
+              installed: controller.isInstalled,
+              onSetUpOffline: widget.onSetUpOffline,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
             padding: const EdgeInsets.all(12),
             child: Wrap(
               spacing: 8,
@@ -408,6 +424,10 @@ final class _TopicsPanelState extends State<TopicsPanel> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Text('$error'),
+          StudyOfflineStatus(
+            installed: null,
+            onSetUpOffline: widget.onSetUpOffline,
+          ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: () => unawaited(retry()),

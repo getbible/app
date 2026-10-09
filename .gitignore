@@ -35,6 +35,8 @@ migrate_working_dir/
 /coverage/
 /web/drift_worker.dart.js.deps
 /web/drift_worker.dart.js.map
+/web/offline_bible_worker.dart.js.deps
+/web/offline_bible_worker.dart.js.map
 
 # Local release output and signing material are never committed.
 /release/

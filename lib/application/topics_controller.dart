@@ -5,6 +5,7 @@ import '../core/request_cancellation.dart';
 import '../domain/models/public_topic.dart';
 import '../domain/models/service_envelopes.dart';
 import '../domain/models/study_context.dart';
+import '../domain/repositories/installed_study_resource.dart';
 import '../domain/repositories/public_topics_repository.dart';
 import '../domain/repositories/study_preferences_repository.dart';
 
@@ -37,6 +38,9 @@ final class TopicsController extends ChangeNotifier {
   final Set<String> hidden = <String>{};
   final Set<String> savingPreferences = <String>{};
   bool loading = false;
+  bool isInstalled = false;
+  bool _active = false;
+  int _installationStatusGeneration = 0;
   bool loadingTopic = false;
   bool loadingNames = false;
   bool restoringPreferences = false;
@@ -52,7 +56,34 @@ final class TopicsController extends ChangeNotifier {
   String nameOf(PublicTopicSummary topic) =>
       localizedNames[topic.id] ?? topic.name;
 
+  Future<void> refreshInstallationStatus() async {
+    final openedContext = context;
+    final capability = repository;
+    if (!_active ||
+        _disposed ||
+        openedContext == null ||
+        capability is! InstalledStudyResource) {
+      return;
+    }
+    final generation = ++_installationStatusGeneration;
+    final installed = await (capability as InstalledStudyResource).isInstalled(
+      'all',
+    );
+    if (!_active ||
+        _disposed ||
+        generation != _installationStatusGeneration ||
+        !identical(openedContext, context)) {
+      return;
+    }
+    if (isInstalled != installed) {
+      isInstalled = installed;
+      _notify();
+    }
+  }
+
   Future<void> initialize(StudyContext newContext) async {
+    _active = true;
+    final statusGeneration = ++_installationStatusGeneration;
     final RequestCancellation request = _catalogueOwner.begin();
     _topicOwner.cancel();
     _namesOwner.cancel();
@@ -70,6 +101,16 @@ final class TopicsController extends ChangeNotifier {
     error = null;
     _notify();
     try {
+      isInstalled = false;
+      final capability = repository;
+      if (capability is InstalledStudyResource) {
+        final installed = await (capability as InstalledStudyResource)
+            .isInstalled('all');
+        if (!_catalogueOwner.owns(request)) return;
+        if (statusGeneration == _installationStatusGeneration) {
+          isInstalled = installed;
+        }
+      }
       final PublicTopicDiscovery discovered = await repository.discovery(
         cancellation: request,
       );
@@ -326,6 +367,8 @@ final class TopicsController extends ChangeNotifier {
   }
 
   void dismiss() {
+    _active = false;
+    _installationStatusGeneration++;
     _catalogueOwner.cancel();
     _topicOwner.cancel();
     _namesOwner.cancel();

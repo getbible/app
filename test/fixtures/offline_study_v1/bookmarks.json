@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "topics": [
+    {
+      "id": "authority-of-the-bible",
+      "name": "Authority of the Bible",
+      "color": "#93c5fd",
+      "aliases": [
+        "Bible authority"
+      ],
+      "default": true,
+      "verses": [
+        [
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          3
+        ],
+        [
+          43,
+          3,
+          16
+        ]
+      ]
+    },
+    {
+      "id": "faith",
+      "name": "Faith",
+      "color": "#22c55e",
+      "aliases": [],
+      "default": false,
+      "verses": [
+        [
+          43,
+          3,
+          16
+        ]
+      ]
+    }
+  ],
+  "locales": {
+    "en": {
+      "schema_version": 1,
+      "locale": "en",
+      "name": "English",
+      "topics": {
+        "authority-of-the-bible": "Authority of the Bible",
+        "faith": "Faith"
+      }
+    },
+    "af": {
+      "schema_version": 1,
+      "locale": "af",
+      "name": "Afrikaans",
+      "topics": {
+        "authority-of-the-bible": "Gesag van die Bybel"
+      }
+    }
+  }
+}

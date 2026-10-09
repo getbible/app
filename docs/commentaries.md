@@ -58,3 +58,34 @@ against the current live Commentary v1 OpenAPI schemas on 2026-10-08. The adapte
 also parsed live Abbott metadata, 27-book coverage and John 3 (17 entries). These
 checks establish contract compatibility, not physical-device or store readiness.
 The composed Study/reader journey and platform builds are recorded separately.
+
+## Installed commentary modules
+
+An explicit **Set up offline use** installation downloads the published whole
+`{commentary}.json`, its metadata and sparse coverage, and verifies every exact
+byte digest against `hashes.json` before and after the operation. Book/chapter
+identities, language, names and entry totals must agree throughout the nested
+module. Native and browser workers build chapter indexes in bounded batches;
+activation occurs only after complete validation. A failed update leaves the
+previous installed snapshot intact.
+
+`InstalledCommentaryRepository` preserves the online repository contract.
+Installed resources open after restart without fetching their catalogue or
+chapters. The saved discovery also retains online-only choices. An installed
+chapter preserves its entire original source document, including chapter/verse
+zero introductions, overlapping ranges, repeated anchors, structured references,
+plain text and v2 source provenance. No conversion into a verse-keyed map drops
+source entries. The panel identifies installed versus online resources and
+provides **Set up offline use**. Scripture preview still requires the selected
+Bible's Query result or complete installed Bible; installing commentary does
+not imply installing Scripture.
+
+Complete-module and failed-update regressions are in
+`test/installed_study_test.dart`. Native host and browser release checks remain
+necessary in addition to these source-contract tests.
+
+On 9 October 2026 the complete-module processor also validated the generated
+source repository's current `spurious.json` against its real metadata and sparse
+coverage: 24,688 bytes produced 82 local documents. This independently checks
+the nested whole-book/chapter format used by installation. Source:
+[`getbible/commentaries`](https://github.com/getbible/commentaries/tree/main/v1).

@@ -77,24 +77,33 @@ final class DictionaryIndex {
     required this.name,
     required this.uniqueKeyCount,
     required Iterable<DictionaryIndexEntry> entries,
+    List<List<String>>? normalizedLookupKeys,
   }) : entries = List<DictionaryIndexEntry>.unmodifiable(entries) {
     _byId = Map<String, DictionaryIndexEntry>.unmodifiable(
       <String, DictionaryIndexEntry>{
         for (final DictionaryIndexEntry entry in this.entries) entry.id: entry,
       },
     );
-    _lookupKeys = List<List<String>>.unmodifiable(
-      this.entries.map(
-        (DictionaryIndexEntry entry) => List<String>.unmodifiable(
-          <String>[
-            entry.id,
-            entry.key,
-            entry.search,
-            ...entry.aliases,
-          ].map(foldDictionaryKey),
-        ),
-      ),
-    );
+    if (normalizedLookupKeys != null &&
+        normalizedLookupKeys.length != this.entries.length) {
+      throw ArgumentError('Normalized dictionary keys must match its entries.');
+    }
+    _lookupKeys = normalizedLookupKeys != null
+        ? List<List<String>>.unmodifiable(
+            normalizedLookupKeys.map(List<String>.unmodifiable),
+          )
+        : List<List<String>>.unmodifiable(
+            this.entries.map(
+              (DictionaryIndexEntry entry) => List<String>.unmodifiable(
+                <String>[
+                  entry.id,
+                  entry.key,
+                  entry.search,
+                  ...entry.aliases,
+                ].map(foldDictionaryKey),
+              ),
+            ),
+          );
   }
   final String dictionary, language, name;
   final int uniqueKeyCount;

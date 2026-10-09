@@ -18,6 +18,7 @@ import 'package:getbible_live/domain/models/reference.dart';
 import 'package:getbible_live/domain/models/service_envelopes.dart';
 import 'package:getbible_live/domain/models/study_context.dart';
 import 'package:getbible_live/domain/repositories/commentary_repository.dart';
+import 'package:getbible_live/domain/repositories/installed_study_resource.dart';
 import 'package:getbible_live/domain/repositories/study_preferences_repository.dart';
 import 'package:getbible_live/presentation/widgets/commentary_panel.dart';
 import 'package:http/http.dart' as http;
@@ -31,6 +32,60 @@ void main() {
       'commentary fixtures',
     );
   });
+
+  test(
+    'imported commentary preferences replace an earlier remembered choice',
+    () async {
+      final preferences = _Preferences();
+      final repository = _Repository(fixture, secondModule: true);
+      final controller = CommentaryController(
+        repository: repository,
+        preferences: preferences,
+      );
+      addTearDown(controller.dispose);
+      await controller.open(_context());
+      await controller.selectModule('second');
+      expect(preferences.saved['en'], 'second');
+      preferences.saved['en'] = 'fixture';
+      controller.clearRememberedPreferences();
+      controller.close();
+      await controller.open(_context());
+      expect(controller.selectedModule!.id, 'fixture');
+      expect(preferences.saved['en'], 'fixture');
+    },
+  );
+
+  test(
+    'commentary status refresh preserves displayed chapter and rejects another module result',
+    () async {
+      final repository = _Repository(fixture, secondModule: true);
+      final controller = CommentaryController(
+        repository: repository,
+        preferences: _Preferences(),
+      );
+      addTearDown(controller.dispose);
+      await controller.open(_context());
+      controller.setVerseMode(false);
+      final chapter = controller.chapter;
+      final reads = repository.chapterReads.length;
+      repository.installed = true;
+      await controller.refreshInstallationStatus();
+      expect(controller.isInstalled, isTrue);
+      expect(controller.chapter, same(chapter));
+      expect(controller.verseMode, isFalse);
+      expect(repository.chapterReads.length, reads);
+      final pending = Completer<bool>();
+      repository.statusPending = pending;
+      final older = controller.refreshInstallationStatus();
+      repository.statusPending = null;
+      repository.installed = false;
+      await controller.selectModule('second');
+      pending.complete(true);
+      await older;
+      expect(controller.selectedModule!.id, 'second');
+      expect(controller.isInstalled, isFalse);
+    },
+  );
 
   test(
     'ranges anchored earlier, multiple comments and introductions preserve source order',
@@ -550,8 +605,14 @@ StudyContext _context({
   translationName: 'Selected Bible',
 );
 
-final class _Repository implements CommentaryRepository {
+final class _Repository
+    implements CommentaryRepository, InstalledStudyResource {
   _Repository(this.fixture, {this.secondModule = false});
+  bool installed = false;
+  Completer<bool>? statusPending;
+  @override
+  Future<bool> isInstalled(String id) =>
+      statusPending?.future ?? Future.value(installed);
   final JsonMap fixture;
   final bool secondModule;
   final List<String> metadataReads = <String>[];

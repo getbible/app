@@ -1,13 +1,16 @@
 import '../core/errors.dart';
+import '../data/api/api_configuration.dart';
 import '../data/api/api_transport.dart';
 import '../data/database/local_database.dart';
 import '../data/repositories/api_commentary_repository.dart';
 import '../data/repositories/api_dictionary_repository.dart';
 import '../data/repositories/api_public_topics_repository.dart';
+import '../data/repositories/installed_study_repositories.dart';
 import '../data/repositories/sql_notebook_repository.dart';
 import '../data/repositories/sql_public_topic_copy_repository.dart';
 import '../data/repositories/sql_study_preferences_repository.dart';
 import '../domain/repositories/notebook_repository.dart';
+import '../domain/repositories/offline_resource_repository.dart';
 import 'commentary_controller.dart';
 import 'dictionary_controller.dart';
 import 'notebook_controller.dart';
@@ -20,19 +23,44 @@ final class StudyServices {
     required LocalDatabase database,
     required ApiTransport transport,
     NotebookRepository? notebookRepository,
+    OfflineResourceStore? offlineStore,
   }) {
     final SqlStudyPreferencesRepository preferences =
         SqlStudyPreferencesRepository(database);
     dictionary = DictionaryController(
-      repository: ApiDictionaryRepository(transport),
+      repository: offlineStore == null
+          ? ApiDictionaryRepository(transport)
+          : InstalledDictionaryRepository(
+              store: offlineStore,
+              sourceUri: transport.configuration
+                  .endpoint(ApiService.dictionaries)
+                  .baseUri,
+              online: ApiDictionaryRepository(transport),
+            ),
       preferences: preferences,
     );
     commentary = CommentaryController(
-      repository: ApiCommentaryRepository(transport),
+      repository: offlineStore == null
+          ? ApiCommentaryRepository(transport)
+          : InstalledCommentaryRepository(
+              store: offlineStore,
+              sourceUri: transport.configuration
+                  .endpoint(ApiService.commentaries)
+                  .baseUri,
+              online: ApiCommentaryRepository(transport),
+            ),
       preferences: preferences,
     );
     topics = TopicsController(
-      repository: ApiPublicTopicsRepository(transport),
+      repository: offlineStore == null
+          ? ApiPublicTopicsRepository(transport)
+          : InstalledPublicTopicsRepository(
+              store: offlineStore,
+              sourceUri: transport.configuration
+                  .endpoint(ApiService.bookmarks)
+                  .baseUri,
+              online: ApiPublicTopicsRepository(transport),
+            ),
       preferences: preferences,
       copyRepository: SqlPublicTopicCopyRepository(database),
     );
@@ -46,6 +74,21 @@ final class StudyServices {
   late final TopicsController topics;
   late final NotebookController notebooks;
   Future<void>? _closeFuture;
+
+  /// Reopen Study against newly imported private preferences. Notebook reload
+  /// remains owned by the portability transaction and notebook controller.
+  void reloadImportedPreferences() {
+    commentary.clearRememberedPreferences();
+    dismissResources();
+  }
+
+  Future<void> refreshInstallationStatus() async {
+    await Future.wait<void>([
+      dictionary.refreshInstallationStatus(),
+      commentary.refreshInstallationStatus(),
+      topics.refreshInstallationStatus(),
+    ]);
+  }
 
   void dismissResources() {
     dictionary.close();

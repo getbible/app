@@ -1,0 +1,138 @@
+{
+  "schema": "getbible-commentary-v1",
+  "commentary": "fixture",
+  "language": "en",
+  "name": "Fixture Commentary",
+  "books": [
+    {
+      "schema": "getbible-commentary-book-v1",
+      "commentary": "fixture",
+      "language": "en",
+      "book": 1,
+      "name": "Genesis",
+      "chapters": [
+        {
+          "schema": "getbible-commentary-chapter-v1",
+          "commentary": "fixture",
+          "language": "en",
+          "book": 1,
+          "name": "Genesis",
+          "chapter": 0,
+          "entries": [
+            {
+              "book": 1,
+              "chapter": 0,
+              "verse": 0,
+              "text": "Book introduction.\n\nA second paragraph."
+            }
+          ]
+        },
+        {
+          "schema": "getbible-commentary-chapter-v1",
+          "commentary": "fixture",
+          "language": "en",
+          "book": 1,
+          "name": "Genesis",
+          "chapter": 1,
+          "entries": [
+            {
+              "book": 1,
+              "chapter": 1,
+              "verse": 0,
+              "text": "Chapter introduction."
+            },
+            {
+              "book": 1,
+              "chapter": 1,
+              "verse": 3,
+              "text": "First ranged comment.\n\n<b>Plain text stays plain.</b>",
+              "verses": [
+                3,
+                4,
+                5
+              ],
+              "osis": "Gen.1.3",
+              "references": [
+                {
+                  "ref": "Genesis 1:1-2",
+                  "osis": "Gen.1.1-Gen.1.2",
+                  "book": 1,
+                  "chapter": 1,
+                  "verse": 1,
+                  "verses": [
+                    1,
+                    2
+                  ],
+                  "text": "Gen. 1:1–2"
+                },
+                {
+                  "ref": "John 1",
+                  "osis": "John.1",
+                  "book": 43,
+                  "chapter": 1
+                }
+              ]
+            },
+            {
+              "book": 1,
+              "chapter": 1,
+              "verse": 5,
+              "text": "Second comment for the same verse.",
+              "osis": "Gen.1.5"
+            },
+            {
+              "book": 1,
+              "chapter": 1,
+              "verse": 8,
+              "text": "Cross-chapter quotation.",
+              "verses": [
+                8,
+                9
+              ],
+              "osis": "Gen.1.8",
+              "references": [
+                {
+                  "ref": "Genesis 1:1-2",
+                  "osis": "Gen.1.1-Gen.1.2",
+                  "book": 1,
+                  "chapter": 1,
+                  "verse": 1,
+                  "verses": [
+                    1,
+                    2
+                  ],
+                  "text": "Gen. 1:1–2"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "getbible-commentary-book-v1",
+      "commentary": "fixture",
+      "language": "en",
+      "book": 43,
+      "name": "John",
+      "chapters": [
+        {
+          "schema": "getbible-commentary-chapter-v1",
+          "commentary": "fixture",
+          "language": "en",
+          "book": 43,
+          "name": "John",
+          "chapter": 2,
+          "entries": [
+            {
+              "book": 43,
+              "chapter": 2,
+              "verse": 1,
+              "text": "John commentary."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

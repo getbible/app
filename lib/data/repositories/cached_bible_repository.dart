@@ -11,6 +11,7 @@ import '../api/api_transport.dart';
 import '../api/bible_bulk_parser.dart';
 import '../api/getbible_api_client.dart';
 import '../database/local_database.dart';
+import 'installed_bible_repository.dart';
 
 const Duration scriptureIndexMaxAge = Duration(days: 7);
 
@@ -21,12 +22,14 @@ final class CachedBibleRepository implements BibleRepository {
     this._database,
     this._client, {
     DateTime Function()? clock,
+    this.installed,
   }) : _clock = clock ?? DateTime.now,
        _identity = ScriptureCacheIdentity(
          apiVersion: _client.apiVersion,
          schemaVersion: bibleModelVersion,
          sourceScope: _client.cacheSourceScope,
        );
+  final InstalledBibleRepository? installed;
   final LocalDatabase _database;
   final GetBibleApiClient _client;
   final DateTime Function() _clock;
@@ -40,6 +43,24 @@ final class CachedBibleRepository implements BibleRepository {
   Future<RepositoryResult<List<Translation>>> getTranslations({
     bool forceRefresh = false,
   }) async {
+    // Installed discovery succeeds after a cold restart with zero HTTP.
+    if (!forceRefresh && installed != null) {
+      final local = await installed!.getTranslations();
+      if (local.data.isNotEmpty) {
+        final cached = await _readList('translations', Translation.fromJson);
+        final choices = <String, Translation>{
+          if (cached != null)
+            for (final item in _decodeList(cached, Translation.fromJson))
+              item.abbreviation: item,
+          for (final item in local.data) item.abbreviation: item,
+        };
+        return RepositoryResult(
+          data: choices.values.toList(),
+          freshness: local.freshness,
+          checkedAt: local.checkedAt,
+        );
+      }
+    }
     const String resource = 'translations';
     final CacheRecord? cached = await _readList(resource, Translation.fromJson);
     if (!forceRefresh && _isCurrent(cached)) {
@@ -85,6 +106,9 @@ final class CachedBibleRepository implements BibleRepository {
     bool forceRefresh = false,
   }) async {
     final String abbreviation = translation.toLowerCase();
+    if (installed != null && await installed!.contains(abbreviation)) {
+      return installed!.getBooks(abbreviation);
+    }
     final String resource = 'books:$abbreviation';
     final CacheRecord? cached = await _readList(resource, BibleBook.fromJson);
     if (!forceRefresh && _isCurrent(cached)) {
@@ -126,6 +150,9 @@ final class CachedBibleRepository implements BibleRepository {
     bool forceRefresh = false,
   }) async {
     final String abbreviation = translation.toLowerCase();
+    if (installed != null && await installed!.contains(abbreviation)) {
+      return installed!.getChapters(abbreviation, book);
+    }
     final String resource = 'chapters:$abbreviation:$book';
     final CacheRecord? cached = await _readList(resource, ChapterInfo.fromJson);
     if (!forceRefresh && _isCurrent(cached)) {
@@ -272,6 +299,9 @@ final class CachedBibleRepository implements BibleRepository {
     int chapter,
   ) async {
     final String abbreviation = translation.toLowerCase();
+    if (installed != null && await installed!.contains(abbreviation)) {
+      return installed!.getChapter(abbreviation, book, chapter);
+    }
     final String resource = 'chapter:$abbreviation:$book:$chapter';
     final CacheRecord? cached = await _readObject(
       resource,
@@ -429,6 +459,10 @@ final class CachedBibleRepository implements BibleRepository {
   Future<RepositoryResult<WholeTranslation>> getWholeTranslation(
     Translation translation,
   ) async {
+    if (installed != null &&
+        await installed!.contains(translation.abbreviation)) {
+      return installed!.getWholeTranslation(translation);
+    }
     final String resource = 'full:${translation.abbreviation}';
     final cached = await _readBulk<WholeTranslation>(
       cacheKey(resource),

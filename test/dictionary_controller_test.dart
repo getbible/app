@@ -7,10 +7,71 @@ import 'package:getbible_live/domain/models/dictionary.dart';
 import 'package:getbible_live/domain/models/service_envelopes.dart';
 import 'package:getbible_live/domain/models/study_context.dart';
 import 'package:getbible_live/domain/repositories/dictionary_repository.dart';
+import 'package:getbible_live/domain/repositories/installed_study_resource.dart';
 
 import 'support/dictionary_fixture.dart';
 
 void main() {
+  test(
+    'installation status refresh preserves the current dictionary entry and history',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository);
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      await controller.openEntry('G3056--2');
+      final entry = controller.entry;
+      final history = controller.historyLength;
+      final requests = fixture.requests.length;
+      repository.installed = true;
+      await controller.refreshInstallationStatus();
+      expect(controller.isInstalled, isTrue);
+      expect(controller.entry, same(entry));
+      expect(controller.historyLength, history);
+      expect(fixture.requests.length, requests);
+      repository.statusPending = Completer<bool>();
+      final stale = controller.refreshInstallationStatus();
+      controller.close();
+      repository.statusPending!.complete(false);
+      await stale;
+      expect(
+        controller.isInstalled,
+        isTrue,
+        reason: 'Dismissed status reads cannot update controller state.',
+      );
+    },
+  );
+
+  test('the latest dictionary installation refresh owns its result', () async {
+    final fixture = DictionaryFixture();
+    final repository = DelayedDictionaryRepository(fixture.repository);
+    final controller = DictionaryController(
+      repository: repository,
+      preferences: MemoryStudyPreferences(),
+    );
+    addTearDown(() {
+      controller.dispose();
+      fixture.close();
+    });
+    await controller.open(dictionaryContext(strongs: ['G3056']));
+    final pending = Completer<bool>();
+    repository.statusPending = pending;
+    final older = controller.refreshInstallationStatus();
+    repository.statusPending = null;
+    repository.installed = false;
+    await controller.refreshInstallationStatus();
+    pending.complete(true);
+    await older;
+    expect(controller.isInstalled, isFalse);
+  });
+
   test(
     'lookup shows duplicate definitions and every Strong ID without bulk requests',
     () async {
@@ -230,8 +291,14 @@ void main() {
   });
 }
 
-final class DelayedDictionaryRepository implements DictionaryRepository {
+final class DelayedDictionaryRepository
+    implements DictionaryRepository, InstalledStudyResource {
   DelayedDictionaryRepository(this.delegate);
+  bool installed = false;
+  Completer<bool>? statusPending;
+  @override
+  Future<bool> isInstalled(String id) =>
+      statusPending?.future ?? Future.value(installed);
   final DictionaryRepository delegate;
   String? delayModule;
   String? delayEntry;

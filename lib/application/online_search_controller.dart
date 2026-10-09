@@ -15,13 +15,21 @@ final class SearchRevisionChangedException extends NetworkException {
       );
 }
 
-/// Owns one interactive online search independently from reader navigation.
-/// Results preserve API ranking; only duplicate verse identities are skipped.
+/// Owns one interactive search independently from reader navigation. Online is
+/// the default; installed execution requires an explicit source choice. Results
+/// preserve repository ordering; only duplicate verse identities are skipped.
 final class OnlineSearchController extends ChangeNotifier {
-  OnlineSearchController({required this.repository, DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  OnlineSearchController({
+    required this.repository,
+    this.installedRepository,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   final SearchRepository repository;
+  final SearchRepository? installedRepository;
+  SearchExecutionMode _mode = SearchExecutionMode.online;
+  SearchExecutionMode get mode => _mode;
+  bool get supportsInstalledSearch => installedRepository != null;
   final DateTime Function() _now;
   final RequestOwner _owner = RequestOwner();
   final List<OnlineSearchHit> _results = <OnlineSearchHit>[];
@@ -70,15 +78,23 @@ final class OnlineSearchController extends ChangeNotifier {
     OnlineSearchCriteria? criteria,
     int pageSize = 25,
     String direction = 'LTR',
+    SearchExecutionMode mode = SearchExecutionMode.online,
   }) async {
     if (_disposed) return;
     // Even repeated effective inputs replace the previous interaction's token.
     clear();
+    _mode = mode;
     try {
       _request = OnlineSearchRequest(
         translation: translation,
         text: text,
-        criteria: criteria ?? OnlineSearchCriteria(),
+        criteria:
+            criteria ??
+            OnlineSearchCriteria(
+              diacritics: mode == SearchExecutionMode.installed
+                  ? SearchDiacritics.exact
+                  : SearchDiacritics.fold,
+            ),
         limit: pageSize,
         direction: direction,
       );
@@ -105,6 +121,7 @@ final class OnlineSearchController extends ChangeNotifier {
         criteria: request.criteria,
         pageSize: request.limit,
         direction: request.direction,
+        mode: _mode,
       );
     } else {
       await _load(first: false);
@@ -114,7 +131,9 @@ final class OnlineSearchController extends ChangeNotifier {
   Future<void> _load({required bool first}) async {
     final OnlineSearchRequest? original = _request;
     if (original == null || _disposed) return;
-    if (_servicePauseUntil != null && _now().isBefore(_servicePauseUntil!)) {
+    if (_mode == SearchExecutionMode.online &&
+        _servicePauseUntil != null &&
+        _now().isBefore(_servicePauseUntil!)) {
       // Retry-After applies to the service, not just the Retry button. Editing
       // filters, clearing the surface or submitting again cannot bypass it.
       _error = _servicePauseError;
@@ -124,8 +143,10 @@ final class OnlineSearchController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    _servicePauseUntil = null;
-    _servicePauseError = null;
+    if (_mode == SearchExecutionMode.online) {
+      _servicePauseUntil = null;
+      _servicePauseError = null;
+    }
     final RequestCancellation token = _owner.begin();
     final OnlineSearchRequest pageRequest = first
         ? original
@@ -136,7 +157,15 @@ final class OnlineSearchController extends ChangeNotifier {
     _loadingMore = !first;
     notifyListeners();
     try {
-      final OnlineSearchPage page = await repository.search(
+      final selectedRepository = _mode == SearchExecutionMode.online
+          ? repository
+          : installedRepository;
+      if (selectedRepository == null) {
+        throw const FormatException(
+          'Installed search is not available in this application.',
+        );
+      }
+      final OnlineSearchPage page = await selectedRepository.search(
         pageRequest,
         cancellation: token,
       );

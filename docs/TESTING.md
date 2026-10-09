@@ -2,7 +2,7 @@
 
 ## Interactive platform testing
 
-Run `flutter devices` to list available targets. Use `flutter run -d chrome` for the quickest browser test, or `flutter run -d <device-id>` for a connected phone, emulator, simulator, or desktop target. A successful GitHub Actions run exposes Android APK and web-build artifacts from its summary page.
+Run `flutter devices` to list available targets. Use `flutter run -d chrome` for the quickest browser test, or `flutter run -d <device-id>` for a connected phone, emulator, simulator, or desktop target. A successful GitHub Actions run exposes versioned packages for every supported target from its Artifacts section; see [distribution](DEPLOYMENT.md).
 
 pub.dev distributes Dart/Flutter libraries; it does not host or execute this application. Browser previews should use a locally served web build or an explicitly configured GitHub Pages deployment. Mobile prereleases should use Android APK/Play internal testing and iOS TestFlight.
 
@@ -202,3 +202,38 @@ install/upgrade, Apple/Windows host builds, physical-device gestures and
 accessibility, full locale adoption, complete offline installations and private
 notebook portability retain their later roadmap/release gates. Local test
 artifacts and server-header checks do not close those gates.
+
+## Distribution and host regression gates
+
+The current workflow restores the pinned Flutter SDK and lockfile, checks every
+native target on its corresponding host, and runs the production Web bundle in
+Chromium. `tool/browser_smoke` intercepts only the public Bible/daily endpoints
+with deterministic fixtures. The app uses its real SQLite WASM and worker, saves
+a private note and reopens it with API requests unavailable under both ordinary
+static hosting and cross-origin-isolated headers. Unexpected external requests,
+JavaScript exceptions and absent reader/note state fail the job.
+
+Python standard-library suites cover developer preflight, checksum-verified SDK
+setup, package/version validation, Debian packaging, signing configuration,
+provisioning validation and release publication invariants:
+
+```bash
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+python3 -m unittest discover -s scripts/release/tests -p 'test_*.py'
+```
+
+Unsigned package builds require no signing credentials. Optional signed jobs
+run only on trusted main and only with complete per-platform configuration.
+Missing configuration is reported by name. A signing job that runs and fails is
+a real failure, not a successful unsigned fallback. Publishing a GitHub release
+requires a manual trigger and checks the authoritative pubspec version.
+
+Linux installs its Debian output and launches the installed application. Windows
+silently installs its EXE into a temporary directory and launches that installed
+binary. macOS unpacks its produced ZIP and launches the contained app. These are
+loader/startup checks, not a substitute for interactive feature/device testing.
+
+The source-backed [October parity audit](PARITY_AUDIT_2026-10.md) records current
+reference behavior and outstanding product gaps. New daily-reference and bookmark
+preservation suites target previously untested failures, including a full
+schema-3-to-4 SQLite migration and current website provenance round trips.

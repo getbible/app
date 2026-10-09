@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=getBible.live
+Comment=Read and study Scripture
+Exec=/opt/getbible-live/getbible_life
+Icon=life.getbible.mobile
+Terminal=false
+Categories=Education;
+StartupWMClass=life.getbible.mobile

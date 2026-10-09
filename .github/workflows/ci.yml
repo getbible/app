@@ -4,54 +4,565 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish the version in pubspec.yaml to GitHub Releases (main only)'
+        default: false
+        type: boolean
+      web_base_href:
+        description: 'Web hosting path (leading and trailing slash)'
+        default: /flutter/
+        type: string
+
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: flutter-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      flutter: ${{ steps.sdk.outputs.version }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      release_version: ${{ steps.version.outputs.release_version }}
+      channel: ${{ steps.version.outputs.channel }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      artifact_version: ${{ steps.version.outputs.artifact_version }}
+      web_base_href: ${{ steps.sdk.outputs.web_base_href }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: sdk
+        env:
+          WEB_BASE_HREF: ${{ inputs.web_base_href || '/flutter/' }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, re
+          version = pathlib.Path('.flutter-version').read_text().strip()
+          base = os.environ['WEB_BASE_HREF']
+          assert re.fullmatch(r'\d+\.\d+\.\d+', version), 'Invalid SDK pin'
+          assert re.fullmatch(r'/(?:[A-Za-z0-9._~-]+/)*', base), 'Invalid web base path'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\nweb_base_href={base}\n')
+          PY
+      - id: version
+        run: python scripts/release/package.py metadata --output build/release-metadata.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-metadata
+          path: build/release-metadata.json
+          if-no-files-found: error
+
+  test:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
           channel: stable
-          flutter-version: '3.44.6'
           cache: true
-      - run: flutter pub get
-      - name: Verify approved GetBible brand assets
-        run: sha256sum -c assets/branding/BRAND_ASSETS.sha256
-      - name: Validate Dart formatting and parsing
-        run: dart format --output=none --set-exit-if-changed .
+      - run: flutter pub get --enforce-lockfile
+      - run: sha256sum -c assets/branding/BRAND_ASSETS.sha256
+      - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build web --release --base-href /flutter/
-      - run: flutter build apk --debug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: getBible-live-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: getBible-live-web
-          path: build/web
+      - name: Test developer and release tooling
+        run: |
+          python -m unittest discover -s scripts/tests -p 'test_*.py'
+          python -m unittest discover -s scripts/release/tests -p 'test_*.py'
 
-  linux-reader:
-    runs-on: ubuntu-latest
+  linux:
+    needs: metadata
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
           channel: stable
-          flutter-version: '3.44.6'
           cache: true
-      - name: Install Linux build and display dependencies
+      - name: Install native build and packaging prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
-      - run: flutter pub get
-      - name: Exercise the complete reader and native clipboard
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb dpkg-dev
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: python scripts/develop.py check linux
+      - run: flutter pub get --enforce-lockfile
+      - name: Exercise reader and native clipboard
         run: xvfb-run -a flutter test integration_test/reader_upgrade_test.dart -d linux
-      - name: Exercise contextual Study and private notebook persistence
+      - name: Exercise Study and private notebook reopening
         run: xvfb-run -a flutter test integration_test/study_workspace_test.dart -d linux
-      - run: flutter build linux --release
+      - run: flutter build linux --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: python scripts/release/package.py package --target linux --metadata build/release-metadata.json --output dist --arch x64
+      - name: Validate Debian installation and installed application startup
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          xvfb-run -a python scripts/release/smoke_desktop.py /opt/getbible-live/getbible_life
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  web:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+      WEB_BASE_HREF: ${{ needs.metadata.outputs.web_base_href }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tool/browser_smoke/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: flutter pub get --enforce-lockfile
+      - run: dart compile js -O4 tool/drift_worker.dart -o web/drift_worker.dart.js
+      - run: flutter build web --release --no-web-resources-cdn --base-href "$WEB_BASE_HREF" --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: npm ci --prefix tool/browser_smoke
+      - run: npx --prefix tool/browser_smoke playwright install --with-deps chromium
+      - name: Launch compiled app and verify persistent notes in a real browser
+        run: node tool/browser_smoke/run.mjs --build-dir build/web --base-path "$WEB_BASE_HREF"
+      - run: python scripts/release/package.py package --target web --metadata build/release-metadata.json --output dist --base-href "$WEB_BASE_HREF"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-web-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  android:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VERSION_NAME: ${{ needs.metadata.outputs.release_version }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build apk --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build apk --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: python scripts/release/package.py package --target android --metadata build/release-metadata.json --output dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-android-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    needs: metadata
+    runs-on: windows-2022
+    timeout-minutes: 40
+    env:
+      VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - name: Install Windows installer compiler when absent
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build windows --release --build-name "$env:VERSION_NAME" --build-number "$env:BUILD_NUMBER"
+      - run: python scripts/release/package.py package --target windows --metadata build/release-metadata.json --output dist --arch x64
+      - name: Install and launch the Windows package
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem dist/*-setup.exe)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one Windows installer.' }
+          $destination = Join-Path $env:RUNNER_TEMP 'GetBible-Smoke'
+          $process = Start-Process -FilePath $installer[0].FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$destination") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          python scripts/release/smoke_desktop.py (Join-Path $destination 'getbible_life.exe')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  apple:
+    needs: metadata
+    runs-on: macos-15
+    timeout-minutes: 50
+    env:
+      VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [macos, ios-device, ios-simulator]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.3
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+          xcrun --find notarytool
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: flutter pub get --enforce-lockfile
+      - if: matrix.target == 'macos'
+        run: flutter build macos --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - if: matrix.target == 'ios-device'
+        run: flutter build ios --release --no-codesign --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - if: matrix.target == 'ios-simulator'
+        run: flutter build ios --simulator --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: python scripts/release/package.py package --target '${{ matrix.target }}' --metadata build/release-metadata.json --output dist
+      - if: matrix.target == 'macos'
+        name: Unpack and launch the macOS package
+        run: |
+          mkdir "$RUNNER_TEMP/getbible-smoke"
+          ditto -x -k dist/*.app.zip "$RUNNER_TEMP/getbible-smoke"
+          python scripts/release/smoke_desktop.py "$RUNNER_TEMP/getbible-smoke/getBible.live.app/Contents/MacOS/getBible.live"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  signing:
+    # No secret is exposed to pull-request code, including same-repository PRs.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: metadata
+    runs-on: ubuntu-24.04
+    outputs:
+      android: ${{ steps.config.outputs.android_signing }}
+      windows: ${{ steps.config.outputs.windows_signing }}
+      macos: ${{ steps.config.outputs.macos_signing }}
+      ios: ${{ steps.config.outputs.ios_signing }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: config
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_KEY_P8_BASE64: ${{ secrets.MACOS_NOTARY_KEY_P8_BASE64 }}
+          MACOS_SIGNING_IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_SIGNING_IDENTITY: ${{ vars.IOS_SIGNING_IDENTITY }}
+          IOS_TEAM_ID: ${{ vars.IOS_TEAM_ID }}
+        run: |
+          python scripts/release/signing_configuration.py --github-output > signing-status.json
+          cat signing-status.json
+          {
+            echo '### Optional signed distributions'
+            echo 'Missing configuration skips only that signed target. Unsigned test builds still run.'
+            echo '```json'
+            cat signing-status.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  android-signed:
+    needs: [metadata, signing, test]
+    if: needs.signing.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: flutter pub get --enforce-lockfile
+      - name: Build signed Android release packages
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_NAME: ${{ needs.metadata.outputs.release_version }}
+          BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+        run: |
+          python scripts/release/sign_android.py -- flutter build apk --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+          python scripts/release/sign_android.py -- flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - name: Verify signatures and package
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          test -n "$APKSIGNER"
+          python scripts/release/package.py package --target android-signed --metadata build/release-metadata.json --output dist --apksigner "$APKSIGNER"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-android-signed-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  windows-signed:
+    needs: [metadata, signing, test]
+    if: needs.signing.outputs.windows == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - name: Install Inno Setup when absent
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - run: flutter pub get --enforce-lockfile
+      - name: Build Windows release
+        env:
+          VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+        run: flutter build windows --release --build-name "$env:VERSION_NAME" --build-number "$env:BUILD_NUMBER"
+      - name: Sign staged executables and installer before checksums
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: python scripts/release/package.py package --target windows --metadata build/release-metadata.json --output dist --signing-mode distribution --sign-hook scripts/release/sign_windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows-signed-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  macos-signed:
+    needs: [metadata, signing, test]
+    if: needs.signing.outputs.macos == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.3
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+          xcrun --find notarytool
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: flutter pub get --enforce-lockfile
+      - name: Build macOS release
+        env:
+          VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+        run: flutter build macos --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - name: Sign, notarize, staple and package macOS
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_KEY_P8_BASE64: ${{ secrets.MACOS_NOTARY_KEY_P8_BASE64 }}
+          MACOS_SIGNING_IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          bash scripts/release/sign_macos.sh app build/macos/Build/Products/Release/getBible.live.app
+          python scripts/release/package.py package --target macos --metadata build/release-metadata.json --output dist --signing-mode distribution --sign-hook scripts/release/sign_macos_artifact.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos-signed-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  ios-signed:
+    needs: [metadata, signing, test]
+    if: needs.signing.outputs.ios == 'true'
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.3
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+          xcrun --find notarytool
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ needs.metadata.outputs.flutter }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - run: flutter pub get --enforce-lockfile
+      - name: Build signed iOS App Store package
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_SIGNING_IDENTITY: ${{ vars.IOS_SIGNING_IDENTITY }}
+          IOS_TEAM_ID: ${{ vars.IOS_TEAM_ID }}
+          VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+        run: bash scripts/release/sign_ios.sh
+      - run: python scripts/release/package.py package --target ios-signed --metadata build/release-metadata.json --output dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-ios-signed-${{ needs.metadata.outputs.artifact_version }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' && inputs.publish_release &&
+      needs.test.result == 'success' && needs.linux.result == 'success' &&
+      needs.web.result == 'success' && needs.android.result == 'success' &&
+      needs.windows.result == 'success' && needs.apple.result == 'success' &&
+      needs.signing.result == 'success' &&
+      (needs.android-signed.result == 'success' || needs.android-signed.result == 'skipped') &&
+      (needs.windows-signed.result == 'success' || needs.windows-signed.result == 'skipped') &&
+      (needs.macos-signed.result == 'success' || needs.macos-signed.result == 'skipped') &&
+      (needs.ios-signed.result == 'success' || needs.ios-signed.result == 'skipped')
+    needs: [metadata, test, linux, web, android, windows, apple, signing, android-signed, windows-signed, macos-signed, ios-signed]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: build
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+      - name: Publish the new recorded version, or skip an existing release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANDROID_SIGNING: ${{ needs.signing.outputs.android }}
+          WINDOWS_SIGNING: ${{ needs.signing.outputs.windows }}
+          MACOS_SIGNING: ${{ needs.signing.outputs.macos }}
+          IOS_SIGNING: ${{ needs.signing.outputs.ios }}
+        run: |
+          REQUIRED_SIGNED=$(python -c "import os; print(','.join(p for p in ('android','windows','macos','ios') if os.environ.get(p.upper() + '_SIGNING') == 'true'))")
+          python scripts/release/publish.py --directory dist --metadata build/release-metadata.json --required-signed-targets "$REQUIRED_SIGNED"

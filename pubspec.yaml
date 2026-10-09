@@ -1,7 +1,7 @@
 name: getbible_live
 description: A local-first, cross-platform Flutter Bible reader powered by GetBible v3 Bible and Query services.
 publish_to: none
-version: 1.0.0+1
+version: 1.0.0-alpha.1+2
 
 environment:
   sdk: '>=3.12.2 <4.0.0'
@@ -46,6 +46,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Keep the existing default web UI font available without a Google CDN call.
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
   assets:
+    - assets/fonts/Roboto_LICENSE.txt
     - assets/branding/
     - assets/locales/

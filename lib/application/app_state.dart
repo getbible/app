@@ -169,7 +169,7 @@ final class AppState extends ChangeNotifier {
   Future<void>? _closeFuture;
   bool _closing = false;
   String _installedSignature = '';
-  Future<void> _resourceRefresh = Future<void>.value();
+  Future<void>? _resourceRefresh;
   String? resourceChoicesError;
 
   bool get searchLoading => onlineSearch.isLoading;
@@ -841,7 +841,7 @@ final class AppState extends ChangeNotifier {
   /// removed; installation state is owned exclusively by the offline manager.
   Future<void> refreshInstalledResourceChoices() {
     if (_closing) return Future<void>.value();
-    final refresh = _resourceRefresh.then((_) async {
+    Future<void> refreshChoices() async {
       if (_closing) return;
       final installed = await bibles.installed!.getTranslations();
       if (_closing) return;
@@ -852,7 +852,12 @@ final class AppState extends ChangeNotifier {
       await study.refreshInstallationStatus();
       resourceChoicesError = null;
       if (!_closing) notifyListeners();
-    });
+    }
+
+    final previous = _resourceRefresh;
+    final refresh = previous == null
+        ? refreshChoices()
+        : previous.then((_) => refreshChoices());
     _resourceRefresh = refresh.catchError((Object _) {
       resourceChoicesError =
           'Installed resource choices could not refresh. Open Offline resources to retry.';

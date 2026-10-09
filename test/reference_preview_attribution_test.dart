@@ -28,7 +28,7 @@ void main() {
       passage: const Passage(translation: 'kjv', book: 1, chapter: 1, verse: 1),
       label: 'Genesis1:1',
     );
-    await controller.open(reference.previewRequest);
+    await tester.runAsync(() => controller.open(reference.previewRequest));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

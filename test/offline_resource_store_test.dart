@@ -358,7 +358,13 @@ void main() {
         )).single.verse,
         2,
       );
-      expect((await store.readSearchVerses(_resource().key, terms: ['𐐀' * 500])).single.verse, 4);
+      expect(
+        (await store.readSearchVerses(
+          _resource().key,
+          terms: ['𐐀' * 500],
+        )).single.verse,
+        4,
+      );
       await expectLater(
         store.readSearchVerses(_resource().key, limit: 501),
         throwsArgumentError,

@@ -4,7 +4,8 @@ import { readFile, mkdir, writeFile, stat } from 'node:fs/promises';
 import { resolve, sep, extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
-import { apiFixtures, firstVerse, noteText } from './fixtures.mjs';
+import { apiFixtures, firstVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
+import { studyInstallationFixtures } from './study-fixtures.mjs';
 
 const { values } = parseArgs({ options: {
   'build-dir': { type: 'string', default: 'build/web' },
@@ -17,7 +18,7 @@ const outputDirectory = resolve(values['output-dir']);
 const basePath = values['base-path'];
 assert.match(basePath, /^\/(?:[a-zA-Z0-9._~-]+\/)*$/, 'Base path must start and end in /');
 assert.ok(!basePath.split('/').some((segment) => segment === '.' || segment === '..'), 'Base path cannot contain dot segments');
-for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js']) {
+for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js', 'offline_bible_worker.dart.js']) {
   assert.ok((await stat(join(buildDirectory, asset))).isFile(), `Missing built asset: ${asset}`);
 }
 const index = await readFile(join(buildDirectory, 'index.html'), 'utf8');
@@ -79,11 +80,13 @@ async function runJourney(browser, { isolated }) {
   const errors = [];
   const requests = [];
   const missingAssets = [];
-  const fixtures = apiFixtures();
+  const workers = [];
+  const fixtures = new Map([...apiFixtures(), ...studyInstallationFixtures()]);
   let apiOffline = false;
   let page;
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   context.on('page', (opened) => {
+    opened.on('worker', (worker) => workers.push(worker.url()));
     opened.on('pageerror', (error) => errors.push({ type: 'pageerror', message: error.stack ?? error.message }));
     opened.on('console', (message) => {
       if (message.type() !== 'error') return;
@@ -144,8 +147,8 @@ async function runJourney(browser, { isolated }) {
     await page.screenshot({ path: join(outputDirectory, `${mode}-saved.png`) });
     console.log(`${mode}: private note saved`);
 
-    // A new page discards all Dart state. It reopens the production browser
-    // database, while public APIs fail and local release assets still load.
+    // Preserve coverage for readers that have cached a passage but have not
+    // installed a complete Bible. Reopening must retain the note and text.
     apiOffline = true;
     await page.close();
     page = await context.newPage();
@@ -157,11 +160,115 @@ async function runJourney(browser, { isolated }) {
     await page.getByRole('button', { name: 'Saved Scripture', exact: true }).click();
     await page.getByText('Saved for offline reading', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
+    assert.ok(requests.some((request) => request.apiOffline),
+      'Cached chapter path must attempt current-source verification');
+    apiOffline = false;
+    console.log(`${mode}: cached passage and note reopened without public APIs`);
+
+    // Download the actual private snapshot, then import an edited copy through
+    // the system file picker. The preview must precede any merge confirmation.
+    await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+    await page.getByRole('button', { name: 'Backup and restore', exact: true }).press('Enter');
+    await page.getByRole('button', { name: 'Prepare complete backup', exact: true }).click();
+    const downloadEvent = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Save file', exact: true }).click();
+    const download = await downloadEvent;
+    assert.match(download.suggestedFilename(), /^getbible-private-\d{4}-\d{2}-\d{2}\.json$/);
+    const backupPath = join(outputDirectory, `${mode}-private-backup.json`);
+    await download.saveAs(backupPath);
+    const backup = JSON.parse(await readFile(backupPath, 'utf8'));
+    assert.equal(backup.format, 'getbible-private-backup');
+    const savedNote = backup.reader.notes.find((note) => note.text === noteText);
+    assert.ok(savedNote, 'Downloaded backup must contain the saved private note');
+    savedNote.text = restoredNoteText;
+    assert.ok(Number.isSafeInteger(savedNote.updatedAt));
+    savedNote.updatedAt += 1000;
+    const fileChooserEvent = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Choose backup file', exact: true }).click();
+    await (await fileChooserEvent).setFiles({
+      name: 'restore.json', mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(backup)),
+    });
+    await page.getByText('Complete private backup preview', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Confirm import', exact: true }).click();
+    await page.locator('flt-semantics').getByText(/^Import complete:/).waitFor();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    console.log(`${mode}: downloaded and restored private backup`);
+
+    // Install the complete fixture Bible through the real production worker.
+    // Chapter two has never been opened, so a later offline read cannot be
+    // satisfied by the opportunistic chapter cache.
+    assert.ok(!requests.some((request) => request.url.endsWith('/1/2.json')));
+    await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+    await page.getByRole('button', { name: 'Set up offline use', exact: true }).press('Enter');
+    await page.getByRole('button', { name: 'Browse catalogue', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Find a resource', exact: true }).click();
+    await page.locator('input:focus, textarea:focus').fill('King James Version');
+    const resourceCard = page.getByRole('group', { name: /^King James Version \(English\)\s+Bible/ });
+    await resourceCard.waitFor();
+    await resourceCard.scrollIntoViewIfNeeded();
+    await page.getByRole('button', { name: 'Install', exact: true }).first().click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Install', exact: true }).click();
+    console.log(`${mode}: resource installation confirmed`);
+    await page.getByRole('group', { name: /^King James Version \(English\)\s+Bible[\s\S]*Installed[\s\S]*Verified source revision:/ }).waitFor();
+    const bibleWorkers = workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length;
+    assert.ok(bibleWorkers > 0, 'Complete installation must execute the bundled web worker');
+    await page.getByRole('textbox', { name: 'Find a resource', exact: true }).click();
+    await page.locator('input:focus, textarea:focus').fill('Greek lexicon');
+    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary/ }).waitFor();
+    await page.getByRole('button', { name: 'Install', exact: true }).first().click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Install', exact: true }).click();
+    console.log(`${mode}: resource installation confirmed`);
+    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary[\s\S]*Installed/ }).waitFor();
+    assert.ok(workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length > bibleWorkers,
+      'Bible and dictionary installation must both execute the production worker');
+    await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
+    console.log(`${mode}: complete Bible and dictionary installed by production worker`);
+
+    // A new page discards all Dart state. It reopens the production browser
+    // database, while public APIs fail and local release assets still load.
+    const requestsBeforeInstalledRestart = requests.length;
+    apiOffline = true;
+    await page.close();
+    page = await context.newPage();
+    page.setDefaultTimeout(45000);
+    await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
+    await enableSemantics(page);
+    await readerVisible(page);
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await page.getByRole('button', { name: 'Verified Scripture', exact: true }).click();
+    await page.getByText('Scripture verified', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+    await page.getByRole('button', { name: 'Set up offline use', exact: true }).press('Enter');
+    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary/ }).waitFor();
+    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary[\s\S]*Installed/ }).waitFor();
+    await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
+    const requestsBeforeOfflineRead = requests.length;
+    await page.getByRole('button', { name: 'Next chapter', exact: true }).first().click();
+    await page.getByRole('group', { name: `Genesis 2:1. ${unvisitedVerse}`, exact: true }).waitFor();
+    assert.equal(requests.length, requestsBeforeOfflineRead,
+      'An installed chapter must open without public HTTP requests');
+    // The compact reader exposes a dedicated search action, exercising the
+    // responsive toolbar as well as the desktop installation layout.
+    await page.setViewportSize({ width: 700, height: 900 });
+    await page.getByRole('button', { name: 'Search this translation', exact: true }).click();
+    await page.getByRole('button', { name: /^Search source\s+Online search/ }).click();
+    await page.getByRole('menuitem', { name: 'Installed Bible (offline)', exact: true }).click();
+    await page.getByRole('textbox', { name: /Search KJV/ }).click();
+    await page.getByPlaceholder('Words, a phrase or a Scripture reference', { exact: true }).fill('finished');
+    const requestsBeforeOfflineSearch = requests.length;
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('button', { name: 'Open Genesis 2:1', exact: true }).waitFor();
+    assert.equal(requests.length, requestsBeforeOfflineSearch,
+      'Installed search must not request an online search or query service');
     await page.screenshot({ path: join(outputDirectory, `${mode}-offline.png`) });
-    assert.ok(requests.some((request) => request.apiOffline), 'Offline cache path must attempt verification');
+    assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
+      'Installed restart, reading and search must stay within the local database');
     assert.deepEqual(errors, [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
-    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'new-page persistence', 'API-offline cached reader', 'no browser errors'] };
+    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'no browser errors'] };
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: join(outputDirectory, `${mode}-failure.png`) }).catch(() => {});
@@ -169,7 +276,7 @@ async function runJourney(browser, { isolated }) {
     }
     throw error;
   } finally {
-    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({ errors, missingAssets, requests }, null, 2));
+    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({ errors, missingAssets, requests, workers }, null, 2));
     await context.tracing.stop({ path: join(outputDirectory, `${mode}-trace.zip`) });
     await context.close();
     await new Promise((resolveClose) => server.close(resolveClose));

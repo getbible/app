@@ -17,11 +17,25 @@ class OfflineSetupPanel extends StatefulWidget {
 
 class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
   OfflineResourceKind? _kind;
-  String _filter = '';
+  // Progress and installed cards change the controls' positions in the lazy
+  // list. Keep the editor state here and key its widget so those updates do not
+  // reset the visible query, selection or focus while filtering remains active.
+  final TextEditingController _filterController = TextEditingController();
+  final FocusNode _filterFocus = FocusNode(
+    debugLabel: 'Offline resource filter',
+  );
+
   @override
   void initState() {
     super.initState();
     unawaited(widget.controller.initialize());
+  }
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    _filterFocus.dispose();
+    super.dispose();
   }
 
   @override
@@ -34,7 +48,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
             (resource) =>
                 (_kind == null || resource.kind == _kind) &&
                 ('${resource.title} ${resource.id}').toLowerCase().contains(
-                  _filter.toLowerCase(),
+                  _filterController.text.toLowerCase(),
                 ),
           )
           .toList();
@@ -176,6 +190,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                     if (controller.catalog.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       DropdownButtonFormField<OfflineResourceKind>(
+                        key: const ValueKey<String>('offline-resource-kind'),
                         initialValue: _kind,
                         hint: const Text('All resources'),
                         isExpanded: true,
@@ -197,11 +212,14 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+                        key: const ValueKey<String>('offline-resource-filter'),
+                        controller: _filterController,
+                        focusNode: _filterFocus,
                         decoration: const InputDecoration(
                           labelText: 'Find a resource',
                           prefixIcon: Icon(Icons.search),
                         ),
-                        onChanged: (value) => setState(() => _filter = value),
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 8),
                       for (final resource in items.take(100))

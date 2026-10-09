@@ -11,7 +11,7 @@ import '../../domain/models/service_envelopes.dart';
 import '../../services/search_match_emphasis.dart';
 import 'scripture_verse_text.dart';
 
-/// Native online search content, reusable in a full-screen route or Study pane.
+/// Native search content with an explicit online/installed source selection.
 /// The injected controller owns requests; widgets only edit typed criteria.
 class SearchPanel extends StatefulWidget {
   const SearchPanel({
@@ -44,6 +44,7 @@ class _SearchPanelState extends State<SearchPanel> {
   final TextEditingController _exclusions = TextEditingController();
   final TextEditingController _proximity = TextEditingController();
   final ScrollController _scroll = ScrollController();
+  SearchExecutionMode _mode = SearchExecutionMode.online;
   SearchWordMode _words = SearchWordMode.all;
   SearchMatchMode _match = SearchMatchMode.exact;
   OnlineSearchScope _scope = OnlineSearchScope.bible;
@@ -66,6 +67,7 @@ class _SearchPanelState extends State<SearchPanel> {
     if (previous != null &&
         previous.translation == widget.translation &&
         widget.initialQuery.isEmpty) {
+      _mode = widget.controller.mode;
       _query.text = previous.text;
       final OnlineSearchCriteria criteria = previous.criteria;
       _words = criteria.words;
@@ -177,6 +179,7 @@ class _SearchPanelState extends State<SearchPanel> {
         _query.text,
         criteria: criteria,
         direction: widget.direction,
+        mode: _mode,
       ),
     );
   }
@@ -248,11 +251,13 @@ class _SearchPanelState extends State<SearchPanel> {
               ),
             )
           else if (!_hasSearched)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Enter words or a Scripture reference. Search uses the selected Bible online.',
+                  _mode == SearchExecutionMode.online
+                      ? 'Enter words or a Scripture reference. Search uses the selected Bible online.'
+                      : 'Search only the selected installed Bible. No query is sent online.',
                 ),
               ),
             ),
@@ -364,7 +369,7 @@ class _SearchPanelState extends State<SearchPanel> {
               child: Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'More matches exist beyond the online offset limit. Narrow the search using books, scope or additional words.',
+                  'More matches exist beyond the page offset limit. Narrow the search using books, scope or additional words.',
                 ),
               ),
             )
@@ -393,6 +398,35 @@ class _SearchPanelState extends State<SearchPanel> {
   Widget _controls(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: <Widget>[
+      if (widget.controller.supportsInstalledSearch) ...[
+        _dropdown<SearchExecutionMode>(
+          'Search source',
+          _mode,
+          const {
+            SearchExecutionMode.online: 'Online search',
+            SearchExecutionMode.installed: 'Installed Bible (offline)',
+          },
+          (value) {
+            _mode = value;
+            if (value == SearchExecutionMode.installed) {
+              _diacritics = SearchDiacritics.exact;
+              _sort = SearchSort.canonical;
+              if (_scope == OnlineSearchScope.deuterocanon) {
+                _scope = OnlineSearchScope.bible;
+              }
+              _proximity.clear();
+            }
+            _inputChanged();
+          },
+        ),
+        if (_mode == SearchExecutionMode.installed)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Offline search uses exact diacritics and Bible order. Folding, relevance, proximity and Deuterocanon scope require Online search. Choose individual books to include other offline scopes. Install the selected Bible in Offline resources first.',
+            ),
+          ),
+      ],
       TextField(
         key: const ValueKey<String>('online-search-query'),
         controller: _query,

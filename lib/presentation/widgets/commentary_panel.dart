@@ -8,6 +8,7 @@ import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
 import '../../domain/models/study_citation.dart';
 import '../../domain/models/study_context.dart';
+import 'study_offline_status.dart';
 
 /// Plain native study text. The injected preview action reuses the reader's
 /// selected-Bible Query surface; this widget owns no network or storage access.
@@ -16,12 +17,14 @@ final class CommentaryPanel extends StatefulWidget {
     required this.controller,
     required this.context,
     required this.onPreviewReference,
+    this.onSetUpOffline,
     super.key,
   });
 
   final CommentaryController controller;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
+  final VoidCallback? onSetUpOffline;
 
   @override
   State<CommentaryPanel> createState() => _CommentaryPanelState();
@@ -73,6 +76,12 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            StudyOfflineStatus(
+              installed: controller.selectedModule == null
+                  ? null
+                  : controller.isInstalled,
+              onSetUpOffline: widget.onSetUpOffline,
+            ),
             Text(
               widget.context.label,
               style: Theme.of(context).textTheme.titleMedium,

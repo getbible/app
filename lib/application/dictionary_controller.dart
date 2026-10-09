@@ -7,6 +7,7 @@ import '../domain/models/reference.dart';
 import '../domain/models/service_envelopes.dart';
 import '../domain/models/study_context.dart';
 import '../domain/repositories/dictionary_repository.dart';
+import '../domain/repositories/installed_study_resource.dart';
 import '../domain/repositories/study_preferences_repository.dart';
 import 'dictionary_lookup.dart';
 
@@ -41,6 +42,10 @@ final class DictionaryController extends ChangeNotifier {
   Object? _error;
   Object? _preferenceError;
   bool _loading = false;
+  bool isInstalled = false;
+  bool _active = false;
+  bool _disposed = false;
+  int _installationStatusGeneration = 0;
   String? _requestedEntry;
 
   StudyContext? get context => _context;
@@ -60,7 +65,38 @@ final class DictionaryController extends ChangeNotifier {
   bool get canGoBack => _history.isNotEmpty;
   int get historyLength => _history.length;
 
+  /// Refresh only installation availability; keep the selected definition,
+  /// index results and navigation history intact while a download completes.
+  Future<void> refreshInstallationStatus() async {
+    final module = _selected;
+    final context = _context;
+    final capability = repository;
+    if (!_active ||
+        _disposed ||
+        module == null ||
+        capability is! InstalledStudyResource) {
+      return;
+    }
+    final generation = ++_installationStatusGeneration;
+    final installed = await (capability as InstalledStudyResource).isInstalled(
+      module.id,
+    );
+    if (!_active ||
+        _disposed ||
+        generation != _installationStatusGeneration ||
+        !identical(context, _context) ||
+        !identical(module, _selected)) {
+      return;
+    }
+    if (isInstalled != installed) {
+      isInstalled = installed;
+      notifyListeners();
+    }
+  }
+
   Future<void> open(StudyContext context) async {
+    _active = true;
+    _installationStatusGeneration++;
     final RequestCancellation request = _owner.begin();
     _context = context;
     _lookup = DictionaryLookupBuilder.fromContext(context);
@@ -181,6 +217,17 @@ final class DictionaryController extends ChangeNotifier {
     RequestCancellation request,
   ) async {
     _selected = module;
+    final statusGeneration = ++_installationStatusGeneration;
+    isInstalled = false;
+    final capability = repository;
+    if (capability is InstalledStudyResource) {
+      final installed = await (capability as InstalledStudyResource)
+          .isInstalled(module.id);
+      if (!_owner.owns(request)) return;
+      if (statusGeneration == _installationStatusGeneration) {
+        isInstalled = installed;
+      }
+    }
     final DictionaryMetadata metadata = await repository.metadata(
       module.id,
       cancellation: request,
@@ -322,6 +369,8 @@ final class DictionaryController extends ChangeNotifier {
   }
 
   void close() {
+    _active = false;
+    _installationStatusGeneration++;
     _owner.cancel();
     _loading = false;
     _history.clear();
@@ -329,6 +378,9 @@ final class DictionaryController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _active = false;
+    _installationStatusGeneration++;
     _owner.cancel();
     super.dispose();
   }

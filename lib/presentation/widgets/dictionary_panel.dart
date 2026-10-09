@@ -8,6 +8,7 @@ import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
 import '../../domain/models/study_citation.dart';
 import '../../domain/models/study_context.dart';
+import 'study_offline_status.dart';
 
 /// Native plain-text dictionary UI. The controller owns resource requests and
 /// the reader supplies the one shared, selected-Bible Scripture preview.
@@ -16,11 +17,13 @@ final class DictionaryPanel extends StatefulWidget {
     required this.controller,
     required this.context,
     required this.onPreviewReference,
+    this.onSetUpOffline,
     super.key,
   });
   final DictionaryController controller;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
+  final VoidCallback? onSetUpOffline;
 
   @override
   State<DictionaryPanel> createState() => _DictionaryPanelState();
@@ -71,6 +74,10 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
+          StudyOfflineStatus(
+            installed: state.selectedModule == null ? null : state.isInstalled,
+            onSetUpOffline: widget.onSetUpOffline,
+          ),
           if (lookup != null && lookup.sourceWord.isNotEmpty) ...<Widget>[
             SelectableText(
               lookup.sourceWord,

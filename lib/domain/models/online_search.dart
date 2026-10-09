@@ -2,6 +2,8 @@ import 'bible.dart';
 import 'search.dart';
 import 'service_envelopes.dart';
 
+enum SearchExecutionMode { online, installed }
+
 enum OnlineSearchScope { bible, oldTestament, newTestament, deuterocanon }
 
 enum SearchDiacritics { fold, exact }
@@ -69,7 +71,7 @@ final class OnlineSearchCriteria {
   final SearchSort sort;
 }
 
-/// An explicitly requested online operation, bounded by the published contract.
+/// An explicitly requested Scripture search, bounded by the shared page contract.
 /// [text] is retained exactly, including an original selected phrase.
 final class OnlineSearchRequest {
   OnlineSearchRequest({

@@ -26,6 +26,7 @@ import 'package:getbible_live/domain/models/reference.dart';
 import 'package:getbible_live/domain/models/service_envelopes.dart';
 import 'package:getbible_live/domain/models/study_context.dart';
 import 'package:getbible_live/domain/repositories/bible_repository.dart';
+import 'package:getbible_live/domain/repositories/installed_study_resource.dart';
 import 'package:getbible_live/domain/repositories/public_topics_repository.dart';
 import 'package:getbible_live/presentation/widgets/topics_panel.dart';
 import 'package:http/http.dart' as http;
@@ -47,6 +48,35 @@ const StudyContext _context = StudyContext(
 );
 
 void main() {
+  test(
+    'topic installation status changes preserve selected topic and private choices',
+    () async {
+      final database = await LocalDatabase.memory();
+      addTearDown(database.close);
+      final repository = _TopicsFake();
+      final controller = _controller(repository, database);
+      addTearDown(controller.dispose);
+      await controller.initialize(_context);
+      await controller.selectTopic('authority-of-the-bible');
+      await controller.setFollowed('authority-of-the-bible', true);
+      final selected = controller.selectedTopic;
+      final names = controller.localizedNames;
+      repository.installed = true;
+      await controller.refreshInstallationStatus();
+      expect(controller.isInstalled, isTrue);
+      expect(controller.selectedTopic, same(selected));
+      expect(controller.localizedNames, same(names));
+      expect(controller.followed, contains('authority-of-the-bible'));
+      final pending = Completer<bool>();
+      repository.statusPending = pending;
+      final older = controller.refreshInstallationStatus();
+      controller.dismiss();
+      pending.complete(false);
+      await older;
+      expect(controller.isInstalled, isTrue);
+    },
+  );
+
   test(
     'topic citations reject unavailable selected-Bible books and verses without partial success',
     () async {
@@ -760,7 +790,13 @@ final class _TopicBible extends Fake implements BibleRepository {
   );
 }
 
-final class _TopicsFake implements PublicTopicsRepository {
+final class _TopicsFake
+    implements PublicTopicsRepository, InstalledStudyResource {
+  bool installed = false;
+  Completer<bool>? statusPending;
+  @override
+  Future<bool> isInstalled(String id) =>
+      statusPending?.future ?? Future.value(installed);
   Completer<PublicTopic>? delayedTopic;
   @override
   String get sourceScope => 'bookmarks:v1:fake';

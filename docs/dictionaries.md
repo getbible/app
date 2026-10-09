@@ -61,3 +61,39 @@ and verified identical synchronous/cooperative matches, event-loop yielding and
 cancellation. Native compute avoids putting that large parse on the UI isolate.
 Flutter Web still performs JSON parsing on its event loop; physical-phone and
 browser performance profiling remains a later integrated UX release gate.
+
+## Complete offline dictionaries
+
+**Set up offline use** lists the dynamically discovered dictionaries, source
+language, license and advertised whole-module size. An explicit installation
+fetches the current SHA-256 manifest, catalogue, module metadata, index and
+`{dictionary}.json`. It hashes the exact downloaded bytes, validates identities,
+counts and every nested entry against the published index, and checks the same
+manifest paths again before activation. Repeated display keys remain separate
+exact IDs; aliases, lexical IDs, links, citations and attribution survive.
+
+The complete module is decoded, verified and indexed in a native isolate or the
+bundled browser worker, with bounded, acknowledged batches into staging. Saved
+large indexes also rebuild their normalized lookup keys in that worker. No
+per-entry HTTP crawl or main-isolate whole-module JSON parsing is used. Failed,
+cancelled, malformed or source-rotated installations leave the prior installation
+readable. Installation/removal never writes private annotations.
+
+`InstalledDictionaryRepository` supplies the same typed controller boundary.
+Installed metadata, index and entries are read locally after restart, with an
+**Installed on this device** status. Saved discovery retains online-only choices
+without delaying installed lookup for an HTTP timeout; **Set up offline use →
+Browse catalogue / Check for updates** obtains new discovery. Online-only choices retain
+an explicit status and use the existing API. An entry missing from an installed
+snapshot is a repairable storage error, never a fetch from another revision.
+Source roots are isolated and a module reading session pins its generation.
+
+`test/installed_study_test.dart` adds complete-module fixtures, real SQLite
+restart, installed/online source equivalence, exact-byte corruption, manifest
+rotation and atomic failed-update coverage.
+
+The complete-module processor was additionally checked on 9 October 2026
+against the generated source repository's current `saoa.json`, metadata and
+index: 107,863 published bytes produced 35 validated local documents. This
+exercises a real complete dictionary independently of the small regression
+fixtures. Source: [`getbible/dictionaries`](https://github.com/getbible/dictionaries/tree/main/v1).

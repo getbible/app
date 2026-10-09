@@ -17,3 +17,36 @@ Copying the same topic again adds only missing canonical identities. Existing pr
 The present website-compatible backup format includes copied groups and markings, but scoped copy provenance and follow/hide choices await the richer private-data portability contract in step 12. Importing an older backup therefore does not promise restoration of public follow/hide state or copy provenance. Public cache removal never deletes private copied annotations.
 
 `test/public_topics_test.dart` covers the published and constructed positive documents, shape/identity failures, partial names, empty reverse maps, exact lazy GET routes, invalid-response cache recovery, catalogue revision/deletion, local-only choices, extended Bible IDs, late request ownership, collision rollback, preservation of existing groups/notes, duplicate-safe/additive copies and deletion/recreation. Native widget tests exercise selected-Bible previews, explicit confirmation and a narrow 200% text surface with scrollable content. Positive fixtures are independently validated against the current live OpenAPI JSON Schema. Physical-device selection, clipboard, accessibility and store review remain platform release gates.
+
+## Complete offline public topics
+
+**Set up offline use** explicitly downloads `all.json` with `index.json` and
+`checksums.json`. The index's checksum must equal the exact full-body SHA-256;
+both requested paths must retain the same manifest hashes through final
+verification. Workers validate the complete dataset and derive topic summaries,
+individual topics, localized name maps and chapter reverse associations before
+atomic activation. A bulk topic is not parsed as an individual topic: its
+`names` are assembled from the bulk locale documents, preserving partial locale
+coverage and English fallback. Unknown locale/topic IDs remain unavailable.
+
+`InstalledPublicTopicsRepository` reads this complete snapshot without HTTP after
+restart and uses the same public-topic source scope as the online repository.
+Missing reverse indexes represent no associations only for valid canonical
+chapters within the still-active complete generation. A replaced generation
+cannot be mistaken for an empty chapter. The panel identifies the installed
+source and offers **Set up offline use**. Topic coordinates still require the
+chosen Bible to be available for Scripture preview; public-topic installation
+contains no Scripture text and never silently downloads a Bible.
+
+Uninstalling the public dataset removes only its owned public generation.
+Independent **Copy to my markings** groups, copied markings, local choices,
+copy provenance and private verse notes remain intact. The complete-module
+suite exercises a private copy before removal and a duplicate-safe repeat copy
+after removal, in addition to locale and reverse-index equivalence.
+
+On 9 October 2026 the processor validated the generated source repository's
+complete `all.json` (218,400 UTF-8 bytes) against the exact SHA-256 published in
+its `index.json`. Its 61 topics and 54 locales produced 653 local documents.
+This verifies real bulk locale composition and reverse associations independently
+of the constructed fixtures. Source:
+[`getbible/bookmarks`](https://github.com/getbible/bookmarks/tree/main/v1).

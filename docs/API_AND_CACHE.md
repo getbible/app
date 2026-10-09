@@ -24,15 +24,40 @@ Catalogue hash changes invalidate only the exact resource or its delimiter-separ
 
 Introduction-only nested records have no standalone chapter file. Chapter discovery merges their published nested chapter IDs with the normal index. Book-level titles/introductions appear as an internal introduction navigation node with chapter 0 and no verse. This is a reader sentinel, never a published Bible chapter or an invented Scripture coordinate: the repository reads and verifies the book representation and does not request `/0.json` or `/0.sha`. An ordinary chapter index remains usable when optional book metadata is unavailable.
 
-Native book/corpus decoding, source-model construction and SHA-1 calculation run through a bounded Flutter compute worker. The worker also returns the original JSON text, avoiding another large re-encoding during activation. Flutter Web compute runs on its existing event loop; cooperative/worker corpus processing and installation are explicitly part of the later complete offline-resource workflow.
+Ordinary native book decoding uses a Flutter compute worker. Complete deliberate
+installation uses a separate native isolate or a real Web Worker on browsers.
+The same typed processor validates the exact bulk bytes, preserves rich source
+metadata and emits bounded chapter/index/verse batches. Each batch waits for
+SQLite acknowledgement before another is transferred; cancellation terminates
+the worker even during JSON decoding. The browser worker is bundled locally as
+`offline_bible_worker.dart.js` and is shared by Bible and Study installation.
 
-Whole-translation installation/indexing and using an installed corpus for every reader/query/search operation are separate later work. The current deliberate corpus download preserves and verifies enriched source data without claiming that complete installed-resource workflow.
+`BibleResourceInstaller` downloads the selected Bible's bulk file once. Its
+before/after `.sha` values and the exact downloaded byte hash must agree before
+staging activates. Failed verification/update retains the prior installation.
+Installed generation records hold translation metadata, dynamic book/chapter
+indexes, original rich chapters and normalized search candidates separately
+from opportunistic caches. `InstalledBibleRepository` supports cold-start
+translation/book/chapter discovery and reading with no HTTP, including source
+book IDs beyond 66 and introduction-only navigation. Clearing Scripture caches
+preserves these installations; only explicit resource removal uninstalls them.
+
+`CachedBibleRepository` prefers a complete source-scoped installation. Installing
+one Bible does not disable on-demand reading of other Bibles. Translation
+discovery combines installed choices with a saved catalogue; explicit refresh
+can discover more online choices. Installed Query resolves published book names
+and actual source coordinates with the same eight-reference/200-verse bounds,
+never invents missing range members and does not call the Query service for an
+installed source. Online Search remains the default; the explicit Installed
+source selector and its supported filter contract are described in
+[Search](search-v3.md).
 
 ## Online Search and public Study resources
 
 Each service retains its own configured root and native response envelope.
-Public Study resources use the shared bounded HTTP cache and request lifetime;
-they are not stored as a complete offline installation. Invalid typed documents
+On-demand public Study reads use the shared bounded HTTP cache and request
+lifetime. Explicit installations use separate owned SQLite generations and
+complete published module files; those generations never become cache entries. Invalid typed documents
 discard their own transport-cache representation so Retry can obtain corrected
 content. HTTP 404, rate limits, unavailable coverage and offline failures remain
 truthful outcomes rather than empty definitions or substituted Scripture.
@@ -84,9 +109,69 @@ Follow/Hide choices stay local. An explicit topic copy writes private whole-vers
 markings in an atomic transaction with collision-safe group IDs and provenance;
 online discovery or public deletion cannot modify that private copy.
 
-Dictionary/commentary SHA-256 manifests and bookmark `checksums.json` are
-installation integrity contracts for later offline-resource work. This online
-Study flow validates typed documents and HTTP policy without claiming complete
-manifest-verified installation. Schema-3 notebooks and their journals are private
+Dictionary/commentary `hashes.json` and bookmark `checksums.json` govern
+explicit complete offline installations. Exact-byte SHA-256, typed nested
+validation, companion-file consistency and a final manifest recheck precede
+atomic generation activation. Complete dictionary entries, commentary chapters
+and public-topic/localized/reverse indexes are built in the shared native/Web
+Worker with acknowledged bounded batches. Installed Study adapters retain the
+online typed interfaces and pin the active generation during a reading session.
+Missing installed records never fall through to another online revision. Schema-3 notebooks and their journals are private
 SQLite documents, independent from every public resource cache. Clearing
 Scripture/download caches and legacy reader-data replacement preserve them.
+
+## Explicit installations (steps 13–15)
+
+**Offline resources** opens the durable local installation list without waiting
+for any API request. **Browse catalogue** is a separate public metadata request;
+**Install** asks for confirmation before downloading. Each resource retains its
+service-root URI, kind, source identity, revision and attribution. An identical
+module ID from another configured host/version cannot answer an installed read.
+An unpublished download size is shown as unknown rather than an invented estimate.
+
+`OfflineResourceInstaller` provides source-specific discovery and complete typed
+validation. `OfflineController` owns the explicit operation and bounded
+`OfflineInstallSink`; `SqlOfflineResourceStore` implements durable generations
+in schema 5. Builders write logical documents and bounded Bible search batches
+into an invisible staging generation. The active pointer changes only after all
+source validation and indexing succeeds. The previous documents/index are
+removed in that same transaction. Readers can request a captured generation;
+a changed generation never silently supplies bytes from the new revision.
+
+Cancellation stops the builder's request/worker lifetime, discards staging and
+keeps the active installation. Retry starts a fresh validated download; this
+implementation does not advertise HTTP range-resume. Running operations heartbeat
+every 20 seconds. A process interruption leaves a durable attempt; after its
+two-minute lease expires, reopening or **Refresh download status** marks it
+interrupted and releases its staging storage. A second live window cannot
+recover or replace another window's currently leased installation. An explicit
+application shutdown blocks new operations, cancels public work and drains owned
+storage operations before SQLite closes.
+
+Each persisted JSON document is limited to 8 MiB UTF-8. Up to 32 small
+documents (8 MiB aggregate) share one transaction; each index write contains at
+most 200 verses and each index read at most 500 candidates. SHA verification in the common sink
+uses yielding 64 KiB chunks; source builders also verify their complete published
+snapshot before activation. The default 1 GiB content budget counts the active
+installation, staged update and derived verse-index payloads together. It is a
+logical application limit, **not a claim about free physical storage**; SQLite
+pages, temporary journals and browser/OS overhead require additional space.
+Actual filesystem or browser-quota write failures produce an actionable storage
+error and cannot activate an incomplete generation. Updates temporarily require
+space for both versions. Source-specific bounds and worker behavior are documented
+with the Bible and Study installers.
+
+**Remove download** deletes only the chosen public installation and index.
+Private verse notes, notebooks, journals, markings, independent topic copies and
+settings survive. Ordinary Scripture/HTTP cache clearing likewise leaves explicit
+installations intact. Complete private backups exclude downloaded public bodies;
+they are deliberately reinstalled from their public sources.
+
+The store/controller regressions in `test/offline_resource_store_test.dart` use
+actual SQLite transactions and a file-backed restart. They cover invisible
+staging, atomic update, source scoping, SHA rejection, logical budget exhaustion,
+a simulated SQLite disk-full write, cancel/retry, interrupted leases, private
+preservation and Unicode/literal search paging. The native manager widget tests
+exercise deliberate discovery/confirmation and compact RTL at 200% text.
+Executed evidence belongs in the current validation record; test source alone is
+not a claim that supported-host builds or browser runtime have passed.

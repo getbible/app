@@ -1,0 +1,68 @@
+{
+  "schema": "getbible-dictionary-v1",
+  "dictionary": "strongsgreek",
+  "language": "en",
+  "name": "Greek lexicon",
+  "entries": [
+    {
+      "schema": "getbible-dictionary-entry-v1",
+      "dictionary": "strongsgreek",
+      "language": "en",
+      "id": "G3056",
+      "key": "λόγος",
+      "occurrence": 1,
+      "aliases": [
+        "G3056",
+        "Word"
+      ],
+      "text": "Word; speech.\n\nA second paragraph.",
+      "see_also": [
+        {
+          "id": "G4487",
+          "key": "ῥῆμα"
+        }
+      ],
+      "references": [
+        {
+          "ref": "John 1:1",
+          "osis": "John.1.1",
+          "book": 43,
+          "chapter": 1,
+          "verse": 1,
+          "text": "John 1:1"
+        }
+      ]
+    },
+    {
+      "schema": "getbible-dictionary-entry-v1",
+      "dictionary": "strongsgreek",
+      "language": "en",
+      "id": "G3056--2",
+      "key": "λόγος",
+      "occurrence": 2,
+      "aliases": [
+        "G3056",
+        "Word"
+      ],
+      "text": "A distinct definition."
+    },
+    {
+      "schema": "getbible-dictionary-entry-v1",
+      "dictionary": "strongsgreek",
+      "language": "en",
+      "id": "G4487",
+      "key": "ῥῆμα",
+      "occurrence": 1,
+      "aliases": [
+        "G4487"
+      ],
+      "text": "A saying.",
+      "backlinks": [
+        {
+          "id": "G3056",
+          "key": "λόγος"
+        }
+      ]
+    }
+  ]
+}

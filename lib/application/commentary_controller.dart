@@ -6,6 +6,7 @@ import '../domain/models/commentary.dart';
 import '../domain/models/service_envelopes.dart';
 import '../domain/models/study_context.dart';
 import '../domain/repositories/commentary_repository.dart';
+import '../domain/repositories/installed_study_resource.dart';
 import '../domain/repositories/study_preferences_repository.dart';
 
 enum CommentaryAvailability {
@@ -32,6 +33,9 @@ final class CommentaryController extends ChangeNotifier {
   CommentaryCoverage? _coverage;
   CommentaryChapter? _chapter;
   Object? _error;
+  bool isInstalled = false;
+  int _installationStatusGeneration = 0;
+  int _preferenceGeneration = 0;
   String? _preferenceWarning;
   bool _loading = false;
   bool _verseMode = true;
@@ -70,7 +74,41 @@ final class CommentaryController extends ChangeNotifier {
       _context != null &&
       _language(module.language) == _language(_context!.language);
 
+  /// Imported preferences replace the cached in-session resource choice.
+  /// Queued older selections must not subsequently overwrite imported values.
+  void clearRememberedPreferences() {
+    _preferenceGeneration++;
+    _rememberedChoices.clear();
+  }
+
+  Future<void> refreshInstallationStatus() async {
+    final module = _selected;
+    final context = _context;
+    final capability = repository;
+    if (_disposed ||
+        context == null ||
+        module == null ||
+        capability is! InstalledStudyResource) {
+      return;
+    }
+    final generation = ++_installationStatusGeneration;
+    final installed = await (capability as InstalledStudyResource).isInstalled(
+      module.id,
+    );
+    if (_disposed ||
+        generation != _installationStatusGeneration ||
+        !identical(context, _context) ||
+        !identical(module, _selected)) {
+      return;
+    }
+    if (isInstalled != installed) {
+      isInstalled = installed;
+      notifyListeners();
+    }
+  }
+
   Future<void> open(StudyContext context) async {
+    _installationStatusGeneration++;
     if (_disposed) return;
     final RequestCancellation token = _owner.begin();
     final String? previousLanguage = _context?.language;
@@ -162,6 +200,17 @@ final class CommentaryController extends ChangeNotifier {
   Future<void> _loadSelected(RequestCancellation token) async {
     final CommentaryModule module = _selected!;
     final StudyContext context = _context!;
+    final statusGeneration = ++_installationStatusGeneration;
+    isInstalled = false;
+    final capability = repository;
+    if (capability is InstalledStudyResource) {
+      final installed = await (capability as InstalledStudyResource)
+          .isInstalled(module.id);
+      if (!_owner.owns(token)) return;
+      if (statusGeneration == _installationStatusGeneration) {
+        isInstalled = installed;
+      }
+    }
     final List<Object> details = await Future.wait<Object>(<Future<Object>>[
       repository.metadata(module.id, cancellation: token),
       repository.coverage(module.id, cancellation: token),
@@ -217,13 +266,16 @@ final class CommentaryController extends ChangeNotifier {
   }
 
   void _remember(String language, String module) {
+    final preferenceGeneration = _preferenceGeneration;
     // Ordered writes ensure an older async save cannot overwrite the latest
     // module choice. Failure is visible but cannot block reading commentary.
     _preferenceQueue = _preferenceQueue.then((_) async {
+      if (preferenceGeneration != _preferenceGeneration) return;
       try {
         await preferences.setCommentary(language, module);
       } catch (_) {
         if (_disposed ||
+            preferenceGeneration != _preferenceGeneration ||
             _context?.language != language ||
             _selected?.id != module) {
           return;
@@ -239,6 +291,7 @@ final class CommentaryController extends ChangeNotifier {
   /// that is being rebuilt. Explicit workspace dismissal normally notifies.
   void close({bool notify = true}) {
     if (_disposed) return;
+    _installationStatusGeneration++;
     _owner.cancel();
     _loading = false;
     _context = null;
@@ -253,6 +306,7 @@ final class CommentaryController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _installationStatusGeneration++;
     _disposed = true;
     _owner.cancel();
     super.dispose();

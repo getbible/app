@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/services/daily_scripture_service.dart';
 import 'package:getbible_live/domain/models/cache.dart';
+import 'package:getbible_live/services/daily_scripture_service.dart';
 
 void main() {
   test('parses website daily aliases and deliberately opens KJV', () {
@@ -67,6 +67,29 @@ void main() {
         throwsFormatException,
       );
     }
+  });
+
+  test('a valid anchor cannot hide an invalid same-chapter range', () {
+    for (final String range in <String>['16-999999999', '20-16', '0-2']) {
+      expect(
+        () => parseDailyScripture(<String, Object?>{
+          'date': '2026-10-09',
+          'book': 'John',
+          'chapter': 3,
+          'verse': 16,
+          'verses': range,
+        }, DateTime.utc(2026, 10, 9)),
+        throwsFormatException,
+      );
+    }
+    final daily = parseDailyScripture(<String, Object?>{
+      'date': '2026-10-09',
+      'book': 'John',
+      'chapter': 3,
+      'verse': 16,
+      'verses': '4:1-999999999',
+    }, DateTime.utc(2026, 10, 9));
+    expect(daily.verses, <int>[16]);
   });
 
   test(

@@ -132,9 +132,10 @@ CI runs both native Linux journeys before building the Linux release. Integratio
 tests use deterministic HTTP fixtures; public contracts and real downloaded
 resource documents are checked separately. Neither replaces physical-device
 gestures, assistive technology, clipboard, process suspension or browser-runtime
-CORS QA. After an integration run, use normal `flutter pub get`/build commands
-for the production target so the integration-test plugin is not retained in
-production plugin registration.
+CORS QA. After an integration run, use the normal production `flutter build`
+command, without an integration-test entry point. CI restores dependencies once
+with `flutter pub get --enforce-lockfile`, then uses `--no-pub`; the production
+build still regenerates plugin registration without the integration-test plugin.
 
 For manual QA, exercise Study with native selection, 200% text, RTL, a visible
 keyboard and a short landscape viewport. Open a notebook reference preview,
@@ -196,12 +197,11 @@ the chosen implementation, not a phone/browser performance guarantee.
 Five service OPTIONS requests returned successful CORS preflights and exposed
 cache/retry headers; actual deployed-browser CORS remains a separate gate.
 
-Available-host Android release APK/AAB validation uses the normal production
-commands in [deployment](DEPLOYMENT.md), without signing identities. Signing,
-install/upgrade, Apple/Windows host builds, physical-device gestures and
-accessibility, full locale adoption, complete offline installations and private
-notebook portability retain their later roadmap/release gates. Local test
-artifacts and server-header checks do not close those gates.
+That recorded increment also validated unsigned Android release APK/AAB output.
+It predates the host and distribution workflow described below and is not evidence
+that the current head passed Apple/Windows builds or signed-package checks.
+Physical-device gestures and accessibility, full locale adoption, complete offline
+installations and private notebook portability retain their product release gates.
 
 ## Distribution and host regression gates
 
@@ -227,6 +227,12 @@ run only on trusted main and only with complete per-platform configuration.
 Missing configuration is reported by name. A signing job that runs and fails is
 a real failure, not a successful unsigned fallback. Publishing a GitHub release
 requires a manual trigger and checks the authoritative pubspec version.
+The publication suite requires all unsigned target packages and configured signed
+targets, exact manifest/checksum coverage, increasing semantic/native versions,
+and upload digest verification. It exercises recovery of an interrupted draft at
+the original commit/build, rejects moved tags or mismatched uploads, and ensures
+an already published version is never overwritten. These API-contract tests do
+not create a real GitHub release or imply that signing credentials were present.
 
 Linux installs its Debian output and launches the installed application. Windows
 silently installs its EXE into a temporary directory and launches that installed

@@ -100,15 +100,47 @@ by `flutter pub get` once, then retry. These commands remove generated build
 outputs, not application data. Avoid deleting application databases or user
 configuration when repairing the compiler environment.
 
+## Windows: Git checkout and native toolchain
+
+Install Git for Windows, the pinned Flutter SDK from the official archive, and
+Visual Studio's **Desktop development with C++** workload. Select the same SDK
+in your editor. From PowerShell, before fetching project dependencies, run:
+
+```powershell
+git config --global core.longpaths true
+git config --show-origin --get core.longpaths
+flutter doctor -v
+flutter pub get --enforce-lockfile
+flutter run -d windows
+```
+
+The Git check should print `true` with its configuration-file location. This
+user-level setting requires no administrator access. Git for Windows otherwise
+rejects some paths longer than 260 characters during checkout. The pinned
+`go_router` dependency is checked out from Flutter's packages monorepo into the
+Pub cache; nested example paths can exceed that limit before Dart compilation
+starts. This produced `Filename too long` in the first Windows CI build.
+
+Set the option globally for your development account because Pub invokes Git in
+separate dependency repositories; setting it only in this application's local
+Git configuration does not configure those checkouts. After enabling it, rerun
+`flutter pub get --enforce-lockfile`. Keep the dependency lockfile and source
+revision unchanged. Both Windows CI jobs apply this setting before fetching
+dependencies.
+
+Keep SDK and project directories reasonably short as other Windows tools can
+have their own path limits. Git's setting does not configure every application
+or Windows policy. Check the **Windows version** and **Visual Studio** sections
+of `flutter doctor -v` and resolve reported native-toolchain issues before the
+Windows build. The development wrapper above targets Linux and browser checks;
+use Flutter's doctor for this host.
+
 ## Other native targets
 
-Use the same pinned official SDK on each host. Windows requires Visual Studio's
-Desktop development with C++ workload; macOS and iOS/iPadOS require macOS/Xcode;
-Android requires the Android SDK and accepted licenses. Follow Flutter's official
-target setup documentation and the repository's [distribution guide](DEPLOYMENT.md).
-On Windows download the pinned SDK from the official archive and select it in
-the editor. The development wrapper above focuses on the Linux and browser
-failure reports; it does not certify another platform's toolchain.
+Use the same pinned official SDK on each host. macOS and iOS/iPadOS require
+macOS/Xcode; Android requires the Android SDK and accepted licenses. Follow
+Flutter's official target setup documentation and the repository's
+[distribution guide](DEPLOYMENT.md).
 
 ## What automated checks establish
 
@@ -127,3 +159,4 @@ Official references:
 - [Linux prerequisites](https://docs.flutter.dev/platform-integration/linux/setup)
 - [Browser setup and manual launching](https://docs.flutter.dev/platform-integration/web/setup)
 - [Build and serve web output](https://docs.flutter.dev/deployment/web)
+- [Git for Windows long-path checkout setting](https://github.com/git-for-windows/build-extra/blob/main/ReleaseNotes.md#known-issues)

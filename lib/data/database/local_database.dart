@@ -210,6 +210,43 @@ final class LocalDatabase {
 
   Future<void> saveMarking(Marking marking) => _saveMarking(_executor, marking);
 
+  /// Recheck semantic identities under SQLite's write transaction, rather than
+  /// trusting a possibly stale reader snapshot. Overlapping editor requests
+  /// cannot duplicate a membership or replace an unrelated record by ID.
+  Future<void> addMarkingMemberships(List<Marking> markings) => _transaction((
+    QueryExecutor transaction,
+  ) async {
+    for (final Marking marking in markings) {
+      final List<Map<String, Object?>> rows = await transaction.runSelect(
+        'SELECT id, translation, book_nr, chapter_nr, verse_nr, start_offset, end_offset, '
+        'quote, reference, group_id, created_at, source_json FROM markings '
+        'WHERE group_id = ? AND book_nr = ? AND chapter_nr = ? AND verse_nr = ?',
+        <Object?>[
+          marking.groupId,
+          marking.passage.book,
+          marking.passage.chapter,
+          marking.verse,
+        ],
+      );
+      if (rows.any(
+        (Map<String, Object?> row) =>
+            _markingFromRow(row).identity == marking.identity,
+      )) {
+        continue;
+      }
+      final List<Map<String, Object?>> collision = await transaction.runSelect(
+        'SELECT id FROM markings WHERE id = ?',
+        <Object?>[marking.id],
+      );
+      if (collision.isNotEmpty) {
+        throw const StorageException(
+          'The marking identity already belongs to another membership.',
+        );
+      }
+      await _saveMarking(transaction, marking);
+    }
+  });
+
   Future<void> replaceMarkings(List<Marking> remove, List<Marking> add) =>
       _transaction((QueryExecutor transaction) async {
         for (final Marking marking in remove) {

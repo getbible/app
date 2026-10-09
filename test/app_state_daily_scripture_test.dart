@@ -12,8 +12,8 @@ import 'package:getbible_live/domain/models/passage.dart';
 import 'package:getbible_live/main.dart';
 import 'package:getbible_live/presentation/widgets/native_scripture_text.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
 import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -78,8 +78,9 @@ void main() {
       final List<TextSpan> emphasized = <TextSpan>[];
       void visit(InlineSpan span) {
         if (span is TextSpan) {
-          if (span.style?.decoration == TextDecoration.underline)
+          if (span.style?.decoration == TextDecoration.underline) {
             emphasized.add(span);
+          }
           for (final InlineSpan child
               in span.children ?? const <InlineSpan>[]) {
             visit(child);

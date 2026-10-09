@@ -22,7 +22,11 @@ color does not remove it. A group's source never implies that all its markings
 are shared. Personal membership in a linked group remains independent, and
 identical labels/colors do not merge groups with different source identities.
 Distinct group IDs also remain distinct when their editable names/colors match;
-repeated import reuses an identical earlier collision-renamed group.
+a free incoming ID is kept before considering any collision-like suffix.
+When the original ID is occupied, repeated import reuses an identical
+`-imported-N` candidate. This legacy collision convention is not public-topic
+provenance; only the explicit source or exact historical source ID establishes
+a shared membership.
 Invalid source objects or shared selected-text ranges reject the complete backup.
 
 Older website imports are recognized only by the exact deterministic marking ID
@@ -66,11 +70,18 @@ the released structure; earlier schema fixtures and migration tests remain.
 
 Whole-verse assignment now adds one personal membership per group without
 deleting another group's membership or an independent shared origin. Repeating
-the same assignment is idempotent. The verse menu names the personal group to
+the same assignment is idempotent, including overlapping requests. SQLite checks
+membership identities inside the same transaction as the writes; an ID collision
+with an unrelated record rolls back the complete batch. Selected-text identity
+includes its original quote, so re-marking revised source text retains both the
+previous private record and the newly selected quotation. The verse menu names the personal group to
 remove and offers an explicitly labelled all-personal removal when there are
 multiple groups. Shared origins survive these personal actions and remain
 individually removable in saved markings. A personal whole-verse color takes
 precedence over a later shared import in both line and paragraph rendering.
+Menu and group-picker choices retain their opening passage/chapter ownership;
+navigation while either route is open cannot apply its old action to another
+chapter. Imported group IDs are kept separate from reserved menu actions.
 
 This preserves the current website's backup provenance and whole-verse membership
 contract. Automatic global catalogue/group reconciliation, its unified management

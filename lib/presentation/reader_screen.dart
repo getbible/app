@@ -219,6 +219,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               identical(state.current, _arrivalChapter) &&
                                   verse.verse == _arrivalVerse
                               ? _arrivalEmphasis
+                              : state.dailyVerses.contains(verse.verse) &&
+                                    verse.text.isNotEmpty
+                              ? <ScriptureTextEmphasis>[
+                                  ScriptureTextEmphasis(
+                                    range: ScriptureTextRange(
+                                      0,
+                                      verse.text.length,
+                                    ),
+                                    quote: verse.text,
+                                  ),
+                                ]
                               : const <ScriptureTextEmphasis>[],
                           onWord: (verse, range) => _openStudy(
                             verse: verse,
@@ -492,7 +503,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
       items: <PopupMenuEntry<String>>[
         if (active != null)
           PopupMenuItem<String>(
-            value: active.id,
+            // Imported group IDs are data, never reserved menu commands.
+            value: '__group__:${active.id}',
             child: _GroupChoice(group: active),
           ),
         if (state.groups.length > 1)
@@ -534,13 +546,33 @@ class _ReaderScreenState extends State<ReaderScreen> {
             title: Text('Copy or share Scripture'),
           ),
         ),
-        if (state.markings.any(
-          (Marking marking) =>
-              marking.verse == verse.verse && marking.isWholeVerse,
+        for (final MarkingGroup group in state.groups.where(
+          (MarkingGroup group) => state.markings.any(
+            (Marking marking) =>
+                marking.verse == verse.verse &&
+                marking.isWholeVerse &&
+                !marking.isSharedBookmark &&
+                marking.groupId == group.id,
+          ),
         ))
+          PopupMenuItem<String>(
+            value: '__remove__:${group.id}',
+            child: Text('Remove from ${group.name}'),
+          ),
+        if (state.markings
+                .where(
+                  (Marking marking) =>
+                      marking.verse == verse.verse &&
+                      marking.isWholeVerse &&
+                      !marking.isSharedBookmark,
+                )
+                .map((Marking marking) => marking.groupId)
+                .toSet()
+                .length >
+            1)
           const PopupMenuItem<String>(
             value: '__none__',
-            child: Text('Remove verse marking'),
+            child: Text('Remove all personal verse markings'),
           ),
       ],
     );
@@ -575,13 +607,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
       );
     } else if (choice == '__none__') {
       await state.removeWholeVerseMarking(verse.verse);
+    } else if (choice.startsWith('__remove__:')) {
+      await state.removeWholeVerseMarking(
+        verse.verse,
+        groupId: choice.substring('__remove__:'.length),
+      );
     } else if (choice == '__groups__') {
       final String? groupId = await _showMarkingGroupPicker(context, state);
       if (groupId != null) {
         await state.markWholeVerse(verse, reference, groupId);
       }
-    } else {
-      await state.markWholeVerse(verse, reference, choice);
+    } else if (choice.startsWith('__group__:')) {
+      await state.markWholeVerse(
+        verse,
+        reference,
+        choice.substring('__group__:'.length),
+      );
     }
   }
 
@@ -1433,9 +1474,9 @@ class _VerseLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Marking? whole = state.markings
-        .where((Marking item) => item.verse == verse.verse && item.isWholeVerse)
-        .firstOrNull;
+    final Marking? whole = preferredWholeVerseMarking(
+      state.markings.where((Marking item) => item.verse == verse.verse),
+    );
     final MarkingGroup? wholeGroup = whole == null
         ? null
         : state.groups
@@ -2472,7 +2513,7 @@ class _ErrorState extends StatelessWidget {
           Text(state.error!, textAlign: TextAlign.center),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () => state.loadPassage(state.passage),
+            onPressed: state.retryReading,
             child: const Text('Retry'),
           ),
         ],

@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "exportedAt": "2026-10-09T12:00:00.000Z",
+  "colors": [
+    {"id": "my-faith", "name": "My faith", "value": "#4f46e5", "source": {"type": "shared-bookmark", "topicId": "faith"}},
+    {"id": "personal", "name": "Private study", "value": "#aabbcc"}
+  ],
+  "markings": [
+    {"id": "personal-faith", "passage": {"translation": "kjv", "book": 1, "chapter": 1}, "verse": 1, "start": null, "end": null, "quote": "Original personal quote.", "reference": "Genesis 1:1", "colorId": "my-faith", "createdAt": 100},
+    {"id": "getbible-topic:faith:1:1:1", "passage": {"translation": "web", "book": 1, "chapter": 1}, "verse": 1, "start": null, "end": null, "quote": "", "reference": "Genesis 1:1", "colorId": "my-faith", "createdAt": 200, "source": {"type": "shared-bookmark", "topicId": "faith"}},
+    {"id": "selection", "passage": {"translation": "kjv", "book": 1, "chapter": 1}, "verse": 1, "start": 0, "end": 8, "quote": "Original", "reference": "Genesis 1:1", "colorId": "personal", "createdAt": 150}
+  ],
+  "notes": [{"id": "canonical-note", "passage": {"translation": "kjv", "book": 1, "chapter": 1}, "verse": 1, "reference": "Genesis 1:1", "text": "Private unchanged 😃", "createdAt": 111, "updatedAt": 222}]
+}

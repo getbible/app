@@ -232,7 +232,7 @@ final class ScriptureTextComposer {
         )
         .toList(growable: false);
     final Marking? whole = includeWholeVerse
-        ? applicable.where((Marking item) => item.isWholeVerse).lastOrNull
+        ? preferredWholeVerseMarking(applicable)
         : null;
     final List<(ScriptureTextRange, ScriptureSourceStyle)> source =
         <(ScriptureTextRange, ScriptureSourceStyle)>[];

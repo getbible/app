@@ -1,6 +1,33 @@
 import '../../core/json.dart';
 import 'passage.dart';
 
+/// Published bookmark origin, independent of a user's group name and ID.
+/// Personal membership in a linked group deliberately has no source of its own.
+final class SharedBookmarkSource {
+  const SharedBookmarkSource({required this.topicId});
+
+  factory SharedBookmarkSource.fromJson(Object? value) {
+    final JsonMap json = requireJsonMap(value, 'bookmark source');
+    final String topicId = requireString(json, 'topicId');
+    if (requireString(json, 'type') != 'shared-bookmark' ||
+        !isValidTopicId(topicId)) {
+      throw const FormatException('A bookmark contains an invalid source.');
+    }
+    return SharedBookmarkSource(topicId: topicId);
+  }
+
+  final String topicId;
+
+  static bool isValidTopicId(String value) =>
+      value.length <= 80 &&
+      RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(value);
+
+  JsonMap toJson() => <String, Object?>{
+    'type': 'shared-bookmark',
+    'topicId': topicId,
+  };
+}
+
 final class MarkingGroup {
   const MarkingGroup({
     required this.id,
@@ -9,6 +36,7 @@ final class MarkingGroup {
     this.sortOrder = 0,
     this.isStarter = false,
     required this.updatedAt,
+    this.source,
   });
 
   factory MarkingGroup.fromJson(Object? value) {
@@ -31,6 +59,9 @@ final class MarkingGroup {
         optionalInt(json, 'updatedAt', DateTime.now().millisecondsSinceEpoch),
         isUtc: true,
       ),
+      source: json.containsKey('source')
+          ? SharedBookmarkSource.fromJson(json['source'])
+          : null,
     );
   }
 
@@ -40,6 +71,7 @@ final class MarkingGroup {
   final int sortOrder;
   final bool isStarter;
   final DateTime updatedAt;
+  final SharedBookmarkSource? source;
 
   MarkingGroup copyWith({
     String? id,
@@ -54,11 +86,13 @@ final class MarkingGroup {
     sortOrder: sortOrder ?? this.sortOrder,
     isStarter: isStarter,
     updatedAt: updatedAt ?? this.updatedAt,
+    source: source,
   );
 
   JsonMap toJson({bool websiteCompatible = false}) => <String, Object?>{
     'id': id,
     'name': name,
+    if (source != null) 'source': source!.toJson(),
     if (websiteCompatible) 'value': color.toLowerCase() else 'color': color,
     if (!websiteCompatible) ...<String, Object?>{
       'version': 1,
@@ -80,6 +114,7 @@ final class Marking {
     required this.reference,
     required this.groupId,
     required this.createdAt,
+    this.source,
   });
 
   factory Marking.fromJson(Object? value) {
@@ -91,6 +126,14 @@ final class Marking {
     if ((start == null) != (end == null) ||
         (start != null && (start < 0 || end! <= start))) {
       throw const FormatException('A marking contains an invalid text range.');
+    }
+    final SharedBookmarkSource? source = json.containsKey('source')
+        ? SharedBookmarkSource.fromJson(json['source'])
+        : null;
+    if (source != null && start != null) {
+      throw const FormatException(
+        'A shared bookmark must cover a complete verse.',
+      );
     }
     return Marking(
       id: requireString(json, 'id'),
@@ -108,6 +151,7 @@ final class Marking {
         requireInt(json, 'createdAt'),
         isUtc: true,
       ),
+      source: source,
     );
   }
 
@@ -120,10 +164,29 @@ final class Marking {
   final String reference;
   final String groupId;
   final DateTime createdAt;
+  final SharedBookmarkSource? source;
 
   bool get isWholeVerse => start == null && end == null;
+
+  /// Only the website's exact historical deterministic ID implies provenance.
+  /// A personal mark in the same group remains personal. Resolve this before
+  /// renaming a colliding ID or remapping its group during backup import.
+  SharedBookmarkSource? get sharedSource {
+    if (!isWholeVerse) return null;
+    if (source != null) return source;
+    const String prefix = 'getbible-topic:';
+    if (!groupId.startsWith(prefix)) return null;
+    final String topicId = groupId.substring(prefix.length);
+    if (!SharedBookmarkSource.isValidTopicId(topicId) ||
+        id != '$groupId:${passage.book}:${passage.chapter}:$verse') {
+      return null;
+    }
+    return SharedBookmarkSource(topicId: topicId);
+  }
+
+  bool get isSharedBookmark => sharedSource != null;
   String get identity => isWholeVerse
-      ? '${passage.canonicalKey}|$verse|all|$groupId'
+      ? '${passage.canonicalKey}|$verse|${isSharedBookmark ? 'shared' : 'all'}|$groupId'
       : '${passage.key}|$verse|$start|$end|$quote|$groupId';
 
   bool matchesPassage(Passage other) => isWholeVerse
@@ -146,6 +209,7 @@ final class Marking {
     reference: reference,
     groupId: groupId ?? this.groupId,
     createdAt: createdAt,
+    source: sharedSource,
   );
 
   JsonMap toJson({bool websiteCompatible = false}) => <String, Object?>{
@@ -159,7 +223,27 @@ final class Marking {
     'reference': reference,
     websiteCompatible ? 'colorId' : 'groupId': groupId,
     'createdAt': createdAt.millisecondsSinceEpoch,
+    if (sharedSource != null) 'source': sharedSource!.toJson(),
   };
+}
+
+/// Personal whole-verse membership wins over later public imports. The most
+/// recent mark within the chosen origin wins; stable IDs break timestamp ties.
+Marking? preferredWholeVerseMarking(Iterable<Marking> markings) {
+  Marking? preferred;
+  for (final Marking marking in markings) {
+    if (!marking.isWholeVerse) continue;
+    final Marking? previous = preferred;
+    if (previous == null ||
+        (previous.isSharedBookmark && !marking.isSharedBookmark) ||
+        (previous.isSharedBookmark == marking.isSharedBookmark &&
+            (marking.createdAt.isAfter(previous.createdAt) ||
+                (marking.createdAt == previous.createdAt &&
+                    marking.id.compareTo(previous.id) > 0)))) {
+      preferred = marking;
+    }
+  }
+  return preferred;
 }
 
 final class VerseNote {

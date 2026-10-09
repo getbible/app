@@ -210,3 +210,32 @@ the six target platforms on one architecture. Store signing, publication,
 complete localization, physical-device accessibility/suspension and platform
 performance checks remain explicit later release gates. Feature tests and
 composed journeys do not substitute for those gates.
+
+## Decision record ADR-002: portability and installed-resource ownership
+
+The next implementation extends the existing repository boundaries with two
+separate responsibilities. A complete, versioned private backup preserves
+notebooks, recoverable drafts, annotations and user settings. The existing
+website-compatible v1/v2 import and v2 export contract remains available;
+legacy readers must not be presented with notebook data they cannot interpret.
+Imports must validate the complete bounded document before a transactional
+merge and preserve distinct conflicting work and its references.
+
+Explicit offline installations own public resource generations and their
+derived indexes. Downloading, validation and indexing happen in a staged
+generation; only a fully validated generation may replace the active one.
+Cancellation, process interruption, storage failure and resource removal must
+never remove private records or invalidate the last usable installation.
+Transient cache eviction and installation removal are separate operations.
+
+Bible, dictionary, commentary and topic adapters supply source-specific
+discovery and indexing behind a shared installation contract. Reader, Query,
+Search and Study consume typed installed adapters through their existing
+repositories. Normal online use starts no bulk download. Offline Search must
+identify its supported filters and source explicitly. Large parsing/indexing
+requires native workers and a browser-worker or bounded cooperative strategy;
+Flutter Web compute alone does not provide background execution.
+
+This decision establishes implementation boundaries, not a completion claim.
+Current implementation and verification evidence belongs in the existing
+backup, API/cache, feature-parity and testing documents.

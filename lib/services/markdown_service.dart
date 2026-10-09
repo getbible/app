@@ -1,4 +1,5 @@
 import '../domain/models/bible.dart';
+import '../domain/models/notebook.dart';
 
 String chapterMarkdown(BibleChapter chapter, Translation translation) {
   return scriptureMarkdown(chapter, translation, 0, chapter.verses.length - 1);
@@ -43,4 +44,25 @@ String chapterMarkdownFilename(BibleChapter chapter) {
       .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), '-')
       .replaceAll(RegExp(r'^-+|-+$'), '');
   return '$book-${chapter.chapter}.md';
+}
+
+/// Human-readable export is not a backup format. Original block text and saved
+/// Scripture quotations remain literal, with attribution adjacent to each quote.
+String exportNotebookMarkdown(Notebook notebook) {
+  final StringBuffer output = StringBuffer('# ${notebook.displayTitle}\n\n');
+  for (final NotebookBlock block in notebook.blocks) {
+    output.writeln(block.text);
+    final NotebookReference? reference = block.reference;
+    if (reference != null) {
+      output.writeln();
+      for (final String line in reference.quotation.split('\n')) {
+        output.writeln('> $line');
+      }
+      output.writeln(
+        '\n${reference.label} (${reference.passage.translation.toUpperCase()})',
+      );
+    }
+    output.writeln();
+  }
+  return output.toString();
 }

@@ -133,13 +133,26 @@ List<VerseNote> mergeNotes(List<VerseNote> current, List<VerseNote> imported) {
     }
   }
   final List<VerseNote> ordered = merged.values.toList()..sort(compareNotes);
-  final Set<String> ids = <String>{};
+  // A lower canonical coordinate must never let an imported collision take a
+  // local note's stable ID. Reserve ownership before ordering the result.
+  final Map<String, String> owners = <String, String>{
+    for (final VerseNote item in current)
+      if (merged[item.canonicalKey]?.id == item.id) item.id: item.canonicalKey,
+  };
+  for (final VerseNote item in ordered) {
+    owners.putIfAbsent(item.id, () => item.canonicalKey);
+  }
+  // Protect even later-sorted original IDs from generated -imported-N suffixes.
+  final Set<String> reserved = <String>{
+    ...current.map((VerseNote item) => item.id),
+    ...ordered.map((VerseNote item) => item.id),
+  };
   return <VerseNote>[
     for (final VerseNote item in ordered)
-      if (ids.add(item.id))
+      if (owners[item.id] == item.canonicalKey)
         item
       else
-        item.copyWith(id: _uniqueImportedId(item.id, ids)),
+        item.copyWith(id: _uniqueImportedId(item.id, reserved)),
   ];
 }
 
@@ -153,7 +166,18 @@ String _uniqueImportedId(String source, Set<String> ids) {
   return id;
 }
 
-BackupData mergeBackupData(BackupData current, BackupData imported) {
+BackupData mergeBackupData(BackupData current, BackupData imported) =>
+    mergeReaderBackup(current, imported).data;
+
+/// Remapping is part of the merge result so preferences and copy provenance
+/// follow the same group identity as their annotations.
+final class ReaderBackupMerge {
+  const ReaderBackupMerge(this.data, this.importedGroupIds);
+  final BackupData data;
+  final Map<String, String> importedGroupIds;
+}
+
+ReaderBackupMerge mergeReaderBackup(BackupData current, BackupData imported) {
   final List<MarkingGroup> groups = List<MarkingGroup>.from(current.groups);
   final Set<String> ids = groups.map((MarkingGroup item) => item.id).toSet();
   final Map<String, String> importedGroupIds = <String, String>{};
@@ -202,12 +226,23 @@ BackupData mergeBackupData(BackupData current, BackupData imported) {
         ),
       )
       .toList(growable: false);
-  return BackupData(
-    version: 2,
-    exportedAt: DateTime.now().toUtc(),
-    groups: groups,
-    markings: mergeMarkings(current.markings, importedMarkings),
-    notes: mergeNotes(current.notes, imported.notes),
-    preferences: imported.preferences ?? current.preferences,
+  return ReaderBackupMerge(
+    BackupData(
+      version: 2,
+      exportedAt: DateTime.now().toUtc(),
+      groups: groups,
+      markings: mergeMarkings(current.markings, importedMarkings),
+      notes: mergeNotes(current.notes, imported.notes),
+      preferences: imported.preferences == null
+          ? current.preferences
+          : imported.preferences!.copyWith(
+              activeMarkingGroupId:
+                  importedGroupIds[imported
+                      .preferences!
+                      .activeMarkingGroupId] ??
+                  imported.preferences!.activeMarkingGroupId,
+            ),
+    ),
+    Map<String, String>.unmodifiable(importedGroupIds),
   );
 }

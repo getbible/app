@@ -168,6 +168,79 @@ final class NotebookController extends ChangeNotifier {
     }
   }
 
+  /// Refreshes imported documents without discarding an open editor or its
+  /// independent recovery journals. A failed journal write blocks the refresh.
+  Future<void> reloadAfterImport() async {
+    if (_disposed) return;
+    await flush();
+    if (hasUndurableDrafts) {
+      throw const StorageException(
+        'Save or retry the open notebook before refreshing imported data.',
+      );
+    }
+    if (!_initialized) {
+      await load();
+      if (_loadError != null) {
+        throw StorageException(
+          'Could not reload imported notebooks.',
+          _loadError,
+        );
+      }
+      return;
+    }
+    final int generation = ++_selectionGeneration;
+    final List<NotebookSummary> summaries = await repository.notebooks();
+    final List<NotebookDraft> journals = await repository.drafts();
+    final String? selected = await repository.selectedNotebook();
+    if (_disposed || generation != _selectionGeneration) return;
+    _summaries
+      ..clear()
+      ..addEntries(
+        summaries.map((NotebookSummary item) => MapEntry(item.id, item)),
+      );
+    for (final NotebookDraft journal in journals) {
+      final String id = journal.notebook.id;
+      final NotebookDraft? origin = _recoveredOrigins[id];
+      final bool represented =
+          (_draftOwners[id] == journal.editorId && _drafts.containsKey(id)) ||
+          (origin?.editorId == journal.editorId &&
+              origin?.notebook.revision == journal.notebook.revision) ||
+          _additionalDrafts.any(
+            (NotebookDraft item) =>
+                item.notebook.id == id &&
+                item.editorId == journal.editorId &&
+                item.notebook.revision == journal.notebook.revision,
+          );
+      if (represented) continue;
+      if (_drafts.containsKey(id)) {
+        _additionalDrafts.add(journal);
+        continue;
+      }
+      _drafts[id] = journal.notebook;
+      _journaledRevisions[id] = journal.notebook.revision;
+      _draftOwners[id] = _editorId;
+      _recoveredOrigins[id] = journal;
+      _draftBases[id] = journal.baseRevision;
+      if (_summaries[id]?.revision != journal.baseRevision) {
+        _conflicts.add(id);
+        _errors[id] =
+            'This notebook changed after its draft was created. Save your retained draft as a new notebook.';
+      }
+    }
+    final String? target =
+        selected != null &&
+            notebooks.any((NotebookSummary item) => item.id == selected)
+        ? selected
+        : _selectedId ?? notebooks.firstOrNull?.id;
+    final Notebook? loaded = target == null || _drafts.containsKey(target)
+        ? null
+        : await repository.notebook(target);
+    if (_disposed || generation != _selectionGeneration) return;
+    _selectedId = target;
+    if (loaded != null) _loaded = loaded;
+    _notify();
+  }
+
   Future<void> createNotebook({String title = 'New notebook'}) async {
     await load();
     if (!_initialized || _disposed) return;

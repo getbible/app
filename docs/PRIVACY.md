@@ -43,13 +43,18 @@ selected Scripture reference/coordinates through the shared reader services,
 never the surrounding notebook block or complete private document. Editing,
 autosave, draft recovery and conflict resolution require no network request.
 
-Users can export reader data to a file, import a compatible backup, or delete
-reader annotations. The current website-compatible backup includes canonical
-verse notes and markings; notebook documents, draft journals and new Study
-settings/copy provenance are not yet part of that format. Notebook portability
-is planned in roadmap step 12. Existing reader-data replacement/reset preserves
-notebook storage; notebook deletion is a separate explicitly confirmed action
-in Study. Files shared through the operating system are handled by the chosen
-destination and are subject to that destination's privacy terms.
+Users can export a complete private backup to a chosen file and explicitly
+merge a validated backup. This includes verse notes, markings, notebooks,
+draft journals, reading position, preferences and private topic-copy provenance.
+A separately labelled website-compatible export contains only the website's
+supported reader data. Backups are plain JSON; they are not encrypted by the
+application, and possession of a backup permits reading its private contents.
+The app does not upload these files. Saving and sharing occur only on the user's
+action, using a chosen local destination or operating-system share target.
+Those destinations may have their own storage/synchronization and privacy terms.
+
+Notebook deletion remains a separate explicitly confirmed action in Study.
+Public resource/cache removal does not delete private reader data, notebooks or
+draft journals. Import is additive and never resets unrelated private data.
 
 Translation text and metadata may be governed by their respective copyright and license terms. This draft must be reviewed against the final binaries, hosting logs, store disclosures, jurisdictional requirements, and published contact details before release.

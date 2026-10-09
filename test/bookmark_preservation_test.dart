@@ -330,7 +330,7 @@ void main() {
           'PRAGMA user_version',
           <Object?>[],
         )).single['user_version'],
-        4,
+        5,
       );
       for (final String table in tables) {
         final List<Map<String, Object?>> rows = await executor.runSelect(

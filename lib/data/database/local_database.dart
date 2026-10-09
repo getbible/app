@@ -1,16 +1,25 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 
 import '../../core/errors.dart';
 import '../../core/json.dart';
 import '../../core/starter_marking_groups.dart';
 import '../../domain/models/annotations.dart';
+import '../../domain/models/backup.dart';
 import '../../domain/models/notebook.dart';
+import '../../domain/models/offline_resource.dart';
 import '../../domain/models/passage.dart';
+import '../../domain/models/preferences.dart';
+import '../../domain/models/private_backup.dart';
+import '../../domain/repositories/offline_resource_repository.dart';
 import 'database_connection.dart';
 
-const int localDatabaseSchemaVersion = 4;
+part 'offline_resource_store.dart';
+part 'private_data_store.dart';
+
+const int localDatabaseSchemaVersion = 5;
 
 final class CacheRecord {
   const CacheRecord({
@@ -691,6 +700,7 @@ final class _DatabaseUser extends QueryExecutorUser {
         if (from < 2) await _migrateVersionTwo(executor);
         if (from < 3) await _migrateVersionThree(executor);
         if (from < 4) await _migrateVersionFour(executor);
+        if (from < 5) await createOfflineResourceTables(executor);
         await executor.runCustom(
           'PRAGMA user_version = $localDatabaseSchemaVersion',
         );

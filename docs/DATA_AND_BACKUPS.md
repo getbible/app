@@ -57,7 +57,7 @@ Selected-text offsets are **UTF-16 code-unit positions, end exclusive**, matchin
 
 The forward schema 1/2 → 3 migration adds local notebooks, ordered blocks and independent durable draft journals. Canonical notes, their IDs and timestamps, private markings, preferences and cached Scripture remain intact. Saves and document reads are atomic; optimistic base revisions prevent overwriting newer local edits. Independent editor journals retain failed drafts for restart and explicit conflict copying. Both released schemas have SQLite fixtures, rollback checks and actual file-reopen tests. See [Notebooks](notebooks.md).
 
-Website-compatible backups still contain verse notes and markings only. Notebook export/import belongs to step 12 and is explicitly disclosed in the notebook UI. Existing reader-data replacement/reset preserves notebook tables, and cache cleanup never deletes private notebooks. Public-topic copying uses a separate additive transaction with scoped provenance and duplicate checks; it does not replace private groups.
+Website-compatible backups retain the v1/v2 verse-note and marking contract. Complete private backups use the separate versioned envelope described below and include notebooks and durable journals. Existing reader-data replacement/reset preserves notebook tables, and cache cleanup never deletes private notebooks. Public-topic copying uses a separate additive transaction with scoped provenance and duplicate checks; it does not replace private groups.
 
 ## Database schema 4
 
@@ -85,8 +85,8 @@ chapter. Imported group IDs are kept separate from reserved menu actions.
 
 This preserves the current website's backup provenance and whole-verse membership
 contract. Automatic global catalogue/group reconciliation, its unified management
-UI, exact per-topic ranged removal, notebook portability and Flutter's scoped
-private-copy/follow preferences remain separate parity work. Flutter's explicit
+UI, exact per-topic ranged removal, the complete unified bookmark UI remain separate parity work. The complete
+private backup below includes Flutter's scoped private-copy/follow preferences. Flutter's explicit
 private topic copies remain private; they are not reclassified as live shared
 memberships merely from a group label.
 
@@ -96,3 +96,77 @@ and rollback, independent membership removal, personal color precedence and the
 actual reader context menu. The fixture follows `lib/markings.ts` and
 `lib/shared-bookmarks.ts` at web commit
 `22172efd7ed46722c8f0da42b58222c8f1bc2360`.
+
+
+## Complete private-data portability (step 12)
+
+The **Complete private backup** JSON envelope has
+`format: "getbible-private-backup"` and `version: 1`. Its `reader` member is the
+website v2 reader contract with additional group order/starter/timestamp fields
+retained inside this complete envelope. Separate `notebooks`, `drafts` and `settings`
+arrays retain notebook/block identities, ordered text, saved quotations and
+attribution, creation/update times, document revisions, journal owner and base
+revision, reading position, reader preferences, selected notebook, remembered
+Study resources, topic Follow/Hide and scoped private-copy provenance.
+
+A website-compatible export remains available and is labelled as excluding
+notebooks/drafts and complete app settings. Both website schema versions 1 and 2
+remain accepted. The complete app envelope is not represented as a format the
+reference website can restore. Human-readable Markdown is an export for reading
+and sharing, not a replacement for the complete restorable JSON backup.
+
+Files are limited to 64 MiB UTF-8 and 100,000 combined private records, including
+notebook blocks. Existing per-document limits also apply. The full file is
+parsed and validated before any storage mutation. SQLite count and raw-byte
+preflight checks also bound locally accumulated data before snapshot bodies are
+loaded; the final JSON encoder checks the exact serialized byte limit. Unknown complete schema
+versions, duplicate identities, invalid ownership, unsupported private setting
+keys and dangling group/notebook references are rejected. Public cache rows,
+daily Scripture, installation data and downloaded public corpora are excluded.
+No backup is uploaded to a GetBible service.
+
+Opening a backup presents its contents before an explicit **Merge backup**.
+The controller first makes open notebook edits durable; a failed journal write
+prevents the operation. A snapshot reads all private tables in one transaction.
+Import re-reads current private state and merges all changes in one transaction;
+a late write failure rolls back reader annotations, notebooks, journals,
+preferences and internal import identity bookkeeping together.
+
+Existing group, marking and canonical-note merge rules are retained. On an
+installation containing only unchanged bundled starter groups and no private
+annotations/documents, complete restore retains the exported group order and
+timestamps exactly. Merging into an existing private collection keeps its local
+ordering and appends genuinely new groups. Incoming
+active-group preferences and private-copy destinations follow collision remaps.
+Different notebook contents with the same ID become a separate document with
+collision-safe notebook/block IDs, preserving both bodies and original times.
+A locally edited imported copy is not overwritten by repeating the same import.
+Incoming journals never activate a document during import: distinct owners and
+conflicting journal bodies remain recoverable independently, with their base
+revisions. Repeated imports reuse remembered destinations and do not duplicate
+unchanged documents or journals. A consumed journal receipt prevents repeating
+a backup from resurrecting an already recovered draft while its document still
+exists; deleting the entire document permits a deliberate later restoration.
+
+Settings restore when absent or newer; current settings win equal timestamps.
+If both devices have different private copy groups for the same public topic,
+both groups survive. The current destination remains active and the imported
+provenance is retained as a typed alternate in the complete backup. Removing
+public resources has no effect on these private copies or backup history.
+
+`test/private_portability_test.dart` exercises an actual file-backed SQLite
+export/restore/reopen, multiple retained drafts, ID collisions, reimport after
+local edits, legacy imports, original Unicode ranges, provenance remapping,
+validation-before-mutation and late-write rollback. Native picker/save/share
+execution is verified separately from the storage contract.
+
+## Database schema 5
+
+The forward schema 1/2/3/4 → 5 migration transaction adds `offline_generations`,
+`offline_active`, `offline_documents`, `offline_search` and `offline_attempts`.
+Every existing private/cache table and the historical database identity remain
+unchanged. The released schema-4 fixture is
+`test/fixtures/database_schema_v4.sql`; `offline_resource_store_test.dart`
+verifies migration with private notes and source provenance. Ordinary caches,
+complete private backups and explicit installed-resource removal remain separate
+operations with separate ownership.

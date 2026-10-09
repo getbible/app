@@ -19,10 +19,14 @@ The React application at [`getbible/app.getbible.life`](https://github.com/getbi
 
 ## Requirements
 
-- Flutter stable 3.44.6 or newer
+- Flutter stable pinned in `.flutter-version` (currently 3.44.6; use the same SDK as CI)
 - Dart 3.12.2 or newer
 - Android Studio/SDK for Android builds
-- macOS with Xcode for iOS builds
+- macOS with Xcode for iOS/macOS builds
+- Native Linux/Windows toolchains for their respective desktop targets
+
+See [local development and error recovery](docs/LOCAL_DEVELOPMENT.md) for a
+checksum-verified SDK installer and target-specific preflight checks.
 
 ## Start developing
 
@@ -110,12 +114,18 @@ flutter pub get
 flutter run -d chrome
 ```
 
-For Android, enable developer mode/USB debugging or start an emulator, then run `flutter devices` followed by `flutter run -d <device-id>`. GitHub Actions also publishes two downloadable artifacts after a successful `main` build:
+For Android, enable developer mode/USB debugging or start an emulator, then run
+`flutter devices` followed by `flutter run -d <device-id>`. Every successful PR
+and `main` workflow builds versioned Linux, Windows, macOS, Android, iOS device,
+iOS simulator and Web packages. Download them from that run's **Artifacts**
+section. An unsigned iOS device bundle validates compilation; use the simulator
+bundle or a signed/TestFlight build for execution. Web files need an HTTP server.
 
-- `getBible-live-debug-apk` for installation on an Android test device.
-- `getBible-live-web`, containing the compiled static web application.
-
-Open the successful workflow run’s **Artifacts** section to download them. Web files must be served by an HTTP server; opening `index.html` directly is not supported. A permanent GitHub Pages preview can be enabled later after the repository is public and Pages is configured to deploy from GitHub Actions.
+`pubspec.yaml` is the single alpha/beta/rc/stable version source. A manual
+**Flutter CI → Run workflow → Publish release** action on `main` publishes a new
+recorded version to GitHub Releases and skips an existing version. Signing is
+optional and independently configured per target. See [distribution](docs/DEPLOYMENT.md)
+and [signing credentials](docs/SIGNING.md). Store submission comes later.
 
 **pub.dev is not an application testing service.** It is Dart and Flutter’s public package registry. This application is not intended to be published there as a reusable package. Test builds belong in GitHub Actions artifacts, GitHub Pages, TestFlight, Play Console internal testing, or locally attached Flutter devices.
 
@@ -128,7 +138,10 @@ flutter test
 flutter build apk --debug
 ```
 
-CI runs the same checks, both native Linux reader/Study journeys and release web/Linux builds. It uploads a development debug APK and a compiled web build. Consult [testing](docs/TESTING.md) before merging reader, storage, backup, or cache changes.
+CI runs the same checks, both native Linux reader/Study journeys, actual compiled
+browser startup/persistence checks and native-host builds for every target.
+It packages versioned artifacts and checksums. Consult [testing](docs/TESTING.md)
+before merging reader, storage, backup, cache or distribution changes.
 
 ## Release builds
 
@@ -192,6 +205,9 @@ All platform launchers, favicons, splash artwork, window icons, and in-app ident
 - [Personal study and sermon notebooks](docs/notebooks.md)
 - [Feature-parity ledger](docs/FEATURE_PARITY.md)
 - [Web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md)
+- [Current reference-app parity audit (October 2026)](docs/PARITY_AUDIT_2026-10.md)
+- [Local development and launch troubleshooting](docs/LOCAL_DEVELOPMENT.md)
+- [Distribution signing requirements](docs/SIGNING.md)
 - [Source-backed parity audit (July 2026)](docs/PARITY_AUDIT_2026-07.md)
 - [Brand assets](docs/BRANDING.md)
 - [Testing and QA](docs/TESTING.md)

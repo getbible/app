@@ -1,0 +1,9 @@
+{
+  "name": "getbible-browser-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Release-browser verification for the compiled Flutter application",
+  "engines": { "node": ">=22" },
+  "scripts": { "smoke": "node run.mjs" },
+  "devDependencies": { "playwright": "1.64.0" }
+}

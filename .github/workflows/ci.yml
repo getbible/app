@@ -51,6 +51,7 @@ jobs:
           base = os.environ['WEB_BASE_HREF']
           assert re.fullmatch(r'\d+\.\d+\.\d+', version), 'Invalid SDK pin'
           assert re.fullmatch(r'/(?:[A-Za-z0-9._~-]+/)*', base), 'Invalid web base path'
+          assert not any(part in ('.', '..') for part in base.split('/')), 'Invalid web base segment'
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'version={version}\nweb_base_href={base}\n')
           PY
@@ -79,8 +80,8 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - run: sha256sum -c assets/branding/BRAND_ASSETS.sha256
       - run: dart format --output=none --set-exit-if-changed .
-      - run: flutter analyze
-      - run: flutter test
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub
       - name: Test developer and release tooling
         run: |
           python -m unittest discover -s scripts/tests -p 'test_*.py'
@@ -114,10 +115,10 @@ jobs:
       - run: python scripts/develop.py check linux
       - run: flutter pub get --enforce-lockfile
       - name: Exercise reader and native clipboard
-        run: xvfb-run -a flutter test integration_test/reader_upgrade_test.dart -d linux
+        run: xvfb-run -a flutter test --no-pub integration_test/reader_upgrade_test.dart -d linux
       - name: Exercise Study and private notebook reopening
-        run: xvfb-run -a flutter test integration_test/study_workspace_test.dart -d linux
-      - run: flutter build linux --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+        run: xvfb-run -a flutter test --no-pub integration_test/study_workspace_test.dart -d linux
+      - run: flutter build linux --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - run: python scripts/release/package.py package --target linux --metadata build/release-metadata.json --output dist --arch x64
       - name: Validate Debian installation and installed application startup
         run: |
@@ -158,11 +159,17 @@ jobs:
           path: build
       - run: flutter pub get --enforce-lockfile
       - run: dart compile js -O4 tool/drift_worker.dart -o web/drift_worker.dart.js
-      - run: flutter build web --release --no-web-resources-cdn --base-href "$WEB_BASE_HREF" --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build web --no-pub --release --no-web-resources-cdn --base-href "$WEB_BASE_HREF" --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - run: npm ci --prefix tool/browser_smoke
       - run: npx --prefix tool/browser_smoke playwright install --with-deps chromium
       - name: Launch compiled app and verify persistent notes in a real browser
         run: node tool/browser_smoke/run.mjs --build-dir build/web --base-path "$WEB_BASE_HREF"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-diagnostics-${{ needs.metadata.outputs.artifact_version }}
+          path: build/browser-smoke
+          if-no-files-found: ignore
       - run: python scripts/release/package.py package --target web --metadata build/release-metadata.json --output dist --base-href "$WEB_BASE_HREF"
       - uses: actions/upload-artifact@v4
         with:
@@ -196,9 +203,9 @@ jobs:
           name: release-metadata
           path: build
       - run: flutter pub get --enforce-lockfile
-      - run: flutter build apk --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
-      - run: flutter build apk --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
-      - run: flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build apk --no-pub --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build apk --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: flutter build appbundle --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - run: python scripts/release/package.py package --target android --metadata build/release-metadata.json --output dist
       - uses: actions/upload-artifact@v4
         with:
@@ -215,6 +222,8 @@ jobs:
       BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
     steps:
       - uses: actions/checkout@v4
+      - name: Enable long paths for pinned Flutter plugin sources
+        run: git config --global core.longpaths true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -235,7 +244,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
       - run: flutter pub get --enforce-lockfile
-      - run: flutter build windows --release --build-name "$env:VERSION_NAME" --build-number "$env:BUILD_NUMBER"
+      - run: flutter build windows --no-pub --release --build-name "$env:VERSION_NAME" --build-number "$env:BUILD_NUMBER"
       - run: python scripts/release/package.py package --target windows --metadata build/release-metadata.json --output dist --arch x64
       - name: Install and launch the Windows package
         shell: pwsh
@@ -285,11 +294,11 @@ jobs:
           path: build
       - run: flutter pub get --enforce-lockfile
       - if: matrix.target == 'macos'
-        run: flutter build macos --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+        run: flutter build macos --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - if: matrix.target == 'ios-device'
-        run: flutter build ios --release --no-codesign --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+        run: flutter build ios --no-pub --release --no-codesign --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - if: matrix.target == 'ios-simulator'
-        run: flutter build ios --simulator --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+        run: flutter build ios --no-pub --simulator --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - run: python scripts/release/package.py package --target '${{ matrix.target }}' --metadata build/release-metadata.json --output dist
       - if: matrix.target == 'macos'
         name: Unpack and launch the macOS package
@@ -379,8 +388,8 @@ jobs:
           VERSION_NAME: ${{ needs.metadata.outputs.release_version }}
           BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
         run: |
-          python scripts/release/sign_android.py -- flutter build apk --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
-          python scripts/release/sign_android.py -- flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+          python scripts/release/sign_android.py -- flutter build apk --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+          python scripts/release/sign_android.py -- flutter build appbundle --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - name: Verify signatures and package
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
@@ -399,6 +408,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Enable long paths for pinned Flutter plugin sources
+        run: git config --global core.longpaths true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -423,7 +434,7 @@ jobs:
         env:
           VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
           BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
-        run: flutter build windows --release --build-name "$env:VERSION_NAME" --build-number "$env:BUILD_NUMBER"
+        run: flutter build windows --no-pub --release --build-name "$env:VERSION_NAME" --build-number "$env:BUILD_NUMBER"
       - name: Sign staged executables and installer before checksums
         env:
           WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
@@ -465,7 +476,7 @@ jobs:
         env:
           VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
           BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
-        run: flutter build macos --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+        run: flutter build macos --no-pub --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - name: Sign, notarize, staple and package macOS
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}

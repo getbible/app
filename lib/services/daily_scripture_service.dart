@@ -94,7 +94,15 @@ Iterable<int> _verseNumbers(Object? value, int chapter) sync* {
     if (selectedChapter != chapter) continue;
     final int first = _positive(match[2]);
     final int last = _positive(match[3] ?? match[2]);
-    if (first < 1 || last < first || last - first > 1000) continue;
+    if (match[3] != null &&
+        (first < 1 || last < first || last - first > 1000)) {
+      // A valid linked first verse must not disguise a truncated range as a
+      // complete daily selection. Other chapters were excluded above.
+      throw const FormatException(
+        'The daily Scripture verse range is invalid or too large.',
+      );
+    }
+    if (first < 1) continue;
     for (int verse = first; verse <= last; verse++) {
       yield verse;
     }

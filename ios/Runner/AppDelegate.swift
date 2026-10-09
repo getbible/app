@@ -62,15 +62,30 @@ private final class NativeFilesHandler: NSObject, UIDocumentPickerDelegate {
         return
       }
       exportedURL = url
-      let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
+      let picker: UIDocumentPickerViewController
+      if #available(iOS 14.0, *) {
+        picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
+      } else {
+        // Keep export-as-copy behavior on the supported iOS 13 deployment target.
+        picker = UIDocumentPickerViewController(url: url, in: .exportToService)
+      }
       picker.delegate = self
       present(picker)
     case "pickTextFile":
       guard claim(result) else { return }
-      let picker = UIDocumentPickerViewController(
-        forOpeningContentTypes: [.json, .plainText],
-        asCopy: true
-      )
+      let picker: UIDocumentPickerViewController
+      if #available(iOS 14.0, *) {
+        picker = UIDocumentPickerViewController(
+          forOpeningContentTypes: [.json, .plainText],
+          asCopy: true
+        )
+      } else {
+        // Import creates a local copy, matching the modern picker's asCopy mode.
+        picker = UIDocumentPickerViewController(
+          documentTypes: ["public.json", "public.plain-text"],
+          in: .import
+        )
+      }
       picker.delegate = self
       picker.allowsMultipleSelection = false
       present(picker)

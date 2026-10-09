@@ -15,7 +15,8 @@ const { values } = parseArgs({ options: {
 const buildDirectory = resolve(values['build-dir']);
 const outputDirectory = resolve(values['output-dir']);
 const basePath = values['base-path'];
-assert.match(basePath, /^\/(?:[a-zA-Z0-9_-]+\/)*$/, 'Base path must start and end in /');
+assert.match(basePath, /^\/(?:[a-zA-Z0-9._~-]+\/)*$/, 'Base path must start and end in /');
+assert.ok(!basePath.split('/').some((segment) => segment === '.' || segment === '..'), 'Base path cannot contain dot segments');
 for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js']) {
   assert.ok((await stat(join(buildDirectory, asset))).isFile(), `Missing built asset: ${asset}`);
 }
@@ -68,7 +69,7 @@ async function enableSemantics(page) {
 
 async function readerVisible(page) {
   await page.getByRole('button', { name: 'Genesis 1', exact: true }).waitFor();
-  await page.getByText(firstVerse, { exact: true }).waitFor();
+  await page.getByRole('group', { name: `Genesis 1:1. ${firstVerse}`, exact: true }).waitFor();
 }
 
 async function runJourney(browser, { isolated }) {
@@ -129,14 +130,19 @@ async function runJourney(browser, { isolated }) {
     assert.equal(await page.evaluate(() => crossOriginIsolated), isolated);
     assert.deepEqual(errors, [], 'Startup produced browser errors');
     assert.deepEqual(missingAssets, [], 'Startup missed built assets');
+    console.log(`${mode}: release reader opened`);
 
     // Verse-number context actions exercise the actual rendered release UI.
     await page.getByText('1', { exact: true }).click();
     await page.getByRole('menuitem', { name: 'Add note', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Write your note…', exact: true }).fill(noteText);
+    await page.getByRole('textbox', { name: 'Write your note…' }).click();
+    // Flutter replaces its semantics mirror with the platform editing element
+    // on focus. Fill that connected editor, rather than racing its activation.
+    await page.getByPlaceholder('Write your note…', { exact: true }).fill(noteText);
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
-    await page.getByText(noteText, { exact: true }).waitFor();
+    await page.getByRole('button', { name: noteText }).waitFor();
     await page.screenshot({ path: join(outputDirectory, `${mode}-saved.png`) });
+    console.log(`${mode}: private note saved`);
 
     // A new page discards all Dart state. It reopens the production browser
     // database, while public APIs fail and local release assets still load.
@@ -147,8 +153,8 @@ async function runJourney(browser, { isolated }) {
     await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
     await enableSemantics(page);
     await readerVisible(page);
-    await page.getByText(noteText, { exact: true }).waitFor();
-    await page.getByRole('button', { name: /^Saved Scripture/ }).click();
+    await page.getByRole('button', { name: noteText }).waitFor();
+    await page.getByRole('button', { name: 'Saved Scripture', exact: true }).click();
     await page.getByText('Saved for offline reading', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.screenshot({ path: join(outputDirectory, `${mode}-offline.png`) });

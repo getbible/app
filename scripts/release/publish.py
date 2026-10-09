@@ -240,7 +240,15 @@ def publish(client, directory: Path, metadata: dict, required_signed=()):
     if existing and not existing["draft"]:
         print(f"{tag} already exists; published release and assets remain unchanged.")
         return
-    for previous_release in client.releases():
+    releases = list(client.releases())
+    # GitHub's release-by-tag endpoint returns published releases only. Draft
+    # recovery must use the authenticated releases listing instead.
+    drafts = [release for release in releases if release["tag_name"] == tag and release["draft"]]
+    if len(drafts) > 1:
+        raise ReleaseError("Multiple interrupted drafts use this release tag")
+    if not existing and drafts:
+        existing = drafts[0]
+    for previous_release in releases:
         if previous_release["draft"] or not previous_release["tag_name"].startswith("v"):
             continue
         try:
@@ -302,7 +310,7 @@ def publish(client, directory: Path, metadata: dict, required_signed=()):
         verify_remote_asset(asset, assets[asset["name"]])
     assert_source_tag(client, tag, metadata["git_sha"])
     current = client.call(f'/releases/{release["id"]}')
-    if not current or not current["draft"] or current["target_commitish"] != metadata["git_sha"]:
+    if not current or not current["draft"] or current["tag_name"] != tag or current["target_commitish"] != metadata["git_sha"]:
         raise ReleaseError("Draft release changed while uploading; refusing to publish")
     client.call(f'/releases/{release["id"]}', method="PATCH", data={
         "draft": False, "body": body, "prerelease": metadata["channel"] != "stable",

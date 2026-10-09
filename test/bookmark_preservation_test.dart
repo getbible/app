@@ -74,6 +74,26 @@ void main() {
     expect(mergeBackupData(merged, imported).groups.length, 3);
   });
 
+  test('a free imported ID is not inferred from a collision-like suffix', () {
+    final BackupData fixture = _fixture();
+    BackupData withGroup(String id) => BackupData(
+      version: 2,
+      exportedAt: fixture.exportedAt,
+      groups: <MarkingGroup>[fixture.groups.last.copyWith(id: id)],
+      markings: <Marking>[fixture.markings.first.copyWith(groupId: id)],
+      notes: const <VerseNote>[],
+    );
+    final BackupData merged = mergeBackupData(
+      withGroup('faith-imported-1'),
+      withGroup('faith'),
+    );
+    expect(merged.groups.map((MarkingGroup group) => group.id), <String>[
+      'faith-imported-1',
+      'faith',
+    ]);
+    expect(merged.markings.length, 2);
+  });
+
   test('matching labels cannot absorb a different topic or personal group', () {
     final BackupData backup = _fixture();
     final MarkingGroup linked = backup.groups.first;
@@ -441,6 +461,86 @@ void main() {
     expect(preferredWholeVerseMarking(<Marking>[global])?.id, global.id);
   });
 
+  test(
+    'concurrent assignments add one membership and retain revised quotes',
+    () async {
+      final LocalDatabase database = await LocalDatabase.memory();
+      final AppState state = AppState.fromDatabase(database);
+      addTearDown(state.close);
+      final BackupData backup = _fixture();
+      await state.annotations.replaceAll(backup);
+      state.passage = const Passage(translation: 'kjv', book: 1, chapter: 1);
+      state.groups = backup.groups;
+      state.markings = await state.annotations.getMarkingsForPassage(
+        state.passage,
+      );
+      const Verse original = Verse(
+        chapter: 1,
+        verse: 1,
+        name: 'Genesis 1:1',
+        text: 'Original personal quote.',
+      );
+      await Future.wait(<Future<void>>[
+        state.markWholeVerse(original, original.name, 'personal'),
+        state.markWholeVerse(original, original.name, 'personal'),
+      ]);
+      expect(
+        (await state.annotations.getMarkings())
+            .where(
+              (Marking mark) => mark.isWholeVerse && mark.groupId == 'personal',
+            )
+            .length,
+        1,
+      );
+      const Verse revised = Verse(
+        chapter: 1,
+        verse: 1,
+        name: 'Genesis 1:1',
+        text: 'Updated! personal quote.',
+      );
+      await Future.wait(<Future<void>>[
+        state.markSelectedText(revised, 0, 8, revised.name, 'personal'),
+        state.markSelectedText(revised, 0, 8, revised.name, 'personal'),
+      ]);
+      expect(
+        (await state.annotations.getMarkings())
+            .where((Marking mark) => !mark.isWholeVerse)
+            .map((Marking mark) => mark.quote),
+        unorderedEquals(<String>['Original', 'Updated!']),
+      );
+    },
+  );
+
+  test(
+    'membership ID collision rolls back an entire paragraph batch',
+    () async {
+      final LocalDatabase database = await LocalDatabase.memory();
+      addTearDown(database.close);
+      final BackupData backup = _fixture();
+      await database.replaceReaderData(
+        groups: backup.groups,
+        markings: backup.markings,
+        notes: backup.notes,
+      );
+      final Marking newMembership = backup.markings.first.copyWith(
+        id: 'new-membership',
+        groupId: 'personal',
+      );
+      final Marking conflicting = backup.markings.last.copyWith(
+        id: 'personal-faith',
+        quote: 'Changed!',
+      );
+      await expectLater(
+        database.addMarkingMemberships(<Marking>[newMembership, conflicting]),
+        throwsA(isA<Exception>()),
+      );
+      expect(
+        (await database.getMarkings()).map((Marking mark) => mark.toJson()),
+        unorderedEquals(backup.markings.map((Marking mark) => mark.toJson())),
+      );
+    },
+  );
+
   testWidgets('verse menu identifies each removable personal topic', (
     WidgetTester tester,
   ) async {
@@ -525,6 +625,41 @@ void main() {
       isTrue,
     );
     expect(tester.takeException(), isNull);
+
+    // Navigation can finish while either popup route is still open. Its old
+    // Scripture action must never write into the newly displayed chapter.
+    for (final bool groupPicker in <bool>[false, true]) {
+      await tester.runAsync(
+        () => state.loadPassage(
+          const Passage(translation: 'tst', book: 1, chapter: 1),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final int before = state.savedMarkings.length;
+      await tester.tap(find.text('1').first);
+      await tester.pumpAndSettle();
+      if (groupPicker) {
+        await tester.tap(find.text('More marking groups…'));
+        await tester.pumpAndSettle();
+      }
+      await tester.runAsync(
+        () => state.loadPassage(
+          const Passage(
+            translation: 'tst',
+            book: ReaderApiFixture.extendedBook,
+            chapter: 7,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(state.passage.book, ReaderApiFixture.extendedBook);
+      expect(state.passage.chapter, 7);
+      await tester.tap(find.text('Imported action ID').last);
+      await tester.pumpAndSettle();
+      expect(state.markings, isEmpty);
+      expect(state.savedMarkings.length, before);
+      expect(tester.takeException(), isNull);
+    }
   });
 }
 

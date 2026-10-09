@@ -19,11 +19,18 @@ credentials and scripts, and [Deployment](DEPLOYMENT.md) for the package matrix.
 ## GitHub configuration
 
 Set secrets and variables under **Settings → Secrets and variables → Actions**
-in `getbible/app`, or in the release environment used by the workflow. Secrets
-hold private material/passwords; variables hold public account identifiers and
+in `getbible/app`, using the **Secrets** or **Variables** tab identified below.
+Organization values may also be shared with this repository. The current jobs
+do not select a GitHub environment, so values stored only in an environment are
+not available to them. An environment-based setup must explicitly assign that
+environment to the configuration check and corresponding signing jobs.
+Secrets hold private material/passwords; variables hold public account identifiers and
 certificate names. Do not commit a certificate, private key, provisioning profile,
 password or generated signing configuration. Apple and Android/Windows credentials
-have separate prefixes and cannot accidentally enable another target.
+have separate prefixes and cannot accidentally enable another target. All required
+names are listed here and in [Android/Windows signing](SIGNING_ANDROID_WINDOWS.md),
+including the optional Windows timestamp variable. No GitHub version variable is
+needed: application versions come only from `pubspec.yaml`.
 
 An exported `.p12` must contain its certificate **and private key**, and must be
 password protected. Encode the complete file as base64; the scripts accept wrapped
@@ -108,10 +115,18 @@ the optional channel, while Apple `CFBundleShortVersionString` uses the numeric
 three-part version and `CFBundleVersion` uses the explicit build number. Increase
 the build number for another App Store Connect upload; CI does not invent a
 version from its run number. The workflow supplies those numeric `VERSION_NAME`
-and `BUILD_NUMBER` values from `build/release-metadata.json`. After Flutter dependencies are available, run:
+and `BUILD_NUMBER` values from `build/release-metadata.json`; these are generated
+job values, not additional GitHub configuration to maintain. For a local macOS
+build, with the iOS credentials above available in the shell environment:
 
 ```bash
+python3 scripts/release/package.py metadata --output build/release-metadata.json
+flutter pub get --enforce-lockfile
+export VERSION_NAME="$(python3 -c 'import json; print(json.load(open("build/release-metadata.json"))["version_name"])')"
+export BUILD_NUMBER="$(python3 -c 'import json; print(json.load(open("build/release-metadata.json"))["build_number"])')"
 bash scripts/release/sign_ios.sh
+python3 scripts/release/package.py package --target ios-signed \
+  --metadata build/release-metadata.json --output dist
 ```
 
 The script imports the distribution identity, installs the profile in both the

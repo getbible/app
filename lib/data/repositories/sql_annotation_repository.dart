@@ -36,6 +36,10 @@ final class SqlAnnotationRepository implements AnnotationRepository {
   Future<void> saveMarking(Marking marking) => _database.saveMarking(marking);
 
   @override
+  Future<void> addMarkingMemberships(List<Marking> markings) =>
+      _database.addMarkingMemberships(markings);
+
+  @override
   Future<void> replaceMarkings(List<Marking> remove, List<Marking> add) =>
       _database.replaceMarkings(remove, add);
 

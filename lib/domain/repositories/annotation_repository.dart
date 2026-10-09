@@ -11,6 +11,10 @@ abstract interface class AnnotationRepository {
   Future<void> saveGroup(MarkingGroup group);
   Future<void> deleteGroup(String groupId);
   Future<void> saveMarking(Marking marking);
+
+  /// Adds only missing semantic memberships in one atomic operation. Existing
+  /// quotes and independent shared/personal origins are never overwritten.
+  Future<void> addMarkingMemberships(List<Marking> markings);
   Future<void> replaceMarkings(List<Marking> remove, List<Marking> add);
   Future<void> deleteMarking(String id);
   Future<void> deleteAllMarkings();

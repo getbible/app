@@ -490,6 +490,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     String reference,
   ) async {
     final AppState state = context.read<AppState>();
+    final Passage origin = state.passage;
+    final BibleChapter? originChapter = state.current;
+    bool ownsVerse() =>
+        mounted &&
+        state.passage == origin &&
+        identical(state.current, originChapter);
     final RenderBox button = anchorContext.findRenderObject()! as RenderBox;
     final RenderBox overlay =
         Overlay.of(context).context.findRenderObject()! as RenderBox;
@@ -576,7 +582,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           ),
       ],
     );
-    if (choice == null || !mounted) return;
+    if (choice == null || !mounted || !ownsVerse()) return;
     if (choice == '__preview__') {
       await _showReferencePreview(
         StructuredReferenceRequest(
@@ -614,7 +620,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       );
     } else if (choice == '__groups__') {
       final String? groupId = await _showMarkingGroupPicker(context, state);
-      if (groupId != null) {
+      if (groupId != null && ownsVerse()) {
         await state.markWholeVerse(verse, reference, groupId);
       }
     } else if (choice.startsWith('__group__:')) {
@@ -2219,9 +2225,23 @@ class _ChapterFooter extends StatelessWidget {
                   onPressed: () => launchUrl(
                     Uri.parse('https://wiki.crosswire.org/Frontends:getBible'),
                   ),
-                  child: Text(
-                    '${state.ui('lovinglyMaintainedBy')} Vast Development Method ♥',
-                    textAlign: TextAlign.end,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      Flexible(
+                        child: Text(
+                          '${state.ui('lovinglyMaintainedBy')} Vast Development Method',
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // Use the bundled icon font instead of a remote Unicode
+                      // fallback for this decorative heart on Flutter Web.
+                      const ExcludeSemantics(
+                        child: Icon(Icons.favorite, size: 14),
+                      ),
+                    ],
                   ),
                 ),
               ),

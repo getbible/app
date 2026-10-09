@@ -25,7 +25,9 @@ availability. Runtime job gates check the values actually delivered to the job.
 
 ## Android
 
-Configure these GitHub Actions secrets for the authorized release environment:
+Configure these repository Actions secrets under **Settings → Secrets and
+variables → Actions → Secrets**. Organization secrets shared with this repository
+also work; the current workflow does not select a GitHub environment:
 
 | Secret | Content |
 |---|---|
@@ -42,9 +44,15 @@ The job runs the ordinary release build through the temporary-key wrapper:
 
 ```bash
 python3 scripts/release/signing_configuration.py --require android
-python3 scripts/release/sign_android.py -- flutter build apk --release
-python3 scripts/release/sign_android.py -- flutter build appbundle --release
+flutter pub get --enforce-lockfile
+python3 scripts/release/sign_android.py -- flutter build apk --no-pub --release
+python3 scripts/release/sign_android.py -- flutter build appbundle --no-pub --release
 ```
+
+These local commands read the version directly from `pubspec.yaml`. CI passes
+the same full `release_version` and `build_number` from the shared metadata
+explicitly, so Android keeps the alpha/beta/rc label as well as its native
+integer versionCode. There is no separate Android version variable to configure.
 
 Each command decodes the key into a private temporary directory, passes its
 path through `ANDROID_KEYSTORE_PATH`, and removes the directory on completion,
@@ -68,12 +76,13 @@ artifact for Google Play, not a directly installable app.
 
 ## Windows
 
-Configure these GitHub Actions secrets:
+Configure these repository Actions settings in their corresponding tabs:
 
-| Secret | Content |
-|---|---|
-| `WINDOWS_SIGNING_CERTIFICATE_BASE64` | Base64 PFX containing the publisher's code-signing certificate and private key |
-| `WINDOWS_SIGNING_CERTIFICATE_PASSWORD` | PFX password |
+| Setting | Kind | Content |
+|---|---|---|
+| `WINDOWS_SIGNING_CERTIFICATE_BASE64` | Secret | Base64 PFX containing the publisher's code-signing certificate and private key |
+| `WINDOWS_SIGNING_CERTIFICATE_PASSWORD` | Secret | PFX password |
+| `WINDOWS_TIMESTAMP_URL` | Optional variable | RFC3161 service URL; defaults to `http://timestamp.digicert.com` when absent |
 
 The optional Actions variable `WINDOWS_TIMESTAMP_URL` selects an RFC3161 service.
 Its default is DigiCert's documented `http://timestamp.digicert.com` endpoint.

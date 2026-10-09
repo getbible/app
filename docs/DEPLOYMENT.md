@@ -26,9 +26,10 @@ and build numbers must fit 16-bit fields, so the tooling rejects numbers above
 65535 instead of silently truncating them.
 
 Apple bundle marketing versions and Windows native file versions require numeric
-components. They use `1.0.0` plus build number `2` for the first example. Every
-package filename and manifest retains the complete `1.0.0-alpha.1+2` identity;
-Android versionName can retain its prerelease channel. Debian prereleases use
+components. They use `1.0.0` plus build number `2` for the first example. Package
+filenames encode that release as `1.0.0-alpha.1-build.2`; manifests retain
+`1.0.0-alpha.1+2`. Android versionName retains its prerelease channel in both
+unsigned and signed builds. Debian prereleases use
 `1.0.0~alpha.1-2` so Debian's upgrade ordering agrees with the channel sequence.
 
 ## Build versus publish
@@ -47,7 +48,13 @@ reviewed build as a GitHub release:
 
 An already published version is skipped, never overwritten. A lower semantic
 version or non-increasing native build number is rejected. An interrupted
-unpublished draft can be retried only for its original commit. Alpha, beta and
+unpublished draft can be retried only for its original commit and build number.
+Already uploaded files are retained only when their size and SHA-256 match the
+verified local package; differing uploads are rejected instead of replaced.
+Publication requires all seven unsigned targets and every configured signed
+target, complete manifest/checksum coverage, and matching GitHub upload digests.
+The tag's actual commit is checked before uploads and again before publication.
+Alpha, beta and
 rc releases remain prereleases; only stable releases become the latest stable
 release. The workflow never edits the version, makes a version commit, or moves
 an existing release tag.
@@ -101,8 +108,12 @@ flutter pub get --enforce-lockfile
 ```
 
 Use `version_name` and `build_number` from that JSON for Flutter's `--build-name`
-and `--build-number`, and the matching native host. The workflow contains the
-exact platform build commands. Package an already-built Linux bundle with:
+and `--build-number` on desktop, Web and Apple targets. Android uses
+`release_version` for `--build-name`, preserving the channel. Build on the
+matching native host. After the explicit locked dependency restore, CI uses
+`--no-pub` on subsequent builds to preserve that resolved dependency graph.
+The workflow contains the exact platform build commands. Package an already-built
+Linux bundle with:
 
 ```bash
 python3 scripts/release/package.py package --target linux \
@@ -121,6 +132,8 @@ reader/Study journeys, and a browser launch of the actual compiled Web applicati
 Browser fixtures make API responses deterministic while exercising the real
 SQLite WASM/worker and persistence after public requests become unavailable.
 Linux installs its actual Debian package and launches the installed binary.
+Windows installs its generated EXE into a temporary directory and launches that
+installed application; macOS extracts its generated ZIP and launches its app.
 Desktop process startup checks complement feature integration tests; they do
 not establish complete assistive-technology or device behavior.
 

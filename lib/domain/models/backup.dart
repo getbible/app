@@ -167,7 +167,8 @@ BackupData mergeBackupData(BackupData current, BackupData imported) {
         .where(
           (MarkingGroup item) =>
               (item.id == importedGroup.id ||
-                  (item.id.startsWith(collisionPrefix) &&
+                  (ids.contains(importedGroup.id) &&
+                      item.id.startsWith(collisionPrefix) &&
                       RegExp(
                         r'^[1-9][0-9]*$',
                       ).hasMatch(item.id.substring(collisionPrefix.length)))) &&

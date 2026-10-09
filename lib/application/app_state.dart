@@ -452,16 +452,6 @@ final class AppState extends ChangeNotifier {
     // A verse can belong to several topics and can independently retain a
     // public membership in the same group. Adding a personal membership must
     // never recolor by deleting other topic associations or private copies.
-    if (markings.any(
-      (Marking item) =>
-          item.verse == verse.verse &&
-          item.isWholeVerse &&
-          !item.isSharedBookmark &&
-          item.groupId == groupId,
-    )) {
-      await selectActiveGroup(groupId);
-      return;
-    }
     final Marking add = Marking(
       id: const Uuid().v4(),
       passage: passage,
@@ -473,9 +463,9 @@ final class AppState extends ChangeNotifier {
       groupId: groupId,
       createdAt: DateTime.now().toUtc(),
     );
-    await annotations.saveMarking(add);
+    await annotations.addMarkingMemberships(<Marking>[add]);
     await selectActiveGroup(groupId);
-    markings = await annotations.getMarkingsForPassage(passage);
+    await _refreshVisibleMarkings();
     savedMarkings = await annotations.getMarkings();
     notifyListeners();
   }
@@ -488,17 +478,7 @@ final class AppState extends ChangeNotifier {
     String groupId,
   ) async {
     if (start < 0 || end <= start || end > verse.text.length) return;
-    if (markings.any(
-      (Marking item) =>
-          item.verse == verse.verse &&
-          item.start == start &&
-          item.end == end &&
-          item.groupId == groupId,
-    )) {
-      await selectActiveGroup(groupId);
-      return;
-    }
-    await annotations.saveMarking(
+    await annotations.addMarkingMemberships(<Marking>[
       Marking(
         id: const Uuid().v4(),
         passage: passage,
@@ -510,9 +490,9 @@ final class AppState extends ChangeNotifier {
         groupId: groupId,
         createdAt: DateTime.now().toUtc(),
       ),
-    );
+    ]);
     await selectActiveGroup(groupId);
-    markings = await annotations.getMarkingsForPassage(passage);
+    await _refreshVisibleMarkings();
     savedMarkings = await annotations.getMarkings();
     notifyListeners();
   }
@@ -551,7 +531,7 @@ final class AppState extends ChangeNotifier {
         ),
       );
     }
-    await annotations.replaceMarkings(const <Marking>[], additions);
+    await annotations.addMarkingMemberships(additions);
     await selectActiveGroup(groupId);
     await _refreshVisibleMarkings();
     savedMarkings = await annotations.getMarkings();
@@ -604,7 +584,7 @@ final class AppState extends ChangeNotifier {
         )
         .toList();
     await annotations.replaceMarkings(remove, const <Marking>[]);
-    markings = await annotations.getMarkingsForPassage(passage);
+    await _refreshVisibleMarkings();
     savedMarkings = await annotations.getMarkings();
     notifyListeners();
   }

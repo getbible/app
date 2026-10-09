@@ -27,14 +27,15 @@ model supersedes the July baseline. Complete parity remains unfinished.
 | Whole/text markings and memberships | Partial | Canonical whole verses, UTF-16 selections, overlap rendering and private group management exist. Typed source provenance, additive whole-verse membership, scoped personal removal and schema-4 migration are added with regression cases. The full unified list/menu/migration remains missing; see the October audit. |
 | Unified global/personal topic list | Missing | Flutter still separates public Topics and My markings; API-based defaults, automatic legacy group reconciliation, G badges and origin-aware global-download management are not implemented. |
 | Inline notes | Implemented core | Add/edit/delete editor opens under its verse and saved note folds inline; keyboard-shortcut and full widget journey tests remain |
-| Online Search v3 | Implemented core; interaction differs | Advanced filters, ranked pagination, complete references, cancellation/cooldown and exact-verse opening exist. Flutter requires submission after edits; the web searches with a debounce. Installed offline search remains step 14 and is not supplied by the current website. |
+| Online Search v3 | Implemented core; interaction differs | Advanced filters, ranked pagination, complete references, cancellation/cooldown and exact-verse opening exist. Flutter requires submission after edits; the web searches with a debounce. Explicit Installed search uses validated local corpora with a documented filter subset; this additional offline capability is not supplied by the current website. |
 | Adaptive Study workspace | Implemented core | Captured word/phrase/verse/chapter context, responsive side panel/sheet, keyboard/Escape, native selection precedence and six usable tabs. Large-text and nested-dialog regressions complement composed journeys; device/screen-reader QA remains. |
-| Dictionaries and commentaries | Partial | Typed on-demand indexes/coverage/citations work. The current web cross-resource chooser of confirmed definitions is absent. Complete offline installation remains step 15. |
+| Dictionaries and commentaries | Partial | Typed on-demand indexes/coverage/citations work. The current web cross-resource chooser of confirmed definitions is absent. Complete module installation and local indexed adapters are implemented; the remaining gap is the cross-resource interaction. |
 | Public topic browsing and private copies | Implemented core; workflow differs | Lazy browsing, local Follow/Hide and explicit private copies work. They are different from the reference's unified global-download workflow. |
 | Source annotations and references | Partial | Rich source data and styled text survive; the web's below-verse source-note/citation controls and red Jesus quotation presentation are not reproduced. |
-| Personal study/sermon notebooks | Implemented core | Ordered private blocks and references, durable draft journals, revision conflicts, lifecycle flush and schema 3 migrations. Notebook import/export remains step 12. |
-| Website-compatible backups | Partial | Legacy v1/v2 validation/merge exists; current shared-bookmark provenance now has a shared fixture and preservation regressions. Complete native file import/export and notebook/journal/Study portability remain step 12. |
-| Markdown generation | Partial | Native preview and clipboard exist; save/download and operating-system sharing are incomplete. |
+| Personal study/sermon notebooks | Implemented core | Ordered private blocks and references, durable draft journals, revision conflicts, lifecycle flush and schema 3 migrations. The complete private backup includes notebooks, journals and references; Markdown has Save/Copy and supported sharing. |
+| Private-data portability | Implemented core; target verification required | Explicit file import preview/confirmation, legacy v1/v2 import and v2 export, plus a distinct complete private format for notebooks, journals, settings and copy provenance. Atomic merging preserves conflicting work; public corpora are excluded. |
+| Complete offline resources | Implemented core; target verification required | Explicit installs, staged generation activation, integrity/revision checks, restart recovery, cancel/retry/remove, installed Bible/reference/search and dictionary/commentary/topic indexes. Private data is independent of public resource removal. |
+| Markdown generation | Implemented core; device verification required | Scripture and notebook Markdown preview, Save file/Download and Copy; supported mobile/browser share sheets with retained fallback actions. |
 | Complete website localization | Partial | Runtime loading and 69 bundled packs exist, but only some widgets use them. At audit time packs contain 199 messages versus 218 in the reference; the current test checks internal consistency only. |
 | Approved GetBible branding | Implemented | Supplied artwork is installed for Android, iOS, macOS, Windows, Linux, web, splash, and the reader header; CI verifies exact hashes |
 | Accessibility | Partial | Safe area, semantics, scaling foundations; full focus/screen-reader audit remains |
@@ -57,7 +58,7 @@ Native commentary reading requests only discovered coverage and the chosen chapt
 
 ## Local notebook storage increment
 
-Independent titled study/sermon notebooks complement canonical inline verse notes. Ordered blocks, captured quotations, serialized autosave, durable editor journals and explicit conflict recovery preserve private content. Twenty-eight notebook, native-input and migration checks cover schema 1/2 upgrades, actual SQLite restart, simultaneous local editors and 200% RTL editing. Website-compatible backups continue to omit notebooks until step 12; the UI states this boundary. See [Notebooks](notebooks.md).
+Independent titled study/sermon notebooks complement canonical inline verse notes. Ordered blocks, captured quotations, serialized autosave, durable editor journals and explicit conflict recovery preserve private content. Twenty-eight notebook, native-input and migration checks cover schema 1/2 upgrades, actual SQLite restart, simultaneous local editors and 200% RTL editing. Website-compatible backups deliberately omit notebooks; the separate complete private format preserves notebooks and draft journals, and the UI explains the distinction. See [Notebooks](notebooks.md).
 
 ## Public topic increment
 
@@ -73,8 +74,9 @@ copy must not be relabelled as that workflow. The [October audit](PARITY_AUDIT_2
 records concrete source paths, preservation risks, the 33 executed reference
 bookmark tests, remaining UX work and the order of implementation.
 
-Build/package fixes do not close these product gaps. Steps 12–15 continue to own
-complete private-data portability and installed offline resources; step 16 covers
+Build/package fixes do not close these product gaps. Steps 12–15 add complete
+private-data portability and installed offline resources; their verification is
+recorded in the testing guide. Step 16 covers
 complete localization and integrated parity/accessibility, and step 17 validates
 supported hosts/devices and distribution. Specific correctness bugs, such as
 losing a bookmark's origin during a backup round trip, must be corrected before

@@ -46,7 +46,16 @@ void main() {
         expect(find.byType(NotesPanel), findsOneWidget);
 
         final Finder insertAction = find.text('Insert current Scripture');
-        await tester.ensureVisible(insertAction);
+        await tester.scrollUntilVisible(
+          insertAction,
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey<String>('notes-panel-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(insertAction);
         await _settle(tester);

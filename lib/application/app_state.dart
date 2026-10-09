@@ -1,18 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/errors.dart';
 import '../core/ui_strings.dart';
+import '../data/api/api_configuration.dart';
 import '../data/api/getbible_api_client.dart';
 import '../data/api/query_api_client.dart';
 import '../data/database/local_database.dart';
+import '../data/offline/bible_resource_installer.dart';
+import '../data/offline/study_resource_installer.dart';
 import '../data/repositories/api_query_repository.dart';
 import '../data/repositories/api_search_repository.dart';
 import '../data/repositories/cached_bible_repository.dart';
+import '../data/repositories/installed_bible_repository.dart';
+import '../data/repositories/installed_query_repository.dart';
+import '../data/repositories/installed_search_repository.dart';
 import '../data/repositories/sql_annotation_repository.dart';
+import '../data/repositories/sql_private_data_repository.dart';
 import '../data/repositories/sql_settings_repository.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
+import '../domain/models/offline_resource.dart';
 import '../domain/models/online_search.dart';
 import '../domain/models/passage.dart';
 import '../domain/models/preferences.dart';
@@ -22,7 +33,9 @@ import '../services/daily_scripture_service.dart';
 import '../services/scripture_text.dart';
 import 'daily_scripture_resolver.dart';
 import 'grouped_reference_lookup.dart';
+import 'offline_controller.dart';
 import 'online_search_controller.dart';
+import 'portability_controller.dart';
 import 'study_services.dart';
 
 export '../domain/models/preferences.dart'
@@ -38,8 +51,15 @@ final class AppState extends ChangeNotifier {
     this._api,
     this.onlineSearch,
     this.study,
+    this.offline,
   ) {
     onlineSearch.addListener(_searchChanged);
+    offline.addListener(_offlineChanged);
+    portability = PortabilityController(
+      repository: SqlPrivateDataRepository(database),
+      beforeSnapshot: _flushPrivateDrafts,
+      afterImport: _refreshImportedData,
+    );
   }
 
   /// Compose persistent reader and preview operations with one injectable HTTP
@@ -50,9 +70,23 @@ final class AppState extends ChangeNotifier {
     NotebookRepository? notebookRepository,
   }) {
     final GetBibleApiClient client = api ?? GetBibleApiClient();
+    final SqlOfflineResourceStore offlineStore = SqlOfflineResourceStore(
+      database,
+    );
+    final InstalledBibleRepository installed = InstalledBibleRepository(
+      offlineStore,
+      sourceUri: client.transport.configuration
+          .endpoint(ApiService.bible)
+          .baseUri,
+    );
     final CachedBibleRepository repository = CachedBibleRepository(
       database,
       client,
+      installed: installed,
+    );
+    final InstalledQueryRepository query = InstalledQueryRepository(
+      installed: installed,
+      online: ApiQueryRepository(QueryApiClient(transport: client.transport)),
     );
     return AppState._(
       database,
@@ -61,16 +95,33 @@ final class AppState extends ChangeNotifier {
       SqlSettingsRepository(database),
       GroupedReferenceLookup(
         bibleRepository: repository,
-        queryRepository: ApiQueryRepository(
-          QueryApiClient(transport: client.transport),
-        ),
+        queryRepository: query,
       ),
       client,
-      OnlineSearchController(repository: ApiSearchRepository(client.transport)),
+      OnlineSearchController(
+        repository: ApiSearchRepository(client.transport),
+        installedRepository: InstalledSearchRepository(
+          installed: installed,
+          query: query,
+        ),
+      ),
       StudyServices(
         database: database,
         transport: client.transport,
         notebookRepository: notebookRepository,
+        offlineStore: offlineStore,
+      ),
+      OfflineController(
+        store: offlineStore,
+        installers: [
+          BibleResourceInstaller(client.transport),
+          for (final kind in [
+            OfflineResourceKind.dictionary,
+            OfflineResourceKind.commentary,
+            OfflineResourceKind.bookmarks,
+          ])
+            StudyResourceInstaller(client.transport, kind),
+        ],
       ),
     );
   }
@@ -82,6 +133,8 @@ final class AppState extends ChangeNotifier {
   }
 
   final StudyServices study;
+  final OfflineController offline;
+  late final PortabilityController portability;
   final OnlineSearchController onlineSearch;
   final GroupedReferenceLookup referenceLookup;
   final GetBibleApiClient _api;
@@ -114,6 +167,10 @@ final class AppState extends ChangeNotifier {
   int _passageRequest = 0;
   int? _dailyRequest;
   Future<void>? _closeFuture;
+  bool _closing = false;
+  String _installedSignature = '';
+  Future<void> _resourceRefresh = Future<void>.value();
+  String? resourceChoicesError;
 
   bool get searchLoading => onlineSearch.isLoading;
   String? get searchError => onlineSearch.error?.toString();
@@ -122,6 +179,18 @@ final class AppState extends ChangeNotifier {
       .toList(growable: false);
   bool get searchComplete => !onlineSearch.canLoadMore;
   void _searchChanged() => notifyListeners();
+
+  void _offlineChanged() {
+    if (_closing) return;
+    final signature = offline.installed
+        .map((item) => '${item.resource.key}:${item.generation}')
+        .join('\n');
+    if (signature == _installedSignature) return;
+    _installedSignature = signature;
+    // A download may finish after its setup route closes. Refresh only local
+    // discovery and status; never reset an open Study entry or start HTTP.
+    unawaited(refreshInstalledResourceChoices().catchError((Object _) {}));
+  }
 
   Translation? get currentTranslation => translations
       .where((Translation item) => item.abbreviation == passage.translation)
@@ -159,6 +228,9 @@ final class AppState extends ChangeNotifier {
 
   Future<void> initialize() async {
     try {
+      // Recovery is local-only; opening the reader never starts bulk downloads.
+      await offline.initialize();
+      await _resourceRefresh;
       preferences = await settings.getPreferences();
       final LastReadingPosition? last = await settings.getLastReadingPosition();
       groups = await annotations.getGroups();
@@ -724,16 +796,68 @@ final class AppState extends ChangeNotifier {
   Future<void> close() =>
       _closeFuture ??= _close().catchError((Object error, StackTrace stack) {
         _closeFuture = null;
+        _closing = false;
+        portability.resume();
+        offline.resume();
+        _offlineChanged();
         Error.throwWithStackTrace(error, stack);
       });
 
   Future<void> _close() async {
+    _closing = true;
     onlineSearch.cancel(notify: false);
+    await portability.close();
+    await offline.close();
+    await _resourceRefresh;
     await study.close();
     _passageRequest++;
     onlineSearch.removeListener(_searchChanged);
+    offline.removeListener(_offlineChanged);
     onlineSearch.dispose();
+    portability.dispose();
+    offline.dispose();
     _api.close();
     await database.close();
+  }
+
+  Future<void> _flushPrivateDrafts() async {
+    await study.notebooks.flush();
+    if (study.notebooks.hasUndurableDrafts) {
+      throw const StorageException(
+        'Save or recover the latest notebook edits before importing or exporting a backup.',
+      );
+    }
+  }
+
+  Future<void> _refreshImportedData() async {
+    preferences = await settings.getPreferences();
+    await study.notebooks.reloadAfterImport();
+    study.reloadImportedPreferences();
+    await refreshAnnotations();
+  }
+
+  /// Refresh visible choices after explicit setup without an online catalogue
+  /// request. Existing online choices remain selectable when a download is
+  /// removed; installation state is owned exclusively by the offline manager.
+  Future<void> refreshInstalledResourceChoices() {
+    if (_closing) return Future<void>.value();
+    final refresh = _resourceRefresh.then((_) async {
+      if (_closing) return;
+      final installed = await bibles.installed!.getTranslations();
+      if (_closing) return;
+      translations = {
+        for (final item in translations) item.abbreviation: item,
+        for (final item in installed.data) item.abbreviation: item,
+      }.values.toList()..sort((a, b) => a.translation.compareTo(b.translation));
+      await study.refreshInstallationStatus();
+      resourceChoicesError = null;
+      if (!_closing) notifyListeners();
+    });
+    _resourceRefresh = refresh.catchError((Object _) {
+      resourceChoicesError =
+          'Installed resource choices could not refresh. Open Offline resources to retry.';
+      if (!_closing) notifyListeners();
+    });
+    return refresh;
   }
 }

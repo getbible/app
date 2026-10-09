@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../application/notebook_controller.dart';
+import '../../data/platform/platform_text_file_service.dart';
 import '../../domain/models/notebook.dart';
 import '../../domain/models/passage.dart';
 import '../../domain/models/reference.dart';
 import '../../domain/models/study_context.dart';
+import '../../services/markdown_service.dart';
+import '../../services/text_file_service.dart';
 import 'notebook_input_limit_formatter.dart';
+import 'text_export_actions.dart';
 
 /// Local notebooks complement the reader's existing inline canonical notes.
 /// No notebook content is sent to public services by this widget.
@@ -18,18 +22,21 @@ final class NotesPanel extends StatefulWidget {
     required this.context,
     required this.onPreviewReference,
     required this.onOpenPassage,
+    this.files,
     super.key,
   });
   final NotebookController controller;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
   final Future<void> Function(Passage) onOpenPassage;
+  final TextFileService? files;
   @override
   State<NotesPanel> createState() => _NotesPanelState();
 }
 
 final class _NotesPanelState extends State<NotesPanel>
     with WidgetsBindingObserver {
+  bool _preparingExport = false;
   @override
   void initState() {
     super.initState();
@@ -96,7 +103,7 @@ final class _NotesPanelState extends State<NotesPanel>
               ),
               const SizedBox(height: 8),
               const Text(
-                'Current verse-note/marking backups do not include notebooks. Notebook backup portability is a later upgrade.',
+                'Use Complete private backup to save notebooks and retained drafts. Website-compatible backups contain verse notes and markings only.',
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 12),
@@ -122,6 +129,12 @@ final class _NotesPanelState extends State<NotesPanel>
                             ? 'Save now'
                             : 'Saved locally',
                       ),
+                    ),
+                  if (notebook != null)
+                    OutlinedButton.icon(
+                      onPressed: _preparingExport ? null : _exportMarkdown,
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('Export notebook Markdown'),
                     ),
                 ],
               ),
@@ -325,6 +338,104 @@ final class _NotesPanelState extends State<NotesPanel>
       ScaffoldMessenger.maybeOf(
         context,
       )?.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _exportMarkdown() async {
+    if (_preparingExport) return;
+    final NotebookController controller = widget.controller;
+    final String? notebookId = controller.selectedId;
+    if (notebookId == null) return;
+    setState(() => _preparingExport = true);
+    try {
+      await controller.flush();
+      if (!mounted ||
+          widget.controller != controller ||
+          controller.selectedId != notebookId) {
+        return;
+      }
+      if (controller.hasUndurableDrafts) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Save or retry your notebook draft before exporting.',
+            ),
+          ),
+        );
+        return;
+      }
+      final Notebook? notebook = controller.notebook;
+      if (notebook == null) return;
+      final String markdown = exportNotebookMarkdown(notebook);
+      final bool shortened = markdown.length > 32000;
+      final String preview = shortened
+          ? String.fromCharCodes(markdown.runes.take(32000))
+          : markdown;
+      final TextFileService files = widget.files ?? PlatformTextFileService();
+      bool busy = false;
+      await showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) => StatefulBuilder(
+          builder: (BuildContext dialogContext, StateSetter setDialogState) => PopScope(
+            canPop: !busy,
+            child: AlertDialog(
+              title: Text(notebook.displayTitle),
+              content: SizedBox(
+                width: 640,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'Readable Markdown for saving or sharing. Use Complete private backup for a restorable copy.',
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: SelectableText(preview),
+                      ),
+                    ),
+                    if (shortened)
+                      const Text(
+                        'Preview shortened. The saved file includes the complete notebook.',
+                      ),
+                    const SizedBox(height: 12),
+                    TextExportActions(
+                      text: markdown,
+                      filename: 'getbible-notebook.md',
+                      mimeType: 'text/markdown',
+                      subject: notebook.displayTitle,
+                      files: files,
+                      onBusyChanged: (bool value) =>
+                          setDialogState(() => busy = value),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'The notebook could not be exported. Your private draft remains available.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _preparingExport = false);
     }
   }
 

@@ -4,7 +4,7 @@ Cross-platform Flutter implementation of [getBible.Life](https://app.getbible.li
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
-> Development status: the reader provides lossless Bible v3 Scripture, online Search v3, reusable Query v3 previews, an adaptive Study workspace with dictionaries, commentaries and public topics, and separate local study/sermon notebooks. Canonical inline verse notes and personal markings retain their established identities. Complete offline installations, notebook backup portability, full localization and platform/store release gates remain later work. See [feature parity](docs/FEATURE_PARITY.md).
+> Development status: the reader provides lossless Bible v3 Scripture, online Search v3, reusable Query v3 previews, an adaptive Study workspace with dictionaries, commentaries and public topics, and separate local study/sermon notebooks. Canonical inline verse notes and personal markings retain their established identities. Complete private backups and explicitly installed Bibles/Study resources extend these workflows. Full localization, integrated reference-app parity and final platform/store release gates remain later work. See [feature parity](docs/FEATURE_PARITY.md).
 
 ## Supported targets
 
@@ -58,8 +58,9 @@ reader position; Open loads the contextual chapter only when explicitly chosen.
 Finish or close an active inline note editor before using **Open in reader**;
 the preview keeps its draft in place while that editor is active.
 Missing or incompatible references display an error without substituting a
-default passage. Complete installed-Bible offline reference resolution is later
-work.
+default passage. Installed Bibles resolve supported references locally using their
+published book names and coordinates, without a Query request. Unavailable names
+or coordinates produce a clear error; see the offline search contract.
 
 ## Search and Study
 
@@ -95,10 +96,37 @@ optional attributed Scripture quotations. Autosave, durable draft journals,
 Retry and conflict recovery preserve drafts across ordinary navigation and
 restart. Canonical one-note-per-verse editing remains inline and works across
 translations. Schema 3 adds notebook storage without converting existing notes.
-The current reader backup exports verse notes and markings; notebooks, draft
-journals and new Study settings/copy provenance are not yet included. Complete
-portability is roadmap step 12. A forced exit before a pending save completes
-can still lose its last uncommitted edit.
+Use **Backup and restore → Complete private backup** to include notebooks,
+draft journals, verse notes, markings, reader preferences, reading position and
+Study choices/copy provenance. **Website-compatible backup** remains the v2
+reader-data format and explicitly omits notebooks. A forced exit before a pending
+save completes can still lose its last uncommitted edit.
+
+## Backup and offline use
+
+Open **Backup and restore** in the navigation drawer. Export prepares a snapshot
+before offering Save file and Copy; Scripture and notebook Markdown also offer
+system sharing where supported. Import selects a bounded JSON file, validates it
+and displays a preview before confirmation. The additive transaction preserves
+conflicting private work with deterministic identities. Backups contain private
+text in readable JSON; choose their destination deliberately.
+
+Open **Set up offline use** to browse public resource catalogues and explicitly
+install a complete Bible, dictionary, commentary or the public-topic collection.
+The manager shows attribution, known size, progress, cancellation, retry and
+installed revision. Each download is verified and indexed before activation; an
+unsuccessful update leaves the previous installation usable. Removing public
+resources preserves private notes, notebooks and independent topic copies.
+Interrupted downloads restart on retry; byte-range resume is not assumed.
+
+Installed Bibles serve the reader and supported reference previews locally.
+Search remains **Online** by default; choose **Installed** for local full-text
+search, whose supported filters are stated in the search panel. Installed Study
+resources use the same native panels and citations. Public caches and downloaded
+corpora are excluded from private backups; reinstall public resources on a new
+device. On the web, resource storage persists in the browser, but application
+files must still be available from the static host. This is not a guarantee of
+cold-starting the website without its application files.
 
 See [API/cache behavior](docs/API_AND_CACHE.md),
 [architecture](docs/ARCHITECTURE.md), [dictionaries](docs/dictionaries.md),
@@ -138,7 +166,7 @@ flutter test
 flutter build apk --debug
 ```
 
-CI runs the same checks, both native Linux reader/Study journeys, actual compiled
+CI runs the same checks, native Linux reader/Study/offline-portability journeys, actual compiled
 browser startup/persistence checks and native-host builds for every target.
 It packages versioned artifacts and checksums. Consult [testing](docs/TESTING.md)
 before merging reader, storage, backup, cache or distribution changes.

@@ -570,6 +570,7 @@ class WebPackager(Packager):
         require(bundle / "assets", directory=True)
         require(bundle / "sqlite3.wasm")
         require(bundle / "drift_worker.dart.js")
+        require(bundle / "offline_bible_worker.dart.js")
         write_json(bundle / "release-metadata.json", {**asdict(self.context.metadata), "base_href": base_href})
         shutil.copy2(require(self.context.repo / "LICENSE"), bundle / "LICENSE")
         archive_zip(bundle, self.output(".zip", "static web application"), self.context.metadata.source_date_epoch, parent=False)

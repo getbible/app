@@ -14,6 +14,7 @@ flutter analyze
 flutter test
 flutter test integration_test/reader_upgrade_test.dart -d <device-id>
 flutter test integration_test/study_workspace_test.dart -d <device-id>
+flutter test integration_test/offline_portability_test.dart -d <device-id>
 ```
 
 Required suites cover serialization, API parsing, passage links, expiry/hash invalidation, offline fallback, Unicode/RTL search, marking overlap removal, annotation translation rules, note merge/order, backup fixtures, migrations, reader widgets, toolbar positioning, inline notes, and accessibility semantics.
@@ -282,3 +283,41 @@ Earlier green builds do not replace a complete passing matrix on the latest
 reviewed commit, including the Android build-mode regeneration repair above.
 No distribution credentials were supplied for this validation, and no signed
 release or store submission is claimed.
+
+## Private portability and installed resources (steps 12–15)
+
+The private-data suite covers complete snapshots and legacy inputs, deterministic
+collisions, repeated imports after local edits, notebook/block/reference and
+recoverable-journal preservation, typed preferences and copy provenance, malformed
+or unsupported input, actual SQLite restart and rollback after a late write
+failure. File adapters and widgets check byte limits, invalid UTF-8, cancellation,
+preview before import, export failures and retained Save/Copy alternatives.
+
+The offline suites exercise the real SQLite store and source-specific installers:
+staged/active isolation, exact-byte integrity, publication races, cancellation,
+interrupted process recovery, live-window leases, logical quota and injected
+physical-write failures. A failed replacement must leave the previous generation
+usable. Removal and cache eviction must preserve private work.
+
+Bible and Study tests index complete published-shape fixtures through actual
+worker code. They close/reopen the database, disable public HTTP and read installed
+chapters, introductions, extended book IDs, references, local search, dictionary
+definitions, commentary ranges and public-topic associations. Unsupported offline
+search filters fail explicitly. Native integration and compiled-browser journeys
+complement these tests; mocked HTTP verifies app behavior, not live-source CORS
+or store approval.
+
+Targeted suites:
+
+```bash
+flutter test test/private_portability_test.dart test/offline_resource_store_test.dart
+flutter test test/installed_bible_test.dart test/installed_study_test.dart
+flutter test integration_test/offline_portability_test.dart -d linux
+```
+
+For device acceptance, export and reimport on each target through its actual file
+picker, test share cancellation and Save/Copy fallback, install/update/remove a
+large resource, restart without public network access, and verify private data
+after a storage-limit failure. Browser tests must include the configured non-root
+base path and both ordinary and isolated hosting. Physical device accessibility,
+suspension/eviction and signing/store acceptance remain steps 16–17.

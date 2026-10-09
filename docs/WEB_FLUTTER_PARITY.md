@@ -20,17 +20,17 @@ Paths in the reference column refer to `getbible/app.getbible.life`.
 
 | Product contract | Reference authority | Flutter boundary / current gate |
 |---|---|---|
-| Bible v3 and hashes | `lib/getbible.ts`, `lib/cache.ts` | `lib/data/api/`, `CachedBibleRepository`, lossless source models; complete installation later. |
+| Bible v3 and hashes | `lib/getbible.ts`, `lib/cache.ts` | `lib/data/api/`, `CachedBibleRepository`, lossless source models and complete installed Bible indexes. |
 | Query v3 previews | `lib/scripture-api.ts`, `app/components/ReferenceModal.tsx` | `QueryRepository`, `GroupedReferenceLookup`, `ReferencePreviewController`, `ReferencePreview`. |
 | Search v3 | `lib/scripture-api.ts`, `app/page.tsx` | `OnlineSearchController`, `ApiSearchRepository`, `SearchPanel`; input debounce differs. |
 | Dictionary/context lookup | `lib/study-api.ts`, `lib/dictionary-lookup.ts`, `StudyPanel.tsx` | Typed repository/controller and native panel; cross-resource confirmed-definition choices remain missing. |
-| Commentary | `lib/study-api.ts`, `StudyPanel.tsx` | Typed sparse-coverage/range/citation workflow; complete offline modules later. |
+| Commentary | `lib/study-api.ts`, `StudyPanel.tsx` | Typed sparse-coverage/range/citation workflow with explicit complete offline module installation. |
 | Topic identity and migration | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | Public topic/copy repositories plus private annotations; unified list and automatic reconciliation remain missing. |
 | Memberships and provenance | `lib/markings.ts`, `BookmarkMenu.tsx` | `annotations.dart`, `AppState`, annotation repository; preservation and full contextual menu are distinct acceptance gates. |
 | Canonical notes | `lib/notes.ts`, `app/page.tsx` | `VerseNote`, annotation repository, inline reader editor. |
 | Rich source annotations | `lib/annotations.ts`, `ScriptureText.tsx` | `ScriptureTextMap`/composer and native text; full source-note/reference surface remains missing. |
 | Reader restoration and URLs | `lib/reader-state.ts`, `app/page.tsx` | `AppState`, settings and passage parser; router/platform integration incomplete. |
-| Markdown and backups | `lib/markdown.ts`, `lib/markings.ts`, `app/page.tsx` | Model/services and clipboard exist; native file workflows and complete notebook portability remain incomplete. |
+| Markdown and backups | `lib/markdown.ts`, `lib/markings.ts`, `app/page.tsx` | Native Save/Copy/share and previewed file import; separate complete private format includes notebooks and retained drafts while website v2 remains compatible. |
 | Daily Scripture | `lib/daily.ts` | Typed resolver and versioned daily cache; alias/range/ownership fixes have regressions awaiting current validation evidence. |
 | Appearance/localization | `lib/appearance.ts`, `lib/i18n.ts`, `public/locales/` | `ReaderPreferences`, `UiStrings`, `assets/locales/`; complete current-message adoption remains incomplete. |
 
@@ -58,7 +58,7 @@ Web backup version 2 now includes additive `source` fields on groups and
 markings. Accepting the version number alone does not establish compatibility.
 Regression fixtures must cover mixed origins, migrated local group IDs,
 collisions, repeated imports and round-trip provenance. Private notebooks and
-durable editor journals remain a separate extension requiring step-12 portability.
+durable editor journals use the separate complete private backup format; website v2 export makes no claim to include them.
 
 ## Scripture and preview rules
 

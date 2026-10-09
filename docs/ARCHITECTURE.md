@@ -136,10 +136,9 @@ Chapter-turn gestures are suppressed while the surface is open, and closing
 restores the underlying focus and scroll.
 
 Unknown translations and invalid/missing references preserve the service's
-error and never substitute a default passage. Offline reference resolution
-from a complete installed Bible is a later capability; this online adapter
-does not silently replace lookup with a cached whole chapter or start a bulk
-download. Dictionary, commentary, topic and notebook callers reuse these typed
+error and never substitute a default passage. An installed Bible resolves supported references through its published discovery
+and chapter indexes. The online adapter remains the fallback for an uninstalled
+Bible; neither path starts a bulk download during an ordinary lookup. Dictionary, commentary, topic and notebook callers reuse these typed
 requests and the same preview component.
 
 ## Study workflow boundaries
@@ -199,11 +198,12 @@ shutdown fails with a storage error and leaves controllers/database usable for
 Retry. Already durable activation conflicts remain recoverable after reopening;
 they do not force a successful document overwrite.
 
-Legacy website-compatible backups still cover canonical verse notes and
-markings, not notebooks, journals or new Study settings/copy provenance. The
-Notes UI identifies the notebook backup limitation, and documentation records
-the complete step-12 portability boundary; reader-data
-replacement/reset and cache deletion preserve notebook tables.
+Website-compatible backups retain their established reader-data contract. The
+separate complete private format includes notebooks, journals and typed Study
+settings/copy provenance. The portability controller drains pending private
+writes, validates the whole import before mutation and refreshes the open
+reader only after a successful transaction. Imported journals remain recoverable
+without silently activating them. Cache deletion preserves private tables.
 
 Shared controllers, typed repositories and platform database/file adapters keep
 the six target platforms on one architecture. Store signing, publication,
@@ -239,3 +239,25 @@ Flutter Web compute alone does not provide background execution.
 This decision establishes implementation boundaries, not a completion claim.
 Current implementation and verification evidence belongs in the existing
 backup, API/cache, feature-parity and testing documents.
+
+## Portability and offline composition
+
+`AppState` owns the portability and offline controllers alongside Study. Native
+file access is behind `TextFileService`; the platform adapter bounds input before
+decoding and reports cancellation independently of failure. Widgets only present
+typed import previews, progress and export actions. The complete backup contract
+is versioned independently of website v2 so an older importer cannot mistake a
+partial restore for full notebook support.
+
+`OfflineResourceStore` owns schema-5 installation generations, documents, search
+rows and interruption leases. Source-specific installers fetch published bulk
+files, validate exact bytes and publication consistency, and stream bounded
+index batches from a native isolate or the bundled browser worker. Only the
+activation transaction changes the visible generation. Installed adapters pin a
+generation and reject changed snapshots; they do not splice different revisions.
+
+Closing the app drains private portability and offline work before closing
+SQLite. Failure to journal a private edit leaves the database and controllers
+available for Retry. Closing an offline panel alone does not cancel a requested
+installation. Ordinary startup reads installed metadata locally and makes no
+catalogue or bulk-download request.

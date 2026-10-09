@@ -133,9 +133,30 @@ tests use deterministic HTTP fixtures; public contracts and real downloaded
 resource documents are checked separately. Neither replaces physical-device
 gestures, assistive technology, clipboard, process suspension or browser-runtime
 CORS QA. After an integration run, use the normal production `flutter build`
-command, without an integration-test entry point. CI restores dependencies once
-with `flutter pub get --enforce-lockfile`, then uses `--no-pub`; the production
-build still regenerates plugin registration without the integration-test plugin.
+command, without an integration-test entry point or `--no-pub`. CI first validates
+dependencies with `flutter pub get --enforce-lockfile`, then permits each build's
+normal platform preparation. Tests and analysis may reuse that dependency
+resolution with `--no-pub`; production builds must regenerate their native tooling
+for the selected build mode.
+
+In pinned Flutter 3.44.6, `FlutterCommand.regeneratePlatformSpecificToolingIfApplicable`
+returns early when `--no-pub` is set. Standalone `flutter pub get` generates
+platform registrants with `releaseMode: false`, while `injectPlugins` filters
+development-only plugins for supported release targets. Android's Gradle plugin
+separately excludes those native dependencies from release variants. Skipping
+regeneration can therefore leave an `integration_test` Java registration whose
+native class is absent from the release classpath. The debug APK can pass while
+the following release APK fails. The workflow now exercises the complete
+debug-APK → release-APK → release-AAB sequence with normal build preparation.
+Do not repair this by editing generated registrants, deleting the integration
+test dependency or adding test code to release dependencies. Apple plugin
+filtering differs in this SDK; a successful build does not establish that every
+platform omits all development-only native plugins.
+
+The SDK source documents this behavior in
+[`runner/flutter_command.dart`](https://github.com/flutter/flutter/blob/3.44.6/packages/flutter_tools/lib/src/runner/flutter_command.dart),
+[`commands/packages.dart`](https://github.com/flutter/flutter/blob/3.44.6/packages/flutter_tools/lib/src/commands/packages.dart)
+and [`flutter_plugins.dart`](https://github.com/flutter/flutter/blob/3.44.6/packages/flutter_tools/lib/src/flutter_plugins.dart).
 
 For manual QA, exercise Study with native selection, 200% text, RTL, a visible
 keyboard and a short landscape viewport. Open a notebook reference preview,
@@ -243,3 +264,21 @@ The source-backed [October parity audit](PARITY_AUDIT_2026-10.md) records curren
 reference behavior and outstanding product gaps. New daily-reference and bookmark
 preservation suites target previously untested failures, including a full
 schema-3-to-4 SQLite migration and current website provenance round trips.
+
+## Recorded parity and distribution repair validation
+
+The repair increment passed 298 Flutter unit/widget tests and 55 Python checks
+(42 release/packaging checks and 13 development-environment checks), with clean
+Dart formatting and analysis. The real compiled Web application passed its
+reader/private-note persistence journey under both ordinary and isolated hosting
+locally and in CI. Local Linux release compilation, archive/Debian packaging,
+checksums and Debian installation also passed. This worker's display access
+prevented local native UI execution; the Linux reader and Study journeys passed
+on the native CI runner.
+
+Current native build, installed-package startup and downloadable-artifact status
+is recorded in [pull request #3 and its checks](https://github.com/getbible/app/pull/3).
+Earlier green builds do not replace a complete passing matrix on the latest
+reviewed commit, including the Android build-mode regeneration repair above.
+No distribution credentials were supplied for this validation, and no signed
+release or store submission is claimed.

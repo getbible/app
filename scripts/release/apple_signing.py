@@ -254,7 +254,7 @@ def configured_project(source: str, team: str, identity: str, profile: str) -> s
             body = re.sub(r'\n\s*"' + name + r'\[sdk=iphoneos\*\]" = [^;]*;', '', body)
             body += f"\n\t\t\t\t{name} = {json.dumps(value)};"
             if name == "CODE_SIGN_IDENTITY":
-                body += f'\n\t\t\t\t"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = {json.dumps(value)};' 
+                body += f'\n\t\t\t\t"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = {json.dumps(value)};'
         replacements += 1
         return match[1] + body + match[3]
 

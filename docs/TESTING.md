@@ -324,12 +324,17 @@ suspension/eviction and signing/store acceptance remain steps 16–17.
 
 ### Recorded local validation for this increment
 
-The steps 12–15 implementation passes all 368 Flutter unit/widget/composed
+The steps 12–15 implementation passes all 369 Flutter unit/widget/composed
 checks, clean Dart formatting/analysis, and 55 Python checks (42 distribution
 checks and 13 developer-environment checks). Release compilation succeeds for
 Linux and Web with the pinned SDK. The complete offline/private portability
 journey and delayed import/download navigation regressions execute through the
 production composition, real workers and SQLite persistence.
+
+A browser CI failure also exposed catalogue filter state loss when download
+progress and installed cards changed the resource list. A regression reproduces
+the failure before the fix and verifies that filter text, selection and keyboard
+focus survive activation, then successfully selects a different resource.
 
 The local native integration runner compiles successfully but cannot establish
 its debug connection in this managed display environment. Supported-host CI

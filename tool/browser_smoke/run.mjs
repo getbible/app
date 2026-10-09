@@ -214,6 +214,11 @@ async function runJourney(browser, { isolated }) {
     await page.getByRole('group', { name: /^King James Version \(English\)\s+Bible[\s\S]*Installed[\s\S]*Verified source revision:/ }).waitFor();
     const bibleWorkers = workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length;
     assert.ok(bibleWorkers > 0, 'Complete installation must execute the bundled web worker');
+    assert.equal(
+      await page.getByRole('textbox', { name: 'Find a resource', exact: true }).inputValue(),
+      'King James Version',
+      'Installing a resource must preserve the visible catalogue filter',
+    );
     await page.getByRole('textbox', { name: 'Find a resource', exact: true }).click();
     await page.locator('input:focus, textarea:focus').fill('Greek lexicon');
     await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary/ }).waitFor();
@@ -268,7 +273,7 @@ async function runJourney(browser, { isolated }) {
       'Installed restart, reading and search must stay within the local database');
     assert.deepEqual(errors, [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
-    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'no browser errors'] };
+    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'no browser errors'] };
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: join(outputDirectory, `${mode}-failure.png`) }).catch(() => {});

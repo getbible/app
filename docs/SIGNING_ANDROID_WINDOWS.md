@@ -45,8 +45,8 @@ The job runs the ordinary release build through the temporary-key wrapper:
 ```bash
 python3 scripts/release/signing_configuration.py --require android
 flutter pub get --enforce-lockfile
-python3 scripts/release/sign_android.py -- flutter build apk --no-pub --release
-python3 scripts/release/sign_android.py -- flutter build appbundle --no-pub --release
+python3 scripts/release/sign_android.py -- flutter build apk --release
+python3 scripts/release/sign_android.py -- flutter build appbundle --release
 ```
 
 These local commands read the version directly from `pubspec.yaml`. CI passes

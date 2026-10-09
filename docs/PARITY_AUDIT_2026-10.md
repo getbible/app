@@ -76,10 +76,11 @@ removes unrelated default-passage/stale-daily substitution. Old first-verse
 caches remain readable and are refreshed before daily use. No private annotation
 or SQLite schema change is needed for that public cache field.
 
-These corrections are source changes in the current branch. Their newly added
-Flutter regressions must pass before they are treated as verified; actual run
-evidence is maintained in [Testing](TESTING.md). The source-baseline findings
-below remain useful history of the differences that triggered the fixes.
+The new regressions pass within the 298-test Flutter suite, including source
+round trips, forward migration, concurrent membership writes and stale-menu
+ownership. Validation evidence and its platform limits are maintained in
+[Testing](TESTING.md). The source-baseline findings below remain useful history
+of the differences that triggered these targeted fixes.
 
 ## Other verified differences
 

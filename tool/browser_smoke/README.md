@@ -8,6 +8,7 @@ From the repository root, with Flutter 3.44.6 and Node 22 or newer:
 
 ```bash
 flutter pub get
+dart compile js -O2 tool/offline_bible_worker.dart -o web/offline_bible_worker.dart.js
 flutter build web --release --no-web-resources-cdn --base-href /flutter/
 npm ci --prefix tool/browser_smoke
 npx --prefix tool/browser_smoke playwright install --with-deps chromium
@@ -28,15 +29,22 @@ Each run covers ordinary static hosting and hosting with COOP/COEP isolation:
 
 1. Load the exact release at the configured deployment base path.
 2. Enable Flutter's existing accessibility semantics and find real Scripture.
-3. Open the verse's context menu, create a private inline note and save it.
-4. Close the page, disable public API responses, and open a fresh page.
-5. Verify the cached passage, saved note and unverified-offline status reappear.
-6. Fail on uncaught browser exceptions, unexpected console errors or missing
+3. Open the verse's context menu, create a private inline note and save it,
+   then reopen the cached passage and note with public APIs disconnected.
+4. Download a complete private backup, check its saved note, then select an
+   edited backup file through the production file picker and confirm its preview.
+5. Browse the catalogue and deliberately install a complete Bible and dictionary
+   through the shipped resource worker; verify both worker branches execute.
+6. Close the page, disable public API responses, and open a fresh page.
+7. Verify the restored note and both installations persist, open a previously
+   unvisited chapter, and search the installed Bible with no public HTTP requests.
+   Search also checks the compact toolbar at a 700-pixel viewport.
+8. Fail on uncaught browser exceptions, unexpected console errors or missing
    release assets.
 
 “Offline” here means public APIs are disconnected while local static files still
-load. This verifies SQLite persistence and cached Scripture after Dart state is
-discarded; it does not claim that a first-ever visit or a service-worker-free
+load. This verifies SQLite persistence, installed Scripture and local search after Dart
+state is discarded; it does not claim that a first-ever visit or a service-worker-free
 static deployment can cold-start without its application files.
 
 The test creates a fresh browser context for each hosting mode. It never touches

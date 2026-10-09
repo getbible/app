@@ -321,3 +321,30 @@ large resource, restart without public network access, and verify private data
 after a storage-limit failure. Browser tests must include the configured non-root
 base path and both ordinary and isolated hosting. Physical device accessibility,
 suspension/eviction and signing/store acceptance remain steps 16–17.
+
+### Recorded local validation for this increment
+
+The steps 12–15 implementation passes all 368 Flutter unit/widget/composed
+checks, clean Dart formatting/analysis, and 55 Python checks (42 distribution
+checks and 13 developer-environment checks). Release compilation succeeds for
+Linux and Web with the pinned SDK. The complete offline/private portability
+journey and delayed import/download navigation regressions execute through the
+production composition, real workers and SQLite persistence.
+
+The local native integration runner compiles successfully but cannot establish
+its debug connection in this managed display environment. Supported-host CI
+remains the required evidence for native UI execution and platform packages.
+Current branch checks and artifacts are attached to
+[pull request #4](https://github.com/getbible/app/pull/4). Only a complete green
+run on its latest commit establishes the batch's platform acceptance.
+
+The actual compiled Chromium application also passes under both ordinary static
+hosting and COOP/COEP isolation at `/flutter/`: note persistence, cached-only
+offline reopening, complete private JSON download and file-picker restore,
+complete Bible and dictionary installation through the shipped worker, then a
+fresh page reading an unvisited chapter and searching installed Scripture with
+zero public HTTP requests. Both runs report no browser exceptions or missing
+assets. These checks include real browser storage and file workflows.
+
+The increment's package version is `1.0.0-alpha.2+3`. Package creation does not
+publish a GitHub release or submit to a store; those remain explicit actions.

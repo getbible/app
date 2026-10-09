@@ -11,7 +11,8 @@
 - [ ] RTL, screen reader, keyboard, reduced motion, contrast, and large text checked.
 - [ ] Small/large screens, rotation, suspension, and process restoration checked.
 - [ ] New Study/Search labels localized and keyboard/screen-reader journeys checked on actual target platforms.
-- [ ] Notebook/draft import/export completed before claiming complete private-data portability (roadmap step 12).
+- [ ] Complete private backup and retained-draft restore verified through the actual file picker on each target; website v2 export is clearly distinguished.
+- [ ] Complete Bible/Study installation, interruption/retry, atomic update/removal and offline restart verified on target devices without changing private work.
 - [ ] Windows, macOS and iOS builds verified on their supported host toolchains; macOS sandbox HTTPS exercised with the network-client entitlement.
 - [ ] Privacy, store listing, screenshots, content rating, and translation attribution approved.
 - [ ] Version/build numbers and release notes updated; tag points to green CI.

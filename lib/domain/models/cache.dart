@@ -44,14 +44,26 @@ final class RepositoryResult<T> {
 }
 
 final class DailyScriptureCache {
-  const DailyScriptureCache({
+  DailyScriptureCache({
     required this.date,
     required this.translation,
     required this.bookName,
     required this.chapter,
     required this.verse,
     required this.cachedAt,
-  });
+    Iterable<int>? verses,
+    this.hasCompleteSelection = true,
+  }) : verses = List<int>.unmodifiable(
+         (<int>{verse, ...?verses}.toList()..sort()),
+       ) {
+    if (date.trim().isEmpty ||
+        bookName.trim().isEmpty ||
+        chapter < 1 ||
+        this.verses.any((int value) => value < 1) ||
+        this.verses.length > 2000) {
+      throw const FormatException('The daily Scripture reference is invalid.');
+    }
+  }
 
   factory DailyScriptureCache.fromJson(Object? value) {
     final JsonMap json = requireJsonMap(value, 'daily Scripture');
@@ -61,6 +73,19 @@ final class DailyScriptureCache {
       bookName: requireString(json, 'bookName'),
       chapter: requireInt(json, 'chapter'),
       verse: requireInt(json, 'verse'),
+      verses: json.containsKey('verses')
+          ? requireJsonList(json['verses'], 'daily verses').map((
+              Object? value,
+            ) {
+              if (value is! int) {
+                throw const FormatException(
+                  'A daily verse must be an integer.',
+                );
+              }
+              return value;
+            })
+          : null,
+      hasCompleteSelection: json.containsKey('verses'),
       cachedAt: DateTime.fromMillisecondsSinceEpoch(
         optionalInt(json, 'cachedAt', DateTime.now().millisecondsSinceEpoch),
         isUtc: true,
@@ -73,6 +98,9 @@ final class DailyScriptureCache {
   final String bookName;
   final int chapter;
   final int verse;
+  final List<int> verses;
+  // Version-one cache values saved only the first verse and must be refreshed.
+  final bool hasCompleteSelection;
   final DateTime cachedAt;
 
   bool isCurrent(DateTime now) {
@@ -117,12 +145,13 @@ final class DailyScriptureCache {
   );
 
   JsonMap toJson() => <String, Object?>{
-    'version': 1,
+    'version': 2,
     'date': date,
     'translation': translation,
     'bookName': bookName,
     'chapter': chapter,
     'verse': verse,
+    'verses': verses,
     'cachedAt': cachedAt.millisecondsSinceEpoch,
   };
 }

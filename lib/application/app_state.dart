@@ -20,6 +20,7 @@ import '../domain/models/search.dart';
 import '../domain/repositories/notebook_repository.dart';
 import '../services/daily_scripture_service.dart';
 import '../services/scripture_text.dart';
+import 'daily_scripture_resolver.dart';
 import 'grouped_reference_lookup.dart';
 import 'online_search_controller.dart';
 import 'study_services.dart';
@@ -106,7 +107,12 @@ final class AppState extends ChangeNotifier {
   UiStrings ui = UiStrings.english;
   bool loading = true;
   String? error;
+  List<int> _dailyVerses = const <int>[];
+
+  /// The complete temporary daily selection; never stored as private markings.
+  List<int> get dailyVerses => _dailyVerses;
   int _passageRequest = 0;
+  int? _dailyRequest;
   Future<void>? _closeFuture;
 
   bool get searchLoading => onlineSearch.isLoading;
@@ -169,44 +175,55 @@ final class AppState extends ChangeNotifier {
     }
   }
 
+  /// Retrying a failed daily lookup must not open the initial reader default.
+  Future<void> retryReading() => _dailyRequest == _passageRequest
+      ? openDailyScripture()
+      : loadPassage(passage);
+
   Future<void> openDailyScripture() async {
-    final DateTime now = DateTime.now();
-    DailyScriptureCache? daily = await settings.getDailyScripture();
-    if (daily == null || !daily.isCurrent(now)) {
+    final int request = ++_passageRequest;
+    _dailyRequest = request;
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final DateTime now = DateTime.now();
+      DailyScriptureCache? daily;
       try {
-        daily = parseDailyScripture(await bibles.getDailyScripture(), now);
-        await settings.saveDailyScripture(daily);
+        daily = await settings.getDailyScripture();
       } catch (_) {
-        if (daily == null) {
-          await loadPassage(
-            const Passage(translation: 'kjv', book: 49, chapter: 5),
-          );
-          return;
+        // A corrupt or unreadable public cache is a cache miss, not a reason
+        // to redirect the reader to a different passage.
+      }
+      if (request != _passageRequest) return;
+      if (daily == null ||
+          !daily.isCurrent(now) ||
+          !daily.hasCompleteSelection) {
+        daily = parseDailyScripture(await bibles.getDailyScripture(), now);
+        if (request != _passageRequest) return;
+        try {
+          await settings.saveDailyScripture(daily);
+        } catch (_) {
+          // Reading a valid public feed does not depend on cache persistence.
         }
       }
+      if (request != _passageRequest) return;
+      final RepositoryResult<List<BibleBook>> bookResult = await bibles
+          .getBooks('kjv');
+      if (request != _passageRequest) return;
+      final Passage target = await DailyScriptureResolver(
+        referenceLookup,
+      ).resolve(daily, bookResult.data);
+      if (request != _passageRequest) return;
+      await _loadPassage(target, request, dailyVerses: daily.verses);
+    } catch (exception) {
+      if (request == _passageRequest) error = exception.toString();
+    } finally {
+      if (request == _passageRequest && loading) {
+        loading = false;
+        notifyListeners();
+      }
     }
-    final DailyScriptureCache resolvedDaily = daily;
-    final RepositoryResult<List<BibleBook>> bookResult = await bibles.getBooks(
-      'kjv',
-    );
-    final String dailyBookName = resolvedDaily.bookName;
-    final BibleBook? book = bookResult.data
-        .where((BibleBook item) => bookMatchesSlug(item.name, dailyBookName))
-        .firstOrNull;
-    if (book == null) {
-      await loadPassage(
-        const Passage(translation: 'kjv', book: 49, chapter: 5),
-      );
-      return;
-    }
-    await loadPassage(
-      Passage(
-        translation: 'kjv',
-        book: book.number,
-        chapter: resolvedDaily.chapter,
-        verse: resolvedDaily.verse,
-      ),
-    );
   }
 
   Future<void> loadPassage(Passage next, {bool Function()? ownsRequest}) =>
@@ -216,6 +233,7 @@ final class AppState extends ChangeNotifier {
     Passage next,
     int request, {
     bool Function()? ownsRequest,
+    List<int> dailyVerses = const <int>[],
   }) async {
     loading = true;
     error = null;
@@ -252,6 +270,15 @@ final class AppState extends ChangeNotifier {
           'That verse is not available in this translation.',
         );
       }
+      if (dailyVerses.any(
+        (int verse) =>
+            !chapterResult.data.verses.any((Verse item) => item.verse == verse),
+      )) {
+        throw const FormatException(
+          'Some daily Scripture verses are unavailable in KJV. '
+          'Your reading position has been kept.',
+        );
+      }
       final List<Marking> nextMarkings = await annotations
           .getMarkingsForPassage(next);
       final List<VerseNote> nextNotes = await annotations.getNotesForPassage(
@@ -271,6 +298,7 @@ final class AppState extends ChangeNotifier {
       if (passage.translation != next.translation) onlineSearch.clear();
       passage = next;
       current = chapterResult.data;
+      _dailyVerses = List<int>.unmodifiable(dailyVerses);
       ui = nextUi;
       freshness = chapterResult.freshness;
       legacyScripture = chapterResult.isLegacy;
@@ -395,6 +423,7 @@ final class AppState extends ChangeNotifier {
       sortOrder: existing?.sortOrder ?? groups.length,
       isStarter: existing?.isStarter ?? false,
       updatedAt: DateTime.now().toUtc(),
+      source: existing?.source,
     );
     await annotations.saveGroup(group);
     groups = await annotations.getGroups();
@@ -420,9 +449,19 @@ final class AppState extends ChangeNotifier {
     String reference,
     String groupId,
   ) async {
-    final List<Marking> remove = markings
-        .where((Marking item) => item.verse == verse.verse && item.isWholeVerse)
-        .toList();
+    // A verse can belong to several topics and can independently retain a
+    // public membership in the same group. Adding a personal membership must
+    // never recolor by deleting other topic associations or private copies.
+    if (markings.any(
+      (Marking item) =>
+          item.verse == verse.verse &&
+          item.isWholeVerse &&
+          !item.isSharedBookmark &&
+          item.groupId == groupId,
+    )) {
+      await selectActiveGroup(groupId);
+      return;
+    }
     final Marking add = Marking(
       id: const Uuid().v4(),
       passage: passage,
@@ -434,7 +473,7 @@ final class AppState extends ChangeNotifier {
       groupId: groupId,
       createdAt: DateTime.now().toUtc(),
     );
-    await annotations.replaceMarkings(remove, <Marking>[add]);
+    await annotations.saveMarking(add);
     await selectActiveGroup(groupId);
     markings = await annotations.getMarkingsForPassage(passage);
     savedMarkings = await annotations.getMarkings();
@@ -449,6 +488,16 @@ final class AppState extends ChangeNotifier {
     String groupId,
   ) async {
     if (start < 0 || end <= start || end > verse.text.length) return;
+    if (markings.any(
+      (Marking item) =>
+          item.verse == verse.verse &&
+          item.start == start &&
+          item.end == end &&
+          item.groupId == groupId,
+    )) {
+      await selectActiveGroup(groupId);
+      return;
+    }
     await annotations.saveMarking(
       Marking(
         id: const Uuid().v4(),
@@ -542,9 +591,17 @@ final class AppState extends ChangeNotifier {
     if (request == _passageRequest && passage == origin) markings = visible;
   }
 
-  Future<void> removeWholeVerseMarking(int verse) async {
+  /// Removes only personal memberships, optionally in one chosen topic. A
+  /// public association is removable explicitly from the saved-markings list.
+  Future<void> removeWholeVerseMarking(int verse, {String? groupId}) async {
     final List<Marking> remove = markings
-        .where((Marking item) => item.verse == verse && item.isWholeVerse)
+        .where(
+          (Marking item) =>
+              item.verse == verse &&
+              item.isWholeVerse &&
+              !item.isSharedBookmark &&
+              (groupId == null || item.groupId == groupId),
+        )
         .toList();
     await annotations.replaceMarkings(remove, const <Marking>[]);
     markings = await annotations.getMarkingsForPassage(passage);

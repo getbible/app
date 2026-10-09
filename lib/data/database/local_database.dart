@@ -10,7 +10,7 @@ import '../../domain/models/notebook.dart';
 import '../../domain/models/passage.dart';
 import 'database_connection.dart';
 
-const int localDatabaseSchemaVersion = 3;
+const int localDatabaseSchemaVersion = 4;
 
 final class CacheRecord {
   const CacheRecord({
@@ -153,16 +153,16 @@ final class LocalDatabase {
 
   Future<List<MarkingGroup>> getGroups() async {
     final List<Map<String, Object?>> rows = await _executor.runSelect(
-      'SELECT id, name, color, sort_order, is_starter, updated_at FROM marking_groups ORDER BY sort_order, name COLLATE NOCASE',
+      'SELECT id, name, color, sort_order, is_starter, updated_at, source_json FROM marking_groups ORDER BY sort_order, name COLLATE NOCASE',
       const <Object?>[],
     );
     return rows.map(_groupFromRow).toList(growable: false);
   }
 
   Future<void> saveGroup(MarkingGroup group) => _executor.runCustom(
-    'INSERT INTO marking_groups(id, name, color, sort_order, is_starter, updated_at) '
-    'VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, '
-    'color=excluded.color, sort_order=excluded.sort_order, updated_at=excluded.updated_at',
+    'INSERT INTO marking_groups(id, name, color, sort_order, is_starter, updated_at, source_json) '
+    'VALUES(?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, '
+    'color=excluded.color, sort_order=excluded.sort_order, updated_at=excluded.updated_at, source_json=excluded.source_json',
     <Object?>[
       group.id,
       group.name,
@@ -170,6 +170,7 @@ final class LocalDatabase {
       group.sortOrder,
       group.isStarter ? 1 : 0,
       group.updatedAt.millisecondsSinceEpoch,
+      group.source == null ? null : jsonEncode(group.source!.toJson()),
     ],
   );
 
@@ -200,7 +201,7 @@ final class LocalDatabase {
     }
     final List<Map<String, Object?>> rows = await _executor.runSelect(
       'SELECT id, translation, book_nr, chapter_nr, verse_nr, start_offset, end_offset, '
-      'quote, reference, group_id, created_at FROM markings $where '
+      'quote, reference, group_id, created_at, source_json FROM markings $where '
       'ORDER BY book_nr, chapter_nr, verse_nr, COALESCE(start_offset, -1), created_at',
       args,
     );
@@ -652,6 +653,7 @@ final class _DatabaseUser extends QueryExecutorUser {
         if (details.wasCreated || from < 1) await _createVersionOne(executor);
         if (from < 2) await _migrateVersionTwo(executor);
         if (from < 3) await _migrateVersionThree(executor);
+        if (from < 4) await _migrateVersionFour(executor);
         await executor.runCustom(
           'PRAGMA user_version = $localDatabaseSchemaVersion',
         );
@@ -662,6 +664,16 @@ final class _DatabaseUser extends QueryExecutorUser {
       }
     }
   }
+}
+
+/// Additive provenance columns leave all previous annotation values untouched.
+/// Legacy deterministic source IDs are recognized by the domain model; other
+/// existing records remain private rather than guessing from a group's label.
+Future<void> _migrateVersionFour(QueryExecutor executor) async {
+  await executor.runCustom(
+    'ALTER TABLE marking_groups ADD COLUMN source_json TEXT',
+  );
+  await executor.runCustom('ALTER TABLE markings ADD COLUMN source_json TEXT');
 }
 
 Future<void> _migrateVersionThree(QueryExecutor executor) async {
@@ -731,6 +743,7 @@ MarkingGroup _groupFromRow(Map<String, Object?> row) => MarkingGroup(
     row['updated_at']! as int,
     isUtc: true,
   ),
+  source: _bookmarkSourceFromRow(row),
 );
 
 Marking _markingFromRow(Map<String, Object?> row) => Marking(
@@ -750,7 +763,13 @@ Marking _markingFromRow(Map<String, Object?> row) => Marking(
     row['created_at']! as int,
     isUtc: true,
   ),
+  source: _bookmarkSourceFromRow(row),
 );
+
+SharedBookmarkSource? _bookmarkSourceFromRow(Map<String, Object?> row) =>
+    row['source_json'] == null
+    ? null
+    : SharedBookmarkSource.fromJson(jsonDecode(row['source_json']! as String));
 
 VerseNote _noteFromRow(Map<String, Object?> row) => VerseNote(
   id: row['id']! as String,
@@ -776,7 +795,7 @@ Future<void> _saveGroup(
   QueryExecutor executor,
   MarkingGroup group,
 ) => executor.runCustom(
-  'INSERT INTO marking_groups(id, name, color, sort_order, is_starter, updated_at) VALUES(?, ?, ?, ?, ?, ?)',
+  'INSERT INTO marking_groups(id, name, color, sort_order, is_starter, updated_at, source_json) VALUES(?, ?, ?, ?, ?, ?, ?)',
   <Object?>[
     group.id,
     group.name,
@@ -784,6 +803,7 @@ Future<void> _saveGroup(
     group.sortOrder,
     group.isStarter ? 1 : 0,
     group.updatedAt.millisecondsSinceEpoch,
+    group.source == null ? null : jsonEncode(group.source!.toJson()),
   ],
 );
 
@@ -791,9 +811,9 @@ Future<void> _saveMarking(
   QueryExecutor executor,
   Marking marking,
 ) => executor.runCustom(
-  'INSERT INTO markings(id, translation, book_nr, chapter_nr, verse_nr, start_offset, end_offset, quote, reference, group_id, created_at) '
-  'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET group_id=excluded.group_id, '
-  'start_offset=excluded.start_offset, end_offset=excluded.end_offset, quote=excluded.quote, reference=excluded.reference',
+  'INSERT INTO markings(id, translation, book_nr, chapter_nr, verse_nr, start_offset, end_offset, quote, reference, group_id, created_at, source_json) '
+  'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET group_id=excluded.group_id, '
+  'start_offset=excluded.start_offset, end_offset=excluded.end_offset, quote=excluded.quote, reference=excluded.reference, source_json=excluded.source_json',
   <Object?>[
     marking.id,
     marking.passage.translation,
@@ -806,6 +826,9 @@ Future<void> _saveMarking(
     marking.reference,
     marking.groupId,
     marking.createdAt.millisecondsSinceEpoch,
+    marking.sharedSource == null
+        ? null
+        : jsonEncode(marking.sharedSource!.toJson()),
   ],
 );
 

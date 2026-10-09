@@ -114,19 +114,7 @@ List<Marking> mergeMarkings(List<Marking> current, List<Marking> imported) {
     while (ids.contains(id)) {
       id = '${item.id}-imported-${suffix++}';
     }
-    final Marking next = id == item.id
-        ? item
-        : Marking(
-            id: id,
-            passage: item.passage,
-            verse: item.verse,
-            start: item.start,
-            end: item.end,
-            quote: item.quote,
-            reference: item.reference,
-            groupId: item.groupId,
-            createdAt: item.createdAt,
-          );
+    final Marking next = id == item.id ? item : item.copyWith(id: id);
     merged.add(next);
     identities.add(next.identity);
     ids.add(next.id);
@@ -171,11 +159,21 @@ BackupData mergeBackupData(BackupData current, BackupData imported) {
   final Map<String, String> importedGroupIds = <String, String>{};
 
   for (final MarkingGroup importedGroup in imported.groups) {
+    // Labels and colors are user-editable, so equality never makes unrelated
+    // stable group IDs interchangeable. Reuse only the original ID or a prior
+    // collision-renamed copy of this same imported identity.
+    final String collisionPrefix = '${importedGroup.id}-imported-';
     final MarkingGroup? identical = groups
         .where(
           (MarkingGroup item) =>
+              (item.id == importedGroup.id ||
+                  (item.id.startsWith(collisionPrefix) &&
+                      RegExp(
+                        r'^[1-9][0-9]*$',
+                      ).hasMatch(item.id.substring(collisionPrefix.length)))) &&
               item.name == importedGroup.name &&
-              item.color.toUpperCase() == importedGroup.color.toUpperCase(),
+              item.color.toUpperCase() == importedGroup.color.toUpperCase() &&
+              item.source?.topicId == importedGroup.source?.topicId,
         )
         .firstOrNull;
     if (identical != null) {

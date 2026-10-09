@@ -160,3 +160,18 @@ Official references:
 - [Browser setup and manual launching](https://docs.flutter.dev/platform-integration/web/setup)
 - [Build and serve web output](https://docs.flutter.dev/deployment/web)
 - [Git for Windows long-path checkout setting](https://github.com/git-for-windows/build-extra/blob/main/ReleaseNotes.md#known-issues)
+
+## Rebuilding the browser installation worker
+
+The checked-in worker supports complete Bible and Study indexing outside the
+Flutter UI thread. After changing any offline index processor or worker source,
+rebuild it with the pinned SDK before running or building the browser target:
+
+```bash
+flutter pub get --enforce-lockfile
+dart compile js -O2 tool/offline_bible_worker.dart -o web/offline_bible_worker.dart.js
+```
+
+CI rebuilds both the database and offline-index workers. Web packaging refuses
+a bundle missing either worker. Serve the entire output at its configured base
+path; copying only `index.html` and `main.dart.js` is insufficient.

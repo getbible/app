@@ -15,6 +15,7 @@ dependencies:
       url: https://github.com/simolus3/drift.git
       ref: 0936361b756809ccac7021c4663d1703885edc90
       path: drift
+  file_selector: 1.1.0
   flutter:
     sdk: flutter
   flutter_localizations:

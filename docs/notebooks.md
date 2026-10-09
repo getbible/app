@@ -65,9 +65,13 @@ Notebook text is never sent to GetBible services. Reference preview sends only
 the explicitly selected Scripture reference; opening a citation loads only that
 passage. Canonical notes and notebooks remain separate private stores.
 
-The current website-compatible v1/v2 backup contract includes canonical verse
-notes and markings **but does not include notebooks**. The Notes surface states
-this limitation. Notebook portability is roadmap step 12. Legacy reader-data
+The website-compatible v1/v2 backup contract includes canonical verse notes
+and markings **but does not include notebooks**. Choose **Complete private
+backup** to preserve notebook documents, ordered blocks, quotations, independent
+draft journals and selection alongside reader data. Import previews the file and
+requires an explicit merge; conflicting documents/journals are retained as
+separate private work. Notebook Markdown is a readable export, not a restorable
+backup. See [Data and backups](DATA_AND_BACKUPS.md). Legacy reader-data
 replacement/reset and Scripture/download cache deletion preserve notebook tables.
 Notebook/block deletion requires an explicit confirmation in Notes.
 

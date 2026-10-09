@@ -59,6 +59,7 @@ class PackagingTests(unittest.TestCase):
             "index.html": '<html><base href="/flutter/"></html>',
             "flutter_bootstrap.js": "start();", "main.dart.js": "main();",
             "drift_worker.dart.js": "worker();", "sqlite3.wasm": "wasm fixture",
+            "offline_bible_worker.dart.js": "offlineWorker();",
         }.items():
             (path / name).write_text(content, encoding="utf-8")
         return path
@@ -128,6 +129,7 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("index.html", package.namelist())
             self.assertIn("sqlite3.wasm", package.namelist())
             self.assertIn("drift_worker.dart.js", package.namelist())
+            self.assertIn("offline_bible_worker.dart.js", package.namelist())
             self.assertEqual(json.loads(package.read("release-metadata.json"))["version"], "1.2.3+42")
         self.verify_checksums(output)
         self.assertFalse((source / "release-metadata.json").exists())

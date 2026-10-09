@@ -69,7 +69,7 @@ an existing release tag.
 | iOS / iPadOS device | macOS / arm64 | Unsigned device `.app.zip` for build validation | App Store distribution `.ipa` |
 | iOS / iPadOS simulator | macOS / simulator architecture | Debug simulator `.app.zip` | Signing not required |
 | Android phone / tablet | Ubuntu / bundled Android architectures | Installable debug APK, unsigned release APK and AAB | Signed release APK and AAB |
-| Chrome / Web | Ubuntu / browser | Static ZIP with local CanvasKit, SQLite WASM and database worker | No package signing key required; host over HTTPS |
+| Chrome / Web | Ubuntu / browser | Static ZIP with local CanvasKit, SQLite WASM and database and offline-index workers | No package signing key required; host over HTTPS |
 
 Phone and tablet share the Android application. iPhone and iPad share the iOS
 application; they are not separate packages. Each package has a JSON manifest
@@ -127,10 +127,13 @@ output filenames fail clearly. Use a new output directory for a deliberate rebui
 
 ## Validation and limits
 
-CI includes formatting, analysis, unit/widget/migration tests, both native Linux
-reader/Study journeys, and a browser launch of the actual compiled Web application.
+CI includes formatting, analysis, unit/widget/migration tests, native Linux
+reader, Study and offline-portability journeys, and a browser launch of the actual compiled Web application.
 Browser fixtures make API responses deterministic while exercising the real
-SQLite WASM/worker and persistence after public requests become unavailable.
+SQLite WASM, both workers and persistence after public requests become unavailable.
+The static package includes `offline_bible_worker.dart.js`; CI rebuilds it from
+`tool/offline_bible_worker.dart` before compilation and packaging. Missing worker
+assets fail packaging rather than surfacing as a broken install after deployment.
 Linux installs its actual Debian package and launches the installed binary.
 Windows installs its generated EXE into a temporary directory and launches that
 installed application; macOS extracts its generated ZIP and launches its app.
@@ -138,5 +141,5 @@ Desktop process startup checks complement feature integration tests; they do
 not establish complete assistive-technology or device behavior.
 
 Physical-device gestures, screen readers, store acceptance and the remaining
-parity/offline/portability work remain listed in the release checklist. Successful
+integrated parity, localization and device-validation work remain listed in the release checklist. Successful
 packaging provides downloadable builds without declaring those product gates complete.

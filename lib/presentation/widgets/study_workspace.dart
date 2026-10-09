@@ -25,6 +25,7 @@ class StudyWorkspace extends StatefulWidget {
     required this.panelBuilder,
     required this.onClose,
     required this.onSearchSelection,
+    this.onTabChanged,
   });
 
   final StudyContext context;
@@ -32,6 +33,7 @@ class StudyWorkspace extends StatefulWidget {
   final Widget Function(BuildContext, StudyTab) panelBuilder;
   final VoidCallback onClose;
   final VoidCallback? onSearchSelection;
+  final ValueChanged<StudyTab>? onTabChanged;
 
   @override
   State<StudyWorkspace> createState() => _StudyWorkspaceState();
@@ -98,7 +100,10 @@ class _StudyWorkspaceState extends State<StudyWorkspace> {
                                   ),
                               ],
                               onChanged: (StudyTab? tab) {
-                                if (tab != null) setState(() => _tab = tab);
+                                if (tab != null) {
+                                  setState(() => _tab = tab);
+                                  widget.onTabChanged?.call(tab);
+                                }
                               },
                             ),
                           ),

@@ -384,8 +384,9 @@ bool _hasOnlyUntouchedStarterGroups(PrivateBackup snapshot) {
   if (snapshot.reader.markings.isNotEmpty ||
       snapshot.reader.notes.isNotEmpty ||
       snapshot.notebooks.isNotEmpty ||
-      snapshot.drafts.isNotEmpty)
+      snapshot.drafts.isNotEmpty) {
     return false;
+  }
   final Map<String, MarkingGroup> defaults = <String, MarkingGroup>{
     for (final MarkingGroup item in starterMarkingGroups()) item.id: item,
   };

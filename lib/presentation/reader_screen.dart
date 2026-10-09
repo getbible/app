@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../application/app_state.dart';
 import '../application/reference_preview_controller.dart';
+import '../data/platform/platform_text_file_service.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
@@ -25,6 +26,8 @@ import 'widgets/dictionary_panel.dart';
 import 'widgets/my_annotations_panel.dart';
 import 'widgets/native_scripture_text.dart';
 import 'widgets/notes_panel.dart';
+import 'widgets/offline_setup_panel.dart';
+import 'widgets/portability_panel.dart';
 import 'widgets/reader_translation_field.dart';
 import 'widgets/reference_preview.dart';
 import 'widgets/scripture_editorial.dart';
@@ -34,6 +37,7 @@ import 'widgets/scripture_verification_badge.dart';
 import 'widgets/scripture_verse_text.dart';
 import 'widgets/search_panel.dart';
 import 'widgets/study_workspace.dart';
+import 'widgets/text_export_actions.dart';
 import 'widgets/topics_panel.dart';
 
 class ReaderScreen extends StatefulWidget {
@@ -94,6 +98,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         drawer: _ReaderDrawer(
           state: state,
           onReferencePreview: _showReferencePreview,
+          onPortability: _showPortability,
+          onOffline: _showOffline,
           navigationEnabled: _editingNote == null && !_openingDaily,
         ),
 
@@ -363,6 +369,89 @@ class _ReaderScreenState extends State<ReaderScreen> {
         builder: (BuildContext context) =>
             _ScriptureShareDialog(state: state, initialVerse: null),
       );
+
+  Future<void> _showPortability() async {
+    if (_editingNote != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Save or close the verse note before backing up or importing private data.',
+          ),
+        ),
+      );
+      return;
+    }
+    final AppState state = context.read<AppState>();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => AnimatedBuilder(
+          animation: state.portability,
+          builder: (context, _) => PopScope<void>(
+            canPop: !state.portability.busy,
+            child: Scaffold(
+              appBar: AppBar(
+                title: const Text('Backup and restore'),
+                automaticallyImplyLeading: !state.portability.busy,
+              ),
+              body: SafeArea(
+                child: PortabilityPanel(
+                  controller: state.portability,
+                  files: PlatformTextFileService(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (mounted && state.portability.importResult != null) {
+      await _refreshVisibleStudy(state);
+    }
+  }
+
+  Future<void> _showOffline() async {
+    final AppState state = context.read<AppState>();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          body: OfflineSetupPanel(
+            controller: state.offline,
+            onClose: () => Navigator.of(context).pop(),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    try {
+      await state.refreshInstalledResourceChoices();
+      if (mounted) await _refreshVisibleStudy(state);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Resource choices could not refresh. Reopen the reader to retry.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _refreshVisibleStudy(AppState state) async {
+    final StudyContext? captured = _studyContext;
+    if (captured == null) return;
+    switch (_studyTab) {
+      case StudyTab.dictionary:
+        await state.study.dictionary.open(captured);
+      case StudyTab.commentary:
+        await state.study.commentary.open(captured);
+      case StudyTab.topics:
+        await state.study.topics.initialize(captured);
+      default:
+        break;
+    }
+  }
 
   Future<void> _scrollToVerse(int? verse) async {
     if (verse == null) return;
@@ -853,6 +942,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return StudyWorkspace(
       context: captured,
       initialTab: _studyTab,
+      onTabChanged: (tab) => _studyTab = tab,
       onClose: _closeStudy,
       onSearchSelection: captured.selectedText == null
           ? null
@@ -884,17 +974,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
           controller: state.study.dictionary,
           context: captured,
           onPreviewReference: _showReferencePreview,
+          onSetUpOffline: () => unawaited(_showOffline()),
         ),
         StudyTab.commentary => CommentaryPanel(
           controller: state.study.commentary,
           context: captured,
           onPreviewReference: _showReferencePreview,
+          onSetUpOffline: () => unawaited(_showOffline()),
         ),
         StudyTab.topics => TopicsPanel(
           controller: state.study.topics,
           context: captured,
           onPreviewReference: _showReferencePreview,
           onPrivateCopyCommitted: state.refreshAnnotations,
+          onSetUpOffline: () => unawaited(_showOffline()),
         ),
         StudyTab.notes => NotesPanel(
           controller: state.study.notebooks,
@@ -1845,11 +1938,15 @@ class _ReaderDrawer extends StatelessWidget {
     required this.state,
     required this.onReferencePreview,
     required this.navigationEnabled,
+    required this.onPortability,
+    required this.onOffline,
   });
 
   final AppState state;
   final Future<void> Function() onReferencePreview;
   final bool navigationEnabled;
+  final Future<void> Function() onPortability;
+  final Future<void> Function() onOffline;
 
   @override
   Widget build(BuildContext context) => Drawer(
@@ -1948,6 +2045,28 @@ class _ReaderDrawer extends StatelessWidget {
               unawaited(onReferencePreview());
             },
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('Backup and restore'),
+            onTap: navigationEnabled
+                ? () {
+                    Navigator.of(context).pop();
+                    unawaited(onPortability());
+                  }
+                : null,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.download_for_offline_outlined),
+            title: const Text('Set up offline use'),
+            onTap: () {
+              Navigator.of(context).pop();
+              unawaited(onOffline());
+            },
+          ),
+          if (state.resourceChoicesError != null)
+            Text(state.resourceChoicesError!),
           const Divider(height: 32),
           const Text(
             'Appearance',
@@ -2270,7 +2389,6 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
   late int _first;
   late int _last;
   bool _markdown = false;
-  bool _copied = false;
 
   BibleChapter get _chapter => widget.state.current!;
   Translation get _translation => widget.state.currentTranslation!;
@@ -2339,7 +2457,6 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
                 onChanged: (RangeValues value) => setState(() {
                   _first = value.start.round();
                   _last = value.end.round();
-                  _copied = false;
                 }),
               ),
             ],
@@ -2354,11 +2471,15 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
               ),
               child: SingleChildScrollView(child: SelectableText(_value)),
             ),
-            if (_copied)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('Copied to clipboard.', textAlign: TextAlign.end),
-              ),
+            const SizedBox(height: 12),
+            TextExportActions(
+              text: _value,
+              filename:
+                  'getbible-${_translation.abbreviation}-${_chapter.bookNumber}-${_chapter.chapter}.${_markdown ? 'md' : 'txt'}',
+              mimeType: _markdown ? 'text/markdown' : 'text/plain',
+              subject: '${_chapter.bookName} ${_chapter.chapter}',
+              files: PlatformTextFileService(),
+            ),
           ],
         ),
       ),
@@ -2367,14 +2488,6 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
       TextButton(
         onPressed: () => Navigator.of(context).pop(),
         child: Text(widget.state.ui('cancel')),
-      ),
-      FilledButton.icon(
-        onPressed: () async {
-          await Clipboard.setData(ClipboardData(text: _value));
-          if (mounted) setState(() => _copied = true);
-        },
-        icon: const Icon(Icons.copy),
-        label: Text(widget.state.ui('copy')),
       ),
     ],
   );

@@ -20,8 +20,11 @@ Known static assets and friendly passage navigation can then reopen without a
 network connection. A missing cached asset is repaired only with bytes matching
 that active revision; a newer hosted bundle cannot be mixed into an older app.
 The worker never caches API responses, backup/import data or database writes.
-Complete Bible and Study content continues to require deliberate installation
-through the application, independently of these automatically cached app files.
+Bible and Study content is stored separately in verified database generations.
+The application automatically queues its selected Bible and catalogue-discovered
+dictionaries/commentaries, subject to per-module exclusions. The complete
+bookmarks corpus remains manual opt-in. These downloads are independent of the
+automatically cached application files.
 
 Updates do not force activation or reload open tabs. A new verified generation
 waits until the previous application's tabs close, preserving open private
@@ -44,7 +47,7 @@ The Bible root is `https://api.getbible.net/v3`. `ApiConfiguration` permits inde
 | Book content | `/{translation}/{book}.json` | Preserve book titles/introduction and nested intro-only records. |
 | Chapter | `/{translation}/{book}/{chapter}.json` | Save original UTF-8 JSON after byte verification. |
 | Source SHA-1 | Corresponding `.sha` sibling | Check before download and again before activation. |
-| Full translation | `/{translation}.json` | Deliberate corpus download; verify its own `.sha` and exact bytes. Online Search does not request this resource. |
+| Full translation | `/{translation}.json` | Background acquisition for the selected Bible; verify its own `.sha` and exact bytes. Other translations are not automatically downloaded. |
 
 Bible routes have no query parameters. Book IDs are positive source identifiers, including large deterministic IDs; there is no fixed 66-book limit. Verse text remains exactly as received, including whitespace, line endings and UTF-16 code-unit positions. Models retain optional lexical tokens, spans, source attributes, editorial entries, titles, introductions and unknown additive fields. Static and nested chapters share the same verse/enrichment adapters. Known malformed enrichment is rejected during parsing before activation.
 
@@ -58,7 +61,7 @@ Catalogue hash changes invalidate only the exact resource or its delimiter-separ
 
 Introduction-only nested records have no standalone chapter file. Chapter discovery merges their published nested chapter IDs with the normal index. Book-level titles/introductions appear as an internal introduction navigation node with chapter 0 and no verse. This is a reader sentinel, never a published Bible chapter or an invented Scripture coordinate: the repository reads and verifies the book representation and does not request `/0.json` or `/0.sha`. An ordinary chapter index remains usable when optional book metadata is unavailable.
 
-Ordinary native book decoding uses a Flutter compute worker. Complete deliberate
+Ordinary native book decoding uses a Flutter compute worker. Complete
 installation uses a separate native isolate or a real Web Worker on browsers.
 The same typed processor validates the exact bulk bytes, preserves rich source
 metadata and emits bounded chapter/index/verse batches. Each batch waits for
@@ -73,8 +76,9 @@ Installed generation records hold translation metadata, dynamic book/chapter
 indexes, original rich chapters and normalized search candidates separately
 from opportunistic caches. `InstalledBibleRepository` supports cold-start
 translation/book/chapter discovery and reading with no HTTP, including source
-book IDs beyond 66 and introduction-only navigation. Clearing Scripture caches
-preserves these installations; only explicit resource removal uninstalls them.
+book IDs beyond 66 and introduction-only navigation. Narrow Scripture-cache
+cleanup preserves complete installations; **Clear downloads** removes public
+offline generations and their applicable cached representations without private data.
 
 `CachedBibleRepository` prefers a complete source-scoped installation. Installing
 one Bible does not disable on-demand reading of other Bibles. Translation
@@ -82,15 +86,16 @@ discovery combines installed choices with a saved catalogue; explicit refresh
 can discover more online choices. Installed Query resolves published book names
 and actual source coordinates with the same eight-reference/200-verse bounds,
 never invents missing range members and does not call the Query service for an
-installed source. Online Search remains the default; the explicit Installed
-source selector and its supported filter contract are described in
+installed source. Search initially prefers a complete installed selected Bible,
+while retaining an explicit source choice and the online mode's additional
+capabilities. Its supported filter contract is described in
 [Search](search-v3.md).
 
 ## Online Search and public Study resources
 
 Each service retains its own configured root and native response envelope.
 On-demand public Study reads use the shared bounded HTTP cache and request
-lifetime. Explicit installations use separate owned SQLite generations and
+lifetime. Complete installations use separate owned SQLite generations and
 complete published module files; those generations never become cache entries. Invalid typed documents
 discard their own transport-cache representation so Retry can obtain corrected
 content. HTTP 404, rate limits, unavailable coverage and offline failures remain
@@ -100,7 +105,7 @@ truthful outcomes rather than empty definitions or substituted Scripture.
 |---|---|---|
 | Query v3 | `/{translation}/{encoded-reference}` | Reused reference-preview boundary; never changes reader position until explicit Open. |
 | Search v3 | `/{translation}?q=...` with typed filters, `limit` and `offset` | Requested result pages only; no full-Bible download or implicit local corpus search. |
-| Dictionaries v1 | `dictionaries.json`, `{module}/metadata.json`, `{module}/index.json`, `{module}/{exact-entry-id}.json` | Catalogue capability plus actual index IDs/aliases determine lookup; no definition-text server search or whole-module read. |
+| Dictionaries v1 | `dictionaries.json`, `{module}/metadata.json`, `{module}/index.json`, `{module}/{exact-entry-id}.json` | Catalogue capability plus actual index IDs/aliases determine lookup; no definition-text server search. Whole-module acquisition runs separately in the offline queue. |
 | Commentaries v1 | `commentaries.json`, `{module}/metadata.json`, `{module}/books.json`, `{module}/{book}/{chapter}.json` | Published sparse coverage determines chapter requests; there is no verse endpoint. |
 | Bookmarks v1 | `index.json`, `topics.json`, `locales.json`, `locales/{locale}.json`, `topics/{id}.json`, `verses/{book}/{chapter}.json` | Public summaries and individual association/locale files; no online `all.json` or `catalog.json` download. |
 
@@ -144,7 +149,9 @@ markings in an atomic transaction with collision-safe group IDs and provenance;
 online discovery or public deletion cannot modify that private copy.
 
 Dictionary/commentary `hashes.json` and bookmark `checksums.json` govern
-explicit complete offline installations. Exact-byte SHA-256, typed nested
+complete offline installations. Dictionary/commentary acquisition is automatic
+unless the module is excluded; complete bookmark acquisition is manual.
+Exact-byte SHA-256, typed nested
 validation, companion-file consistency and a final manifest recheck precede
 atomic generation activation. Complete dictionary entries, commentary chapters
 and public-topic/localized/reverse indexes are built in the shared native/Web
@@ -154,19 +161,38 @@ Missing installed records never fall through to another online revision. Schema-
 SQLite documents, independent from every public resource cache. Clearing
 Scripture/download caches and legacy reader-data replacement preserve them.
 
-## Explicit installations (steps 13–15)
+## Automatic acquisition and downloads management
 
-**Offline resources** opens the durable local installation list without waiting
-for any API request. **Browse catalogue** is a separate public metadata request;
-**Install** asks for confirmation before downloading. Each resource retains its
-service-root URI, kind, source identity, revision and attribution. An identical
-module ID from another configured host/version cannot answer an installed read.
-An unpublished download size is shown as unknown rather than an invented estimate.
+**Downloads & storage** opens the local installation list without waiting for
+network discovery. Startup queues the selected Bible and all discovered
+dictionaries/commentaries through one acquisition owner. It does not queue every
+Bible translation. Each dictionary/commentary has a persisted **Keep offline** choice. Turning it off removes that module's local copy.
+Excluded modules stay excluded across restart, catalogue
+refresh and public-download clearing. Topic metadata is discovered from Bookmarks
+v1 or its saved representation, never a hardcoded list. The full bookmarks
+dataset is downloaded only on request and stays removed until requested again.
+
+Each resource retains its service-root URI, kind, source identity, revision and
+attribution. An identical module ID from another host/version cannot answer an
+installed read. An unpublished size remains unknown. Foreground reading uses
+verified local content while background work proceeds; unavailable downloads,
+storage limits and network failures remain visible states rather than blocking
+the first reader frame.
+
+Successful manifest/hash checks are persisted. Startup, resume or resource use
+checks due resources after 30 days; **Check for updates** bypasses that interval.
+Unchanged hashes retain the installed generation without another bulk download.
+A changed publication triggers a fully verified atomic replacement. Failed
+checks do not advance the successful-check time, and failed updates retain the
+last good generation. Automatic work runs while the application is active;
+this is not an operating-system scheduler that runs after the app closes.
 
 `OfflineResourceInstaller` provides source-specific discovery and complete typed
-validation. `OfflineController` owns the explicit operation and bounded
+validation. `OfflineController` owns installation operations and the bounded
 `OfflineInstallSink`; `SqlOfflineResourceStore` implements durable generations
-in schema 5. Builders write logical documents and bounded Bible search batches
+introduced in schema 5. Schema 6 adds source-scoped freshness, retry scheduling,
+catalogue plans and automatic-download exclusions through `OfflineFreshnessStore`.
+Builders write logical documents and bounded Bible search batches
 into an invisible staging generation. The active pointer changes only after all
 source validation and indexing succeeds. The previous documents/index are
 removed in that same transaction. Readers can request a captured generation;
@@ -195,17 +221,21 @@ error and cannot activate an incomplete generation. Updates temporarily require
 space for both versions. Source-specific bounds and worker behavior are documented
 with the Bible and Study installers.
 
-**Remove download** deletes only the chosen public installation and index.
-Private verse notes, notebooks, journals, markings, independent topic copies and
-settings survive. Ordinary Scripture/HTTP cache clearing likewise leaves explicit
-installations intact. Complete private backups exclude downloaded public bodies;
-they are deliberately reinstalled from their public sources.
+**Clear downloads** cancels/invalidates affected queued work and removes public
+installations, indexes and applicable cached representations. Private verse
+notes, notebooks, journals, memberships, independent topic copies, settings and
+automatic-download exclusions survive. Selected-Bible and non-excluded Study
+defaults are acquired on the next startup/use, not immediately during the clear
+operation. The complete bookmarks corpus remains absent until a manual request.
+Complete private backups exclude downloaded public bodies.
 
 The store/controller regressions in `test/offline_resource_store_test.dart` use
 actual SQLite transactions and a file-backed restart. They cover invisible
 staging, atomic update, source scoping, SHA rejection, logical budget exhaustion,
 a simulated SQLite disk-full write, cancel/retry, interrupted leases, private
-preservation and Unicode/literal search paging. The native manager widget tests
-exercise deliberate discovery/confirmation and compact RTL at 200% text.
+preservation and Unicode/literal search paging. Manager and acquisition tests
+must additionally cover default queueing, persistent exclusions, 30-day checks,
+unchanged manifests, forced refresh and clearing without private-data loss,
+alongside compact RTL at 200% text.
 Executed evidence belongs in the current validation record; test source alone is
 not a claim that supported-host builds or browser runtime have passed.

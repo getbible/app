@@ -490,10 +490,10 @@ Local validation used the pinned Flutter 3.44.6 / Dart 3.12.2 SDK:
 
 | Check | Evidence |
 |---|---|
-| Complete Flutter unit/widget suite | 469 tests passed |
+| Complete Flutter unit/widget suite | 509 tests passed, including automatic offline acquisition and generation changes |
 | Analyzer and formatting | No issues; no formatting changes |
-| Developer/release tooling | 39 developer tests and 64 release-tool tests passed |
-| Branding, assets and localization | Identity gate, approved-asset checksums, 438-template inventory, 69 locale packs and reference synchronization checked |
+| Developer/release tooling | 41 developer tests and 64 release-tool tests passed; nine offline-shell and six browser-harness checks passed |
+| Branding, assets and localization | Identity gate, approved-asset checksums, 444-template inventory, 69 locale packs and reference synchronization checked |
 | Release compilation | Linux and web compiled successfully during the increment |
 | Graphical inspection | Actual wide Study and compact bookmark captures with loaded fonts; selector clipping and excess menu height corrected |
 
@@ -528,3 +528,44 @@ The PR workflow builds all supported targets and runs the shared acceptance
 journeys on its supported desktop and mobile hosts. Consult that exact head's
 checks and retained artifacts for completion; unsigned builds are not store
 certification. No app-identity upgrade path is provided for these alpha builds.
+
+### Automatic offline acceptance
+
+Only opened Bible translations are acquired automatically, using each complete
+translation file. Dictionary and commentary catalogues supply the default
+downloads; persistent per-module exclusions prevent unwanted copies. The full
+public bookmarks dataset remains explicit opt-in, while topic choices always
+come from Bookmarks v1 metadata or its saved copy.
+
+The scheduler tests cover sequential bounded work, foreground Bible priority,
+queue saturation, duplicate suppression, cancellation, persistent exclusions,
+30-day freshness, retry backoff, unchanged hashes and atomic replacements. A
+failed update retains the last verified generation. Schema-v5 fixtures verify
+the schema-v6 metadata migration without changing private work. Source-specific
+revision tests distinguish Bible SHA-1 from Study manifest fingerprints.
+
+Clear/remove regressions delay public HTTP responses, repository writes,
+dictionary browsing and active downloads across deletion. Old work must not
+restore removed data or silently restart acquisition. Fresh use may reacquire
+eligible defaults; it never overrides exclusions or installs absent bookmarks.
+Private notes, notebooks, preferences and saved quotations remain intact.
+Generation-transition tests keep visible Study content readable during updates
+and reload one coherent generation on subsequent navigation, with bounded retry
+and exact dictionary-ID validation. Search adopts the installed Bible by default
+while preserving a user's explicit search mode and filter choices.
+
+The compiled browser journey exercises automatic whole-Bible, dictionary and
+commentary installation through real workers, persistent exclusions, public
+clearing and restoration, no unsolicited full-bookmark requests, private backup
+round trips, and a fresh offline page reading an unvisited chapter and searching
+installed Scripture with zero public HTTP. It also cold-starts the cached shell
+with all networking disabled. The workflow repeats these checks in Chromium,
+Firefox and WebKit under both standard and isolated hosting.
+Local Chromium and WebKit runs passed all four hosting journeys, with 16 checks
+per journey and no browser errors or missing assets. Firefox remains a hosted
+gate because of the local host restriction described above.
+
+Seven newly introduced long prose/error templates intentionally retain English
+fallbacks in the affected locale packs, with pending translation recorded in
+provenance. Automated inventory and placeholder checks do not establish human
+linguistic review; see [Localization](LOCALIZATION.md).

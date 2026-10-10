@@ -58,7 +58,7 @@ UiStrings.of(context).text(
 The inventory command scans only explicit UI calls. A reviewed list in
 `tool/native_ui_defaults.json` registers UI-owned labels returned by framework-
 independent file/status services and backup validation boundaries. Those services stay independent of Flutter.
-The current native catalog has 438 templates. CI also rejects new plain static
+The current native catalog has 444 templates. CI also rejects new plain static
 text, tooltip and input labels that would bypass this explicit catalog.
 A malformed/missing pack or translated placeholder falls back per message;
 private content is never transformed to fill a translation gap. Unknown parser
@@ -77,6 +77,14 @@ The reader-alignment update adds twelve AI-assisted messages to all 52 existing
 translated packs without using an external translation service. Their placeholders
 and catalog coverage are tested; human linguistic review remains pending. The
 16 deliberate fallback locales continue to use English.
+
+The automatic-offline update adds five locally generated short labels to those
+52 packs. Seven new explanatory or failure messages use explicit English
+fallback while translation and human review remain pending. Per-locale
+`englishFallbackKeys` identifies these messages; coverage tests check that the
+fallback text matches its English source. The generator treats them as pending
+translation, so a future authorized generation run does not mistake English
+fallbacks for completed translations.
 
 The compact `G` global-bookmark origin marker remains invariant. Its full
 accessibility label is independently localized so assistive technology announces

@@ -40,7 +40,22 @@ Never edit an existing released schema in place. Increment `localDatabaseSchemaV
 
 ## API and cache rules
 
-Discover translations/books/chapters dynamically. Use SHA endpoints for chapter verification. Preserve readable cached Scripture on network failures. Invalidate the narrowest affected cache prefix when hashes change. Whole-translation downloads require deliberate user action for offline/search usage.
+Discover translations/books/chapters dynamically. Use SHA endpoints for chapter
+verification. Prefer verified installed content and preserve readable cached
+Scripture on network failures. Invalidate the narrowest affected cache prefix
+when hashes change.
+
+Automatic offline acquisition is the default: enqueue the selected Bible and all
+catalogue-discovered dictionaries/commentaries without blocking reading. Never
+download all Bible translations automatically. Persist per-module automatic-
+download exclusions; clearing public downloads must retain them. Successful
+manifest/hash checks are due after 30 days at startup, resume or use; unchanged
+resources need no bulk download, and changed resources activate atomically only
+after validation. Use one owned queue and retain the last good generation on
+failure. The full public bookmarks dataset is manual opt-in and stays removed
+until requested again. Topic choices come from Bookmarks v1 metadata or its
+saved copy, never hardcoded topic lists. Public downloads never create private
+memberships or modify notes, notebooks or saved quotations.
 
 ## UI rules
 

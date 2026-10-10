@@ -16,8 +16,9 @@ localized topic-name documents. This is lazy metadata loading: it does not fetch
 verse membership documents, download Scripture, or install an offline corpus.
 Locale requests have a concurrency limit of four. Revision checks surround the
 metadata read; a failed or changing catalog leaves saved private groups readable.
-On a pristine installation, unchanged bundled fallback groups are replaced by
-actual API topic metadata without assigning any verses.
+Public topic choices come from this API metadata or its saved copy; the app does
+not seed a hardcoded topic catalogue. Discovery does not assign any verses, and
+user-created private topics remain independent.
 
 `UnifiedBookmarksController` owns public request cancellation, progress, recent
 topic choices and operation lifetime. `UnifiedBookmarksRepository` is the domain
@@ -64,8 +65,8 @@ receives a free ID without replacing the occupied personal record.
 **Remove global bookmarks** requires confirmation and removes only downloaded
 memberships belonging to the current public provider, optionally narrowed to one
 topic. Names, colors, personal memberships, notes and notebooks remain. This
-operation is independent of uninstalling a public API corpus in **Set up offline
-use**. The contextual menu separately offers **Remove personal bookmark** and
+operation is independent of removing a public API corpus in **Downloads &
+storage**. The contextual menu separately offers **Remove personal bookmark** and
 **Remove global bookmark**, each for the selected group and exact verse/range.
 Selecting another topic adds a personal membership without deleting other topics.
 The six most recently selected topics are persisted and shown first in the picker.
@@ -130,12 +131,19 @@ backups. Removing a public corpus does not remove saved bookmarks of either orig
 
 ## Complete offline public topics
 
-**Set up offline use** explicitly downloads `all.json` with `index.json` and
+The full bookmarks dataset is manual opt-in through **Downloads & storage**;
+it is never included in the automatic Bible/dictionary/commentary queue.
+The requested download fetches `all.json` with `index.json` and
 `checksums.json`. The index checksum must equal the exact full-body SHA-256, and
 requested paths must retain their manifest hashes through final verification.
 Workers validate the dataset and derive summaries, individual topics, localized
 name maps and chapter reverse associations before atomic activation. Partial
 locale documents retain English fallback; unknown identities stay unavailable.
+
+Removing this corpus or choosing **Clear downloads** does not schedule it again.
+It remains absent until another manual download request. Saved topic metadata
+and personal/global verse memberships are separate from the public corpus;
+neither a download nor its removal creates or deletes those private records.
 
 `InstalledPublicTopicsRepository` serves that complete source-scoped snapshot
 without HTTP after restart. Its metadata and per-topic reads also support unified

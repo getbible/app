@@ -33,11 +33,12 @@ Paths in the reference column refer to `getbible/app.getbible.life`.
 |---|---|---|
 | Bible v3 and hashes | `lib/getbible.ts`, `lib/cache.ts` | `lib/data/api/`, `CachedBibleRepository`, lossless source models and complete installed Bible indexes. |
 | Query v3 previews | `lib/scripture-api.ts`, `app/components/ReferenceModal.tsx` | `QueryRepository`, `GroupedReferenceLookup`, `ReferencePreviewController`, `ReferencePreview`. |
-| Search v3 | `lib/scripture-api.ts`, `app/page.tsx` | `OnlineSearchController`, `ApiSearchRepository`, `SearchPanel`; 250 ms owned debounce and immediate submit. |
+| Search v3 and installed source | `lib/scripture-api.ts`, `app/page.tsx`; native offline policy | `OnlineSearchController`, repositories and `SearchPanel`; verified installed selected Bible preferred on opening, explicit source choices retained, no unsupported-filter silent online fallback. Online debounce and immediate submit remain. |
 | Contextual Study layout | `StudyPanel.tsx`, maintainer screenshots | Centered wide dialog or compact sheet with captured passage/selection, Search selection and Dictionaries/Commentaries tabs. Personal tools use a separate management selector. Responsive/native accessibility acceptance remains required. |
 | Dictionary/context lookup | `lib/study-api.ts`, `lib/dictionary-lookup.ts`, `StudyPanel.tsx` | Confirmed-definition choices, repeated definitions and actionable lexical IDs; related entries perform another contextual lookup rather than opening the full catalogue. Bounded discovery separates suggestions/failures; large indexes use workers. Installed-first scope has explicit online expansion. |
-| Commentary | `lib/study-api.ts`, `StudyPanel.tsx` | Typed sparse-coverage/range/citation workflow with explicit complete offline module installation. |
-| Topic identity and reconciliation | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | `UnifiedBookmarksRepository`, SQL transaction store and controller reconcile source identity or unambiguous normalized names/aliases/locales; ambiguous independent private groups remain private. Metadata discovery is lazy on first bookmark use. |
+| Commentary | `lib/study-api.ts`, `StudyPanel.tsx` | Typed sparse-coverage/range/citation workflow; catalogue-driven automatic whole-module acquisition with persistent exclusions. |
+| Automatic offline content | Maintainer-approved offline defaults, `Downloads & storage` | Selected Bible plus all non-excluded dictionaries/commentaries enter one queue. Persisted successful checks expire after 30 days; changed data activates atomically, failures keep the last good generation. Complete bookmarks remain manual opt-in. |
+| Topic identity and reconciliation | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | Public choices use Bookmarks v1 metadata or its saved copy, never hardcoded topic lists. Repository transactions reconcile source identity or unambiguous names/aliases/locales; ambiguous independent private groups remain private. |
 | Memberships and provenance | `lib/markings.ts`, `BookmarkMenu.tsx` | Direct verse action, clickable memberships and searchable scrollable Add another topic picker; additive assignment and scoped personal/global removal. All topics and Back to verse retain the originating reader position. |
 | Topic Scripture | `lib/scripture-api.ts`, topic views and maintainer screenshots | `TopicVerseLoader` and `TopicVerseList` resolve coordinates through shared installed/Query lookup, with bounded pages/concurrency/cache, independent errors and cancellation. Display text never replaces saved quotations. |
 | Verification and licensing | Reader verification and licensing views, maintainer screenshots | Inline dismissible verification explanation below the chapter header; licensing footer uses approved book artwork, slogan and documentation attribution. Destinations come from `ProductIdentity`. |
@@ -62,8 +63,9 @@ surviving local IDs, resolves only unambiguous name/alias/locale matches, and
 retains every personal record. Global duplicates can collapse only within the
 same source/topic/coordinate identity. Flutter must implement these rules in a
 single SQLite transaction. The implemented store also remaps active/recent group
-choices while retaining private notebook data. Catalogue refresh is idempotent;
-it does not require changing the existing schema-5 structure.
+choices while retaining private notebook data. Catalogue refresh is idempotent
+and uses the membership structure introduced in schema 5. Schema 6 separately
+adds public-download scheduling and exclusions.
 
 The existing **Copy to my markings** creates an independent private copy. That
 operation is different from the reference's **Download global bookmarks**, whose
@@ -88,6 +90,14 @@ reading position. Explicit Open uses exact returned coordinates; unavailable
 coverage must remain an error. Shared Query previews retain source attribution,
 bounded history and cancellation on replacement/dismissal. Native notes and
 notebooks remain private when their Scripture references are queried.
+
+The selected Bible is prepared independently by the automatic offline queue;
+the preview itself does not wait for a complete download. Dictionary/commentary
+catalogue acquisition is automatic unless its per-module control is disabled.
+Clearing public downloads retains these exclusions and all private data;
+defaults can be acquired on the next startup/use, while removed full bookmark
+datasets remain absent until another manual request. Refresh checks run while
+the app is active, with no closed-app scheduler implied.
 
 ## Synchronization workflow
 

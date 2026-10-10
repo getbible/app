@@ -8,6 +8,16 @@ analytics, behavioral tracking or cross-device synchronization.
 
 The application connects to getBible services to retrieve translation metadata and Scripture. The network provider may process ordinary connection information such as IP address and request time as necessary to serve requests and protect the service. User notes and markings are not sent with Scripture requests.
 
+While the app is active, it automatically downloads the selected Bible and all
+dictionaries/commentaries advertised by their public catalogues for offline use.
+It does not automatically download every Bible translation. **Downloads &
+storage** provides persistent per-module **Keep offline** controls;
+turning one off removes its local copy and excludes it from automatic acquisition.
+Startup, resume or resource use can check source manifests after 30 days since the last
+successful check, and changed public resources are refreshed in the background.
+These requests contain public resource identifiers, not private documents.
+The full Bookmarks v1 dataset requires a manual download request.
+
 Reference previews connect to the public Query v3 service only for an explicitly
 requested Scripture lookup. The request contains the selected Bible translation
 and the user-entered reference, or selected verse coordinates expressed using
@@ -16,13 +26,18 @@ kept for display when structured coordinates are used. The app does not send
 private note text, marking text, marking groups, backups or reading history to
 Query. Opening a preview creates no account, tracking record or cloud copy of
 private reader data in the application.
+Topic verse cards use the same lookup for visible Scripture coordinates when a
+complete selected Bible is unavailable locally; saved topic names and quotations
+are not sent with those requests.
 
-Online Search connects to the public Search v3 service. It sends the entered
+The Online search source connects to the public Search v3 service. It sends the entered
 query, or the exact Scripture word/phrase the user explicitly chooses to search,
 the selected Bible and chosen filters. It retrieves requested result pages
 without uploading a local Bible installation, personal notes or marking data.
-Search text is a public network request, so text deliberately entered into the
-search field is sent to that service.
+Queries entered while Online is active are sent to that service. The Installed
+source searches locally and does not send the query to Search v3. A complete
+installed selected Bible is preferred initially; otherwise the source is Online.
+The active source is visible and can be changed explicitly.
 
 Dictionary and commentary browsing retrieves public catalogues, resource
 metadata, a selected dictionary index/entry or commentary coverage/chapter.
@@ -70,7 +85,10 @@ action, using a chosen local destination or operating-system share target.
 Those destinations may have their own storage/synchronization and privacy terms.
 
 Notebook deletion remains a separate explicitly confirmed action in Study.
-Public resource/cache removal does not delete private reader data, notebooks or
-draft journals. Import is additive and never resets unrelated private data.
+Public resource/cache removal does not delete private reader data, notebooks,
+draft journals or automatic-download exclusions. Default resources can be
+downloaded again on the next startup/use; the full bookmarks dataset stays
+removed until manually requested. Import is additive and never resets unrelated
+private data.
 
 Translation text and metadata may be governed by their respective copyright and license terms. This draft must be reviewed against the final binaries, hosting logs, store disclosures, jurisdictional requirements, and published contact details before release.

@@ -70,13 +70,17 @@ The composed Study/reader journey and platform builds are recorded separately.
 
 ## Installed commentary modules
 
-An explicit **Set up offline use** installation downloads the published whole
-`{commentary}.json`, its metadata and sparse coverage, and verifies every exact
+All commentary modules discovered in the catalogue are queued automatically
+unless excluded through **Downloads & storage**. **Keep offline** is
+persisted per module; turning it off removes the local copy. Acquisition downloads
+the published whole `{commentary}.json`, its metadata and sparse coverage, and verifies every exact
 byte digest against `hashes.json` before and after the operation. Book/chapter
 identities, language, names and entry totals must agree throughout the nested
 module. Native and browser workers build chapter indexes in bounded batches;
 activation occurs only after complete validation. A failed update leaves the
-previous installed snapshot intact.
+previous installed snapshot intact. Successful manifest checks are due again
+after 30 days on startup, resume or use; unchanged hashes do not redownload the
+module. **Check for updates** bypasses that interval.
 
 `InstalledCommentaryRepository` preserves the online repository contract.
 Installed resources open after restart without fetching their catalogue or
@@ -84,8 +88,9 @@ chapters. The saved discovery also retains online-only choices. An installed
 chapter preserves its entire original source document, including chapter/verse
 zero introductions, overlapping ranges, repeated anchors, structured references,
 plain text and v2 source provenance. No conversion into a verse-keyed map drops
-source entries. The panel identifies installed versus online resources and
-provides **Set up offline use**. Scripture preview still requires the selected
+source entries. The panel identifies offline availability while the central
+**Downloads & storage** manager owns progress, exclusions, refresh and clearing.
+Scripture preview still requires the selected
 Bible's Query result or complete installed Bible; installing commentary does
 not imply installing Scripture.
 

@@ -33,16 +33,16 @@ the exact-run evidence in Testing and retain the outstanding human QA gates.
 | RTL and appearance modes | Implemented | Device selection behavior still requires QA |
 | Contextual selection/bookmark menu | Implemented candidate; target verification required | Direct per-verse action, clickable topic memberships and expandable searchable/scrollable Add another topic picker. Assignment remains additive; personal/global removal stays separate. All topics and Back to verse retain the originating reader position. Native selection and assistive-technology focus require device acceptance. |
 | Whole/text markings and memberships | Implemented core | Canonical whole verses, translation-specific UTF-16 ranges, additive topic assignment and scoped origin removal. Source-scoped identity prevents unrelated providers from merging. Private IDs, custom labels/colors, exact quotes and timestamps survive transactional reconciliation. |
-| Unified global/personal topic list | Implemented core | One topic list, G badges, API metadata reconciliation, explicit global download/removal and independent private copies. API metadata loads on first bookmark use; bundled private starter choices remain usable offline. Ambiguous independent private groups remain separate. |
+| Unified global/personal topic list | Implemented core | One topic list, G badges, API metadata reconciliation, explicit global download/removal and independent private copies. Public choices come from Bookmarks v1 or saved metadata, never hardcoded starter topics. Ambiguous independent private groups remain separate. |
 | Inline notes | Implemented core; target verification required | Inline add/edit/delete, retained drafts across layout and failed saves, Ctrl/Cmd+Enter, navigation guarding and saved-note folding. Actual platform keyboard/IME behavior remains a device gate. |
-| Online Search v3 | Implemented core | Advanced filters, ranked pagination, complete references, cancellation/cooldown and exact-verse opening. Edits debounce 250 ms; submit flushes immediately. Explicit Installed search has its documented local filter subset, an additional capability beyond the current website. |
+| Online and installed Search | Implemented candidate; target verification required | Complete installed selected Bibles are preferred on opening; explicit source choices and submitted result sources remain stable. Local filters are stated without silent online fallback. Online mode retains advanced filters, ranked pagination, complete references, cancellation/cooldown and exact-verse opening. |
 | Adaptive Study workspace | Implemented candidate; target verification required | Centered wide dialog or compact keyboard-aware sheet; contextual Study shows passage/selection, Search selection and two resource tabs. Personal tools use a separate selector. Native selection precedence, Escape/focus restoration and large-text/RTL handling remain required. |
 | Dictionaries and commentaries | Implemented candidate; target verification required | Confirmed-definition choices persist through related-entry navigation; actionable lexical IDs and repeated definitions remain visible. Bounded discovery separates suggestions, failures and retry. Installed-first scope uses explicit online expansion; the unbound browser retains catalogue access. Sparse commentary preserves introductions and shared citations. |
 | Public topic browsing and private copies | Implemented candidate; target verification required | Selected-Bible Scripture loads progressively for topic cards through installed resources or Query, with per-verse outcomes, bounded caching and cancellation. Saved quotations remain separate. Follow/Hide and explicit private Copy retain their independent ownership. |
 | Source annotations and references | Implemented core; target verification required | Below-verse/paragraph source notes, unlocated lexical metadata and citation controls; red Jesus quotations. Source text and private offsets remain unchanged; large-text/native selection acceptance remains required. |
 | Personal study/sermon notebooks | Implemented core | Ordered private blocks and references, durable draft journals, revision conflicts, lifecycle flush and schema 3 migrations. The complete private backup includes notebooks, journals and references; Markdown has Save/Copy and supported sharing. |
 | Private-data portability | Implemented core; target verification required | Explicit file import preview/confirmation, legacy v1/v2 import and v2 export, plus a distinct complete private format for notebooks, journals, settings and copy provenance. Atomic merging preserves conflicting work; public corpora are excluded. |
-| Complete offline resources | Implemented core; target verification required | Explicit installs, staged generation activation, integrity/revision checks, restart recovery, cancel/retry/remove, installed Bible/reference/search and dictionary/commentary/topic indexes. Private data is independent of public resource removal. |
+| Automatic offline resources | Implemented candidate; target verification required | One queue prepares the selected Bible and all catalogue dictionaries/commentaries, with persistent per-module exclusions. Successful checks expire after 30 days; changed resources activate atomically and failures retain the last good generation. Clear downloads preserves exclusions/private data. Full bookmarks remain manual opt-in and stay removed until requested. |
 | Markdown generation | Implemented core; device verification required | Scripture and notebook Markdown preview, Save file/Download and Copy; supported mobile/browser share sheets with retained fallback actions. |
 | Complete website localization | Implemented candidate; linguistic verification required | Current 282-message reference contract and 69 bundled packs, native extension catalogue, UI-wide lookup and independent RTL direction. Build-time generated translations require human language review; documented upstream historical-language fallbacks are retained. Tests compare pinned upstream keys, placeholders and native call sites, not only pack lengths. |
 | getBible identity and approved artwork | Implemented candidate; package verification required | Exact display name, lowercase technical names, centralized public destinations and book artwork/native wordmark. CI checks asset hashes and naming. The alpha correction requires clean installation and adds no legacy-name migration. |
@@ -54,7 +54,7 @@ the exact-run evidence in Testing and retain the outstanding human QA gates.
 
 ## Search v3 increment
 
-Online Search now uses service-native paginated requests and preserves ranked original-text results. Filters, reference responses, revision consistency, cancellation, rate limits and native narrow RTL/200% layouts have 29 focused automated checks. See [Search v3](search-v3.md). Whole-translation search remains an explicit offline service, rather than the online reader path. Composed reader and platform evidence is recorded with the completed Study increment.
+Online Search now uses service-native paginated requests and preserves ranked original-text results. Filters, reference responses, revision consistency, cancellation, rate limits and native narrow RTL/200% layouts have 29 focused automated checks. See [Search v3](search-v3.md). The current source default additionally prefers a verified installed selected Bible while retaining explicit online choice. Composed reader and platform evidence is recorded with the completed Study increment.
 
 ## On-demand dictionary increment
 
@@ -62,7 +62,7 @@ Typed dictionary lookup now discovers catalogues, metadata, published indexes an
 
 ## Commentary resource increment
 
-Native commentary reading requests only discovered coverage and the chosen chapter. It distinguishes introductions from Scripture, includes earlier-anchored ranges and multiple source entries, and preserves source OSIS, attribution and v2 citation provenance. Fourteen focused checks cover sparse availability, request ownership, dismissal, preferences and RTL/200% native layouts; six resource fixtures match the current live contract. See [Commentaries](commentaries.md).
+Foreground commentary reading requests discovered coverage and the chosen chapter while automatic whole-module acquisition runs separately. It distinguishes introductions from Scripture, includes earlier-anchored ranges and multiple source entries, and preserves source OSIS, attribution and v2 citation provenance. Fourteen focused checks cover sparse availability, request ownership, dismissal, preferences and RTL/200% native layouts; six resource fixtures match the current live contract. See [Commentaries](commentaries.md).
 
 ## Local notebook storage increment
 
@@ -70,7 +70,7 @@ Independent titled study/sermon notebooks complement canonical inline verse note
 
 ## Public topic increment
 
-Read-only public topic discovery, sparse reverse associations and locale fallback remain separate from private starter marking groups. Follow/Hide save scoped local choices; only explicit previewed Copy creates an independent private UUID group and additive canonical markings. Fifteen focused tests cover published identities, missing selected-Bible coordinates, collisions, repeat copies, source revisions, private-data preservation and native 200% layouts. Seven resource fixtures match the live Bookmarks contract. See [Public topics](public-topics.md).
+Read-only public topic discovery, sparse reverse associations and locale fallback remain separate from user-created private groups. Follow/Hide save scoped local choices; only explicit previewed Copy creates an independent private UUID group and additive canonical markings. Fifteen focused tests cover published identities, missing selected-Bible coordinates, collisions, repeat copies, source revisions, private-data preservation and native 200% layouts. Seven resource fixtures match the live Bookmarks contract. See [Public topics](public-topics.md).
 
 ## Integrated candidate and deliberate differences
 
@@ -86,6 +86,12 @@ than adding startup network work. Dictionary discovery initially uses installed
 modules where available, with an explicit online expansion. Separate private
 notebooks, complete private backups and installed full-text search remain native
 extensions. These choices are visible and preserve existing private data.
+
+The current offline-default policy supersedes deliberate-only public resource
+installation: automatically prepare the selected Bible and non-excluded Study
+catalogues, check successful source snapshots after 30 days, and retain manual
+opt-in for complete bookmarks. Exclusions and private memberships survive public
+clearing; only defaults are acquired again on the next startup/use.
 
 Source comparison, deterministic integration, actual installer execution,
 physical-device accessibility and store review are separate evidence. Generated

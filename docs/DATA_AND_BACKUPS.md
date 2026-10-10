@@ -145,9 +145,9 @@ Import re-reads current private state and merges all changes in one transaction;
 a late write failure rolls back reader annotations, notebooks, journals,
 preferences and internal import identity bookkeeping together.
 
-Existing group, marking and canonical-note merge rules are retained. On an
-installation containing only unchanged bundled starter groups and no private
-annotations/documents, complete restore retains the exported group order and
+Existing group, marking and canonical-note merge rules are retained. On a
+pristine installation without private annotations/documents, complete restore
+retains the exported group order and
 timestamps exactly. Merging into an existing private collection keeps its local
 ordering and appends genuinely new groups. Incoming
 active-group preferences, recent bookmark topics and private-copy destinations
@@ -224,3 +224,30 @@ origins, notes or notebooks. Saved global memberships are part of private reader
 backups, while a separately installed public-topic corpus remains excluded.
 See [Unified bookmarks and public topics](public-topics.md) for operation limits,
 UI ownership and the automated coverage added for these behaviors.
+
+
+## Database schema 6
+
+The forward schema 5 → 6 migration adds public-download freshness, automatic
+catalogue plans and per-resource exclusions in separate tables. Existing
+installed generations, Scripture caches and every private table remain unchanged.
+A successful check stores its UTC time and the active generation it validated;
+failed attempts store a retry deadline without advancing the successful date.
+A late check cannot certify a replacement generation or recreate cleared content.
+
+Automatic catalogue plans and exclusions use the same exact service-root scope
+as installed content. Clearing downloads/freshness preserves deliberate exclusions
+and the catalogue plan so the next use can reacquire allowed resources. These
+are device storage preferences, outside complete private backups; restoring
+private notes on another device must not silently copy download choices.
+The frozen schema-5 fixture and restart/migration regressions cover retained
+installed documents, settings, private notes, retry state and independent sources.
+
+
+Installed Study reads pin one active generation. Activation/removal that crosses
+an in-flight read raises a typed generation-change result, never an empty result
+or a mixture of two revisions. Dictionary entry navigation retains its visible
+text while it reloads metadata and index, validates the exact requested ID, and
+reads the replacement entry. Commentary reloads metadata, coverage and chapter
+together. Both permit one bounded restart; a second publication change remains
+retryable. Public-topic discovery explicitly renews its complete snapshot.

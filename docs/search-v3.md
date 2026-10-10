@@ -1,10 +1,18 @@
 # Online Search v3
 
-The reader requests pages from `https://search.getbible.net/v3/{translation}?q=...`.
-Opening Search or searching a selected phrase does not install, download or scan
-a whole translation. Online is the default. The explicit **Installed Bible
-(offline)** choice searches only a deliberately installed and verified Bible;
-it never downloads a Bible or falls back to HTTP.
+Online search requests pages from
+`https://search.getbible.net/v3/{translation}?q=...`. Search initially prefers
+**Installed Bible (offline)** when the selected Bible has a complete verified
+installation, otherwise Online. The reader's background acquisition prepares
+that selected Bible independently; Search does not wait for it or scan other
+translations. An explicit source choice is retained, and installed search never
+silently falls back to HTTP when a filter is unsupported.
+
+An unused open Search panel can adopt an installation that finishes in the
+background. Once results have been requested, their source stays fixed until
+the user changes it. Selecting the installed source applies its supported
+defaults: exact diacritics and canonical order, without proximity or the
+online-only deuterocanon scope. Online remains available for advanced filters.
 
 ## Ownership
 
@@ -120,7 +128,7 @@ the repository regression suite.
 
 ## Installed Bible search
 
-The source selector makes the choice explicit. `InstalledSearchRepository` reads
+The source selector displays the active choice. `InstalledSearchRepository` reads
 immutable installed-generation records through the same typed search boundary.
 SQLite narrows literal candidates in its database worker; the adapter processes
 100 rows at a time, yields between batches and retains only the requested page.

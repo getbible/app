@@ -104,6 +104,14 @@ async function runJourney(browser, { isolated, browserName }) {
   let deferredShellLoads = 0;
   let page;
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  // Observe independently of fixture interception, including the final phase
+  // where the native service worker owns delivery and all routing is removed.
+  context.on('request', (request) => {
+    const url = request.url();
+    if (/^https?:/.test(url) && !url.startsWith(origin + '/')) {
+      requests.push({ method: request.method(), url, apiOffline });
+    }
+  });
   context.on('page', (opened) => {
     opened.on('worker', (worker) => workers.push(worker.url()));
     opened.on('pageerror', (error) => errors.push({ type: 'pageerror', message: error.stack ?? error.message }));
@@ -135,7 +143,6 @@ async function runJourney(browser, { isolated, browserName }) {
     }
     if (url.startsWith(origin + '/')) return route.continue();
     if (!/^https?:/.test(url)) return route.continue();
-    requests.push({ method: request.method(), url, apiOffline });
     const fixture = fixtures.get(url);
     if (!fixture) {
       errors.push({ type: 'unexpected-network-request', message: `${request.method()} ${url}` });
@@ -321,10 +328,61 @@ async function runJourney(browser, { isolated, browserName }) {
     // Activation never claims an existing page: a deploy must not switch the
     // asset generation underneath an open note editor. The next navigation is
     // controlled after the complete worker has activated.
-    await page.waitForFunction(async () => {
+    // Playwright's polling predicate must be synchronous: an async predicate
+    // yields a truthy Promise before registration has actually completed.
+    // Await the native lifecycle instead, with a bounded installation timeout.
+    await page.evaluate(async () => {
+      let timeout;
+      try {
+        await Promise.race([
+          (async () => {
+            const registration = await navigator.serviceWorker.ready;
+            const worker = registration.active;
+            if (worker.state === 'activated') return;
+            await new Promise((resolveActive, reject) => {
+              const changed = () => {
+                if (worker.state === 'activated') {
+                  worker.removeEventListener('statechange', changed);
+                  resolveActive();
+                } else if (worker.state === 'redundant') {
+                  worker.removeEventListener('statechange', changed);
+                  reject(new Error('Application shell became redundant before activation'));
+                }
+              };
+              worker.addEventListener('statechange', changed);
+              changed();
+            });
+          })(),
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => reject(new Error('Application shell activation timed out')), 90000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
+    const shellState = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
-      return registration?.active?.state === 'activated';
-    }, undefined, { timeout: 90000 });
+      const cacheNames = await caches.keys();
+      return {
+        pageUrl: location.href,
+        baseUri: document.baseURI,
+        scope: registration?.scope,
+        worker: registration?.active?.scriptURL,
+        workerState: registration?.active?.state,
+        caches: await Promise.all(cacheNames.map(async (name) => ({
+          name, entries: (await (await caches.open(name)).keys()).length,
+        }))),
+      };
+    });
+    await writeFile(join(outputDirectory, `${mode}-shell.json`), JSON.stringify(shellState, null, 2));
+    assert.equal(shellState.scope, origin + basePath);
+    assert.equal(shellState.worker, origin + basePath + 'offline_service_worker.js');
+    assert.equal(shellState.workerState, 'activated');
+    // Fixture setup is complete. Let the browser's native offline navigation
+    // use its service worker without Playwright interception; request events
+    // above continue to prove that no public service is requested.
+    await context.unrouteAll({ behavior: 'wait' });
     console.log(`${mode}: production application shell installed`);
     await context.setOffline(true);
     await page.close();

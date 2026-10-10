@@ -85,71 +85,58 @@ class _AppBootstrapState<T extends Object> extends State<AppBootstrap<T>> {
     final resource = _resource;
     if (resource != null) return widget.builder(context, resource);
     final locale = _ui.flutterLocale;
-    return MaterialApp(
-      title: 'getBible.live',
-      debugShowCheckedModeBanner: false,
-      locale: GlobalMaterialLocalizations.delegate.isSupported(locale)
-          ? locale
-          : const Locale('en'),
-      supportedLocales: GlobalMaterialLocalizations.delegate.isSupported(locale)
-          ? [locale]
-          : const [Locale('en')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      // The temporary loading/error surface must not create a Navigator or
-      // consume the platform's launch route before the ready application does.
-      builder: (context, _) => Directionality(
-        textDirection: _ui.isRtl ? TextDirection.rtl : TextDirection.ltr,
-        child: Scaffold(
-          body: SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Image.asset(
-                        'assets/branding/getbible_book.png',
-                        height: 80,
-                        excludeFromSemantics: true,
+    final content = Directionality(
+      textDirection: _ui.isRtl ? TextDirection.rtl : TextDirection.ltr,
+      child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Image.asset(
+                      'assets/branding/getbible_book.png',
+                      height: 80,
+                      excludeFromSemantics: true,
+                    ),
+                    const SizedBox(height: 24),
+                    if (_opening) ...[
+                      const Center(child: CircularProgressIndicator()),
+                      const SizedBox(height: 16),
+                      Text(
+                        _ui.text('Opening local data'),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 24),
-                      if (_opening) ...[
-                        const Center(child: CircularProgressIndicator()),
-                        const SizedBox(height: 16),
-                        Text(
-                          _ui.text('Opening local data'),
-                          textAlign: TextAlign.center,
+                    ] else ...[
+                      Semantics(
+                        header: true,
+                        liveRegion: true,
+                        child: Text(
+                          _ui.text('Local storage is unavailable'),
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
-                      ] else ...[
-                        Semantics(
-                          header: true,
-                          liveRegion: true,
-                          child: Text(
-                            _ui.text('Local storage is unavailable'),
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _ui.text(
+                          'The app could not open its local data. Check available storage and browser permissions, then retry. Do not clear site data to fix this error.',
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _ui.text(
-                            'The app could not open its local data. Check available storage and browser permissions, then retry. Do not clear site data to fix this error.',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(_ui.text('Your saved data has not been reset.')),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                          autofocus: true,
-                          onPressed: _retry,
-                          icon: const Icon(Icons.refresh),
-                          label: Text(_ui.text('Retry')),
-                        ),
-                      ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(_ui.text('Your saved data has not been reset.')),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                        autofocus: true,
+                        onPressed: _retry,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(_ui.text('Retry')),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -157,5 +144,43 @@ class _AppBootstrapState<T extends Object> extends State<AppBootstrap<T>> {
         ),
       ),
     );
+    return _BootstrapContent(
+      content: content,
+      child: MaterialApp(
+        title: 'getBible.live',
+        debugShowCheckedModeBanner: false,
+        locale: GlobalMaterialLocalizations.delegate.isSupported(locale)
+            ? locale
+            : const Locale('en'),
+        supportedLocales:
+            GlobalMaterialLocalizations.delegate.isSupported(locale)
+            ? [locale]
+            : const [Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        // Give startup its own modal focus scope, and ignore the launch name
+        // here: ReaderBootstrap already captured it for the actual reader.
+        onGenerateInitialRoutes: (_) => [_startupRoute()],
+        onGenerateRoute: (_) => _startupRoute(),
+      ),
+    );
   }
+
+  static Route<void> _startupRoute() => MaterialPageRoute<void>(
+    settings: const RouteSettings(name: '/'),
+    builder: (context) => _BootstrapContent.of(context),
+  );
+}
+
+/// Keeps an already-created startup route responsive to Retry and locale
+/// updates without rebuilding its Navigator or replacing its focus scope.
+class _BootstrapContent extends InheritedWidget {
+  const _BootstrapContent({required this.content, required super.child});
+  final Widget content;
+
+  static Widget of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_BootstrapContent>()!.content;
+
+  @override
+  bool updateShouldNotify(_BootstrapContent oldWidget) =>
+      content != oldWidget.content;
 }

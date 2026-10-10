@@ -8,6 +8,7 @@ From the repository root, with Flutter 3.44.6 and Node 22 or newer:
 
 ```bash
 flutter pub get
+dart compile js -O4 tool/drift_worker.dart -o web/drift_worker.dart.js
 dart compile js -O2 tool/offline_bible_worker.dart -o web/offline_bible_worker.dart.js
 flutter build web --release --no-web-resources-cdn --base-href /flutter/
 npm ci --prefix tool/browser_smoke
@@ -59,6 +60,9 @@ During fixture-based phases the harness defers delivery of `offline_shell.js`:
 WebKit requests from controlled pages can bypass Playwright's HTTP interception.
 After installing fixture resources, the harness loads the exact production
 script, waits for native worker activation and only then disables all networking.
+Fixture interception is removed before that final navigation; independent
+request observations continue to reject any public-service request. The shell's
+actual scope, script URL and cache inventory are retained with the diagnostics.
 It does not replace the registration API, worker, cache verification, application
 or database. The new offline page must be controlled by that actual worker.
 An online host must rewrite unknown HTML document routes to `index.html` while

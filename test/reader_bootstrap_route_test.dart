@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ViewFocusDirection, ViewFocusEvent, ViewFocusState;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +66,9 @@ void main() {
           await tester.pumpWidget(bootstrap);
           await tester.pump();
           expect(find.text('Opening local data'), findsOneWidget);
+          _focusView(tester);
+          await tester.pump();
+          expect(tester.takeException(), isNull);
           // The temporary startup MaterialApp can report its root before the
           // actual reader is constructed. Its platform value is not the launch.
           tester.platformDispatcher.defaultRouteNameTestValue = '/';
@@ -74,6 +78,7 @@ void main() {
               () => Future<void>.delayed(const Duration(milliseconds: 10)),
             );
             await tester.pump(const Duration(milliseconds: 20));
+            _focusView(tester);
             if (!state.loading &&
                 find.byType(ReaderScreen).evaluate().isNotEmpty) {
               break;
@@ -111,4 +116,14 @@ void main() {
       },
     );
   }
+}
+
+void _focusView(WidgetTester tester) {
+  tester.binding.handleViewFocusChanged(
+    ViewFocusEvent(
+      viewId: tester.view.viewId,
+      state: ViewFocusState.focused,
+      direction: ViewFocusDirection.forward,
+    ),
+  );
 }

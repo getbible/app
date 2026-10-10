@@ -98,6 +98,14 @@ void main() {
       await tester.tap(find.byTooltip('Back'));
       await _settle(tester);
       expect(find.text('Backup and restore'), findsNothing);
+      // Study is now a modal surface at desktop sizes too. Reopen it through
+      // the launcher after returning from the independently owned import page.
+      await tester.tap(find.text(state.ui('study')));
+      await _settle(tester);
+      await tester.tap(find.byType(DropdownButtonFormField<StudyTab>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Commentary').last);
+      await _settle(tester);
       expect(state.study.commentary.context, isNotNull);
       expect(state.study.commentary.selectedModule!.id, 'fixture');
       expect(state.study.commentary.chapter, isNotNull);
@@ -203,6 +211,10 @@ Future<void> _openDrawerItem(
   AppState state,
   String label,
 ) async {
+  if (find.byType(StudyWorkspace).evaluate().isNotEmpty) {
+    await tester.tap(find.byTooltip('Close Study tools'));
+    await _settle(tester);
+  }
   await tester.tap(find.byTooltip(state.ui('openBibleNavigation')));
   await tester.pumpAndSettle();
   await tester.ensureVisible(find.text(label));

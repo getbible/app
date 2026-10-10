@@ -308,7 +308,7 @@ final class ScriptureVerseSelection {
 
 /// Maps a native paragraph selection back to each unchanged verse string.
 ///
-/// The prefix and separator must match the rich document's plain-text form.
+/// The prefix, suffix and separator match the rich document's plain-text form.
 /// A WidgetSpan verse-number marker occupies one U+FFFC code unit; a plain
 /// textual marker should pass its actual string. These presentation characters
 /// and separators never become part of a saved verse range or quote.
@@ -317,6 +317,7 @@ final class ScriptureParagraphTextMap {
     List<Verse> verses, {
     String separator = ' ',
     String Function(Verse verse)? versePrefix,
+    String Function(Verse verse)? verseSuffix,
   }) {
     final StringBuffer text = StringBuffer();
     final List<(Verse, ScriptureTextRange)> locations =
@@ -328,6 +329,7 @@ final class ScriptureParagraphTextMap {
       final int start = text.length;
       text.write(verse.text);
       locations.add((verse, ScriptureTextRange(start, text.length)));
+      text.write(verseSuffix?.call(verse) ?? '');
     }
     return ScriptureParagraphTextMap._(
       text.toString(),

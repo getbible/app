@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/models/bible.dart';
 import '../../services/scripture_text.dart';
@@ -131,30 +133,125 @@ class _NativeScriptureTextState extends State<NativeScriptureText> {
   }
 
   @override
-  Widget build(BuildContext context) => Listener(
-    onPointerDown: (PointerDownEvent event) {
-      _cancelWord();
-      _tapPosition = event.position;
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {
+      const SingleActivator(LogicalKeyboardKey.keyC, control: true):
+          _copySelection,
+      const SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+          _copySelection,
     },
-    onPointerCancel: (_) => _cancelWord(),
-    child: SelectableText.rich(
-      widget.span,
-      key: _documentKey,
-      textDirection: widget.textDirection,
-      focusNode: widget.focusNode,
-      contextMenuBuilder:
-          widget.contextMenuBuilder ?? _defaultContextMenuBuilder,
-      onTap: widget.onWordTap == null ? null : _scheduleWord,
-      onSelectionChanged:
-          (TextSelection selection, SelectionChangedCause? cause) {
-            if (!selection.isCollapsed) _cancelWord();
-            widget.onSelectionChanged?.call(selection, cause);
-          },
+    child: _ScriptureCopySemantics(
+      onCopy: _copySelection,
+      child: Listener(
+        onPointerDown: (PointerDownEvent event) {
+          _cancelWord();
+          _tapPosition = event.position;
+        },
+        onPointerCancel: (_) => _cancelWord(),
+        child: SelectableText.rich(
+          widget.span,
+          key: _documentKey,
+          textDirection: widget.textDirection,
+          focusNode: widget.focusNode,
+          contextMenuBuilder:
+              widget.contextMenuBuilder ?? _defaultContextMenuBuilder,
+          onTap: widget.onWordTap == null ? null : _scheduleWord,
+          onSelectionChanged:
+              (TextSelection selection, SelectionChangedCause? cause) {
+                if (!selection.isCollapsed) _cancelWord();
+                widget.onSelectionChanged?.call(selection, cause);
+              },
+        ),
+      ),
     ),
   );
 
-  static Widget _defaultContextMenuBuilder(
+  void _copySelection() {
+    final editable = _editable();
+    if (editable != null) copyScriptureSelection(editable, widget.mapping);
+  }
+
+  Widget _defaultContextMenuBuilder(
     BuildContext context,
     EditableTextState editable,
-  ) => AdaptiveTextSelectionToolbar.editableText(editableTextState: editable);
+  ) => AdaptiveTextSelectionToolbar.buttonItems(
+    anchors: editable.contextMenuAnchors,
+    buttonItems: [
+      for (final item in editable.contextMenuButtonItems)
+        if (item.type == ContextMenuButtonType.copy)
+          ContextMenuButtonItem(
+            type: item.type,
+            label: item.label,
+            onPressed: () => copyScriptureSelection(editable, widget.mapping),
+          )
+        else
+          item,
+    ],
+  );
+}
+
+/// Replaces only the existing native Copy action while semantics configurations
+/// merge upwards. An outer Semantics.onCopy is insufficient: EditableText's
+/// child action wins that merge. Excluding or merging all semantics would also
+/// discard native selection actions or the individual inline bookmark controls.
+///
+/// This public rendering delegate keeps the original nodes, action availability,
+/// selection coordinates, labels and child buttons. No clipboard write happens
+/// until the user invokes Copy, and its content follows the same source mapping
+/// as the toolbar and keyboard paths.
+class _ScriptureCopySemantics extends SingleChildRenderObjectWidget {
+  const _ScriptureCopySemantics({required this.onCopy, required super.child});
+  final VoidCallback onCopy;
+
+  @override
+  _RenderScriptureCopySemantics createRenderObject(BuildContext context) =>
+      _RenderScriptureCopySemantics(onCopy);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderScriptureCopySemantics renderObject,
+  ) => renderObject.onCopy = onCopy;
+}
+
+class _RenderScriptureCopySemantics extends RenderProxyBox {
+  _RenderScriptureCopySemantics(this._onCopy);
+  VoidCallback _onCopy;
+  set onCopy(VoidCallback value) {
+    if (_onCopy == value) return;
+    _onCopy = value;
+    markNeedsSemanticsUpdate();
+  }
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config.childConfigurationsDelegate = (children) {
+      final result = ChildSemanticsConfigurationsResultBuilder();
+      for (final child in children) {
+        if (child.getActionHandler(SemanticsAction.copy) != null) {
+          child.onCopy = _onCopy;
+        }
+        result.markAsMergeUp(child);
+      }
+      return result.build();
+    };
+  }
+}
+
+/// Copy original Scripture only. Verse-number and bookmark WidgetSpans are
+/// presentation markers and must never leak into the clipboard or private data.
+void copyScriptureSelection(
+  EditableTextState editable,
+  ScriptureParagraphTextMap mapping,
+) {
+  final selection = editable.textEditingValue.selection;
+  final verses = mapping.selections(selection.start, selection.end);
+  if (verses.isEmpty) return;
+  unawaited(
+    Clipboard.setData(
+      ClipboardData(text: verses.map((verse) => verse.quote).join(' ')),
+    ),
+  );
+  editable.hideToolbar();
 }

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../application/app_state.dart';
 import '../application/reference_preview_controller.dart';
+import '../core/product_identity.dart';
 import '../core/ui_strings.dart';
 import '../data/platform/platform_text_file_service.dart';
 import '../domain/models/annotations.dart';
@@ -27,6 +28,7 @@ import 'boundary_turn_controller.dart';
 import 'widgets/bookmark_assignment_menu.dart';
 import 'widgets/commentary_panel.dart';
 import 'widgets/dictionary_panel.dart';
+import 'widgets/infrastructure_credit.dart';
 import 'widgets/keyboard_inset_padding.dart';
 import 'widgets/my_annotations_panel.dart';
 import 'widgets/native_scripture_text.dart';
@@ -69,10 +71,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   List<ScriptureTextEmphasis> _arrivalEmphasis =
       const <ScriptureTextEmphasis>[];
   StudyContext? _studyContext;
+  StudyContext? _lastContextualStudy;
   StudyTab _studyTab = StudyTab.markings;
   bool _studyModal = false;
   ModalRoute<void>? _compactStudyRoute;
-  bool _compactStudyScheduled = false;
+  bool _contextualStudy = false;
+  int? _bookmarkOriginVerse;
+  double? _bookmarkOriginOffset;
   FocusNode? _readerFocusBeforeStudy;
   final FocusNode _readerFocus = FocusNode(debugLabel: 'Scripture reader');
   final ValueNotifier<int> _studyRevision = ValueNotifier(0);
@@ -149,40 +154,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 onMarkdown: () => _showMarkdown(context, state),
               )
             : null,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bool wide = constraints.maxWidth >= 1100;
-              if (!wide &&
-                  _studyContext != null &&
-                  !_studyModal &&
-                  !_compactStudyScheduled) {
-                _compactStudyScheduled = true;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _compactStudyScheduled = false;
-                  if (mounted &&
-                      _studyContext != null &&
-                      !_studyModal &&
-                      MediaQuery.sizeOf(context).width < 1100) {
-                    unawaited(_showCompactStudy());
-                  }
-                });
-              }
-              return Row(
-                children: [
-                  Expanded(child: _body(context, state)),
-                  if (wide && _studyContext != null && !_studyModal) ...[
-                    const VerticalDivider(width: 1),
-                    SizedBox(
-                      width: (constraints.maxWidth * .42).clamp(420, 560),
-                      child: _studyWorkspace(state, _studyContext!),
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-        ),
+        body: SafeArea(child: _body(context, state)),
       ),
     );
   }
@@ -206,6 +178,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             children: <Widget>[
               if (_showChrome)
                 _ChapterHeading(
+                  key: ValueKey(chapter.name),
                   state: state,
                   onPreview: () => _showReferencePreview(),
                 ),
@@ -1029,39 +1002,69 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final AppState state = context.read<AppState>();
     _readerFocusBeforeStudy ??= FocusManager.instance.primaryFocus;
     _boundaryTurns.clear();
+    final contextual = tab == StudyTab.dictionary || tab == StudyTab.commentary;
+    final previous = _lastContextualStudy;
+    final retainSelection =
+        !contextual &&
+        verse == null &&
+        previous?.verse != null &&
+        previous!.passage.key == state.passage.key &&
+        state.current!.verses.contains(previous.verse);
     setState(() {
-      _studyContext = _captureStudy(state, verse: verse, range: range);
+      _studyContext = retainSelection
+          ? previous
+          : _captureStudy(state, verse: verse, range: range);
       _studyTab = tab;
+      _contextualStudy = contextual;
+      if (contextual && verse != null) _lastContextualStudy = _studyContext;
     });
-    if (MediaQuery.sizeOf(context).width < 1100) unawaited(_showCompactStudy());
+    unawaited(_showAdaptiveStudy());
   }
 
-  Future<void> _showCompactStudy() async {
+  Future<void> _showAdaptiveStudy() async {
     final captured = _studyContext;
     if (!mounted || captured == null || _studyModal) return;
     final state = context.read<AppState>();
     ModalRoute<void>? route;
     _studyModal = true;
     try {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
-        builder: (sheetContext) {
-          route = ModalRoute.of<void>(sheetContext);
-          _compactStudyRoute = route;
-          return KeyboardInsetPadding(
+      Widget workspace(BuildContext surfaceContext) {
+        route = ModalRoute.of<void>(surfaceContext);
+        _compactStudyRoute = route;
+        return AnimatedBuilder(
+          animation: Listenable.merge([state, _studyRevision]),
+          builder: (context, _) => _studyWorkspace(state, captured),
+        );
+      }
+
+      if (MediaQuery.sizeOf(context).width >= 840) {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            insetPadding: const EdgeInsets.all(16),
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              width: _contextualStudy ? 840 : 1000,
+              height: MediaQuery.sizeOf(dialogContext).height * .9,
+              child: workspace(dialogContext),
+            ),
+          ),
+        );
+      } else {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: true,
+          constraints: const BoxConstraints(maxWidth: 1000),
+          builder: (sheetContext) => KeyboardInsetPadding(
             child: SizedBox(
               height: MediaQuery.sizeOf(sheetContext).height * .92,
-              child: AnimatedBuilder(
-                animation: Listenable.merge([state, _studyRevision]),
-                builder: (context, _) => _studyWorkspace(state, captured),
-              ),
+              child: workspace(sheetContext),
             ),
-          );
-        },
-      );
+          ),
+        );
+      }
     } finally {
       // The pop Future completes before the reverse transition. The outgoing
       // sheet can still rebuild on keyboard metrics or storage notifications;
@@ -1089,7 +1092,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     // surface cannot discard edits. Resource requests are cancelled separately.
     context.read<AppState>().study.dismissResources();
     unawaited(context.read<AppState>().study.notebooks.flush());
-    setState(() => _studyContext = null);
+    setState(() {
+      _studyContext = null;
+      _bookmarkGroup = null;
+      _bookmarkOriginVerse = null;
+      _bookmarkOriginOffset = null;
+    });
     final FocusNode? focus = _readerFocusBeforeStudy;
     _readerFocusBeforeStudy = null;
     if (focus?.context != null) {
@@ -1135,6 +1143,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Widget _studyWorkspace(AppState state, StudyContext captured) {
     return StudyWorkspace(
       context: captured,
+      contextual: _contextualStudy,
       initialTab: _studyTab,
       onTabChanged: (tab) => _studyTab = tab,
       onClose: _closeStudy,
@@ -1158,6 +1167,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
         StudyTab.markings => MyAnnotationsPanel(
           state: state,
           initialGroupId: _bookmarkGroup,
+          onBackToVerse: _bookmarkOriginVerse == null
+              ? null
+              : _backToBookmarkVerse,
           onOpenPassage: (passage) => unawaited(_openStudyPassage(passage)),
         ),
         StudyTab.verseNotes => MyAnnotationsPanel(
@@ -1179,6 +1191,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
         StudyTab.topics => TopicsPanel(
           controller: state.study.topics,
+          referenceLookup: state.referenceLookup,
+          preferences: state.preferences,
           bookmarks: state.bookmarks,
           onOpenBookmarks: (topicId) {
             final group = state.groups
@@ -1208,9 +1222,43 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
       };
 
-  void _openBookmarks(String? groupId) {
+  void _openBookmarks(String? groupId, [int? verse]) {
     _bookmarkGroup = groupId;
-    _openStudy(tab: StudyTab.markings);
+    _bookmarkOriginVerse = verse;
+    _bookmarkOriginOffset = _scrollController.hasClients
+        ? _scrollController.offset
+        : null;
+    _openStudy(
+      verse: context
+          .read<AppState>()
+          .current
+          ?.verses
+          .where((item) => item.verse == verse)
+          .firstOrNull,
+      tab: StudyTab.markings,
+    );
+  }
+
+  void _backToBookmarkVerse() {
+    final verse = _bookmarkOriginVerse;
+    final offset = _bookmarkOriginOffset;
+    final route = _compactStudyRoute;
+    _closeStudy();
+    unawaited(() async {
+      await route?.completed;
+      if (!mounted) return;
+      if (offset != null && _scrollController.hasClients) {
+        _scrollController.jumpTo(
+          offset.clamp(
+            _scrollController.position.minScrollExtent,
+            _scrollController.position.maxScrollExtent,
+          ),
+        );
+      } else {
+        await _scrollToVerse(verse);
+      }
+      _readerFocus.requestFocus();
+    }());
   }
 }
 
@@ -1346,42 +1394,66 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-class _ChapterHeading extends StatelessWidget {
-  const _ChapterHeading({required this.state, required this.onPreview});
+class _ChapterHeading extends StatefulWidget {
+  const _ChapterHeading({
+    super.key,
+    required this.state,
+    required this.onPreview,
+  });
 
   final AppState state;
   final VoidCallback onPreview;
 
   @override
+  State<_ChapterHeading> createState() => _ChapterHeadingState();
+}
+
+class _ChapterHeadingState extends State<_ChapterHeading> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final AppState state = widget.state;
     final BibleChapter chapter = state.current!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: TextButton(
-              style: TextButton.styleFrom(
-                alignment: AlignmentDirectional.centerStart,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    alignment: AlignmentDirectional.centerStart,
+                  ),
+                  onPressed: widget.onPreview,
+                  child: Text(
+                    chapter.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
               ),
-              onPressed: onPreview,
-              child: Text(
-                chapter.name,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              const SizedBox(width: 12),
+              Text(
+                chapter.abbreviation.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall,
               ),
-            ),
+              const SizedBox(width: 12),
+              ScriptureVerificationBadge(
+                expanded: _expanded,
+                onPressed: () => setState(() => _expanded = !_expanded),
+                freshness: state.freshness ?? CacheFreshness.cachedUnverified,
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Text(
-            chapter.abbreviation.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-          const SizedBox(width: 12),
-          ScriptureVerificationBadge(
+        ),
+        if (_expanded)
+          ScriptureVerificationNotice(
             freshness: state.freshness ?? CacheFreshness.cachedUnverified,
+            onClose: () => setState(() => _expanded = false),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -1614,6 +1686,7 @@ class _ParagraphReader extends StatelessWidget {
     final ScriptureParagraphTextMap mapping = ScriptureParagraphTextMap(
       verses,
       versePrefix: (_) => '\uFFFC',
+      verseSuffix: (_) => '\uFFFC',
     );
     final List<InlineSpan> content = <InlineSpan>[];
     for (int index = 0; index < verses.length; index++) {
@@ -1661,6 +1734,16 @@ class _ParagraphReader extends StatelessWidget {
                 context,
               )?.emphasisFor?.call(verse) ??
               const <ScriptureTextEmphasis>[],
+        ),
+      );
+      content.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: _VerseBookmarkAction(
+            state: state,
+            verse: verse,
+            reference: reference,
+          ),
         ),
       );
     }
@@ -1927,6 +2010,50 @@ class _VerseLine extends StatelessWidget {
   }
 }
 
+/// The bookmark action is next to its verse in both reader layouts. Its
+/// WidgetSpan is excluded by the source selection map and clipboard handler.
+class _VerseBookmarkAction extends StatelessWidget {
+  const _VerseBookmarkAction({
+    required this.state,
+    required this.verse,
+    required this.reference,
+  });
+  final AppState state;
+  final Verse verse;
+  final String reference;
+
+  @override
+  Widget build(BuildContext context) {
+    final membership = preferredWholeVerseMarking(
+      state.markings.where((marking) => marking.verse == verse.verse),
+    );
+    final group = state.groups
+        .where((item) => item.id == membership?.groupId)
+        .firstOrNull;
+    return IconButton(
+      key: ValueKey('verse-bookmarks-${verse.verse}'),
+      tooltip: UiStrings.of(
+        context,
+      ).text('Bookmarks for {reference}', {'reference': reference}),
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      iconSize: 17,
+      color: group == null
+          ? Theme.of(context).colorScheme.onSurfaceVariant
+          : _hexColor(group.color),
+      icon: Icon(membership == null ? Icons.bookmark_border : Icons.bookmark),
+      onPressed: () => unawaited(
+        _showBookmarkAssignments(
+          context,
+          state,
+          verse,
+          reference,
+          onOpenTopic: ScriptureStudyActions.maybeOf(context)?.onBookmarks,
+        ),
+      ),
+    );
+  }
+}
+
 class _SelectableMarkedVerse extends StatelessWidget {
   const _SelectableMarkedVerse({
     required this.state,
@@ -1942,6 +2069,11 @@ class _SelectableMarkedVerse extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScriptureVerseText(
       verse: verse,
+      trailing: _VerseBookmarkAction(
+        state: state,
+        verse: verse,
+        reference: reference,
+      ),
       style: _scriptureStyle(context, state).copyWith(height: 1.38),
       passage: state.passage,
       markings: state.markings,
@@ -1954,15 +2086,34 @@ class _SelectableMarkedVerse extends StatelessWidget {
       onWordTap: ScriptureStudyActions.maybeOf(context)?.onWord,
       contextMenuBuilder:
           (BuildContext context, EditableTextState editableTextState) {
-            final TextSelection selection =
-                editableTextState.textEditingValue.selection;
+            final rawSelection = editableTextState.textEditingValue.selection;
+            final TextSelection selection = TextSelection(
+              baseOffset: rawSelection.baseOffset.clamp(0, verse.text.length),
+              extentOffset: rawSelection.extentOffset.clamp(
+                0,
+                verse.text.length,
+              ),
+            );
             final bool valid =
                 selection.isValid &&
                 !selection.isCollapsed &&
                 selection.start >= 0 &&
                 selection.end <= verse.text.length;
             final List<ContextMenuButtonItem> buttons = <ContextMenuButtonItem>[
-              ...editableTextState.contextMenuButtonItems,
+              for (final item in editableTextState.contextMenuButtonItems)
+                if (item.type == ContextMenuButtonType.copy)
+                  ContextMenuButtonItem(
+                    type: item.type,
+                    label: item.label,
+                    onPressed: () => copyScriptureSelection(
+                      editableTextState,
+                      ScriptureParagraphTextMap([
+                        verse,
+                      ], verseSuffix: (_) => '\uFFFC'),
+                    ),
+                  )
+                else
+                  item,
               if (valid) ...[
                 ContextMenuButtonItem(
                   label: UiStrings.of(context).text('Search selected phrase'),
@@ -2788,8 +2939,7 @@ class _ChapterFooter extends StatelessWidget {
                     alignment: AlignmentDirectional.centerStart,
                     padding: EdgeInsets.zero,
                   ),
-                  onPressed: () =>
-                      launchUrl(Uri.parse('https://app.getbible.life')),
+                  onPressed: () => launchUrl(ProductIdentity.websiteUri),
                   child: Text(
                     UiStrings.of(context).text(
                       'getBible — {wordsOfEternalLife}',
@@ -2880,7 +3030,7 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
     final String reference = verses.length == 1
         ? '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}'
         : '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}\u2013${verses.last.verse}';
-    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://app.getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
+    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\n${shareablePassageUri(Passage(translation: _translation.abbreviation, book: _chapter.bookNumber, chapter: _chapter.chapter, verse: verses.first.verse), _chapter.bookName)}';
   }
 
   String get _value => _markdown
@@ -3033,6 +3183,7 @@ Future<void> _showTranslationDetails(
                 SelectableText(value),
                 const SizedBox(height: 16),
               ],
+              const InfrastructureCredit(),
             ],
           ),
         ),
@@ -3062,7 +3213,7 @@ Future<void> _showBookmarkAssignments(
   Verse verse,
   String reference, {
   List<ScriptureVerseSelection>? selections,
-  ValueChanged<String?>? onOpenTopic,
+  void Function(String?, int?)? onOpenTopic,
 }) async {
   final origin = state.passage;
   final chapter = state.current;
@@ -3079,75 +3230,98 @@ Future<void> _showBookmarkAssignments(
   await showDialog<void>(
     context: anchor,
     builder: (dialogContext) => SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = (constraints.maxWidth - 24).clamp(0.0, 480.0);
-          final height = (constraints.maxHeight - 24).clamp(0.0, 620.0);
-          final left = anchorPoint.dx.clamp(
-            12.0,
-            (constraints.maxWidth - width - 12).clamp(12.0, double.infinity),
-          );
-          final top = anchorPoint.dy.clamp(
-            12.0,
-            (constraints.maxHeight - height - 12).clamp(12.0, double.infinity),
-          );
-          return Stack(
-            children: [
-              Positioned(
-                left: left,
-                top: top,
-                width: width,
-                height: height,
-                child: Material(
-                  elevation: 12,
-                  borderRadius: BorderRadius.circular(16),
-                  clipBehavior: Clip.antiAlias,
-                  child: BookmarkAssignmentMenu(
-                    selections: selections,
-                    state: state,
-                    passage: origin,
-                    verse: verse.verse,
-                    quote: selected?.quote ?? verse.text,
-                    reference: reference,
-                    start: selected?.range.start,
-                    end: selected?.range.end,
-                    onAdd: (groupId) async {
-                      if (!ownsVerse()) {
-                        throw StateError(
-                          UiStrings.of(context).text(
-                            'This passage changed. Reopen its bookmark menu.',
-                          ),
-                        );
-                      }
-                      if (selections != null) {
-                        await state.markTextSelections(
-                          origin,
-                          selections,
-                          chapter!.bookName,
-                          groupId,
-                        );
-                      } else {
-                        await state.markWholeVerse(verse, reference, groupId);
-                      }
-                    },
-                    onOpenTopic: (id) {
-                      openTopic = true;
-                      selectedGroup = id;
-                      Navigator.of(dialogContext).pop();
-                    },
-                    onClose: () => Navigator.of(dialogContext).pop(),
-                  ),
+      child: KeyboardInsetPadding(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final layoutBox = context.findRenderObject();
+            final localAnchor = layoutBox is RenderBox
+                ? layoutBox.globalToLocal(anchorPoint)
+                : anchorPoint;
+            return CustomSingleChildLayout(
+              delegate: _BookmarkMenuLayout(localAnchor),
+              child: Material(
+                elevation: 12,
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
+                child: BookmarkAssignmentMenu(
+                  selections: selections,
+                  state: state,
+                  passage: origin,
+                  verse: verse.verse,
+                  quote: selected?.quote ?? verse.text,
+                  reference: reference,
+                  start: selected?.range.start,
+                  end: selected?.range.end,
+                  onAdd: (groupId) async {
+                    if (!ownsVerse()) {
+                      throw StateError(
+                        UiStrings.of(context).text(
+                          'This passage changed. Reopen its bookmark menu.',
+                        ),
+                      );
+                    }
+                    if (selections != null) {
+                      await state.markTextSelections(
+                        origin,
+                        selections,
+                        chapter!.bookName,
+                        groupId,
+                      );
+                    } else {
+                      await state.markWholeVerse(verse, reference, groupId);
+                    }
+                  },
+                  onOpenTopic: (id) {
+                    openTopic = true;
+                    selectedGroup = id;
+                    Navigator.of(dialogContext).pop();
+                  },
+                  onClose: () => Navigator.of(dialogContext).pop(),
                 ),
               ),
-            ],
-          );
-        },
+            );
+          },
+        ),
       ),
     ),
   );
   if (!anchor.mounted || !ownsVerse()) return;
   if (previousFocus?.context != null) previousFocus!.requestFocus();
-  if (openTopic) onOpenTopic?.call(selectedGroup);
+  if (openTopic) onOpenTopic?.call(selectedGroup, verse.verse);
+}
+
+/// Measure content first, then keep its actual bounds beside the verse and
+/// inside the safe, keyboard-cleared viewport. Small menus do not reserve the
+/// maximum list height; long memberships and the expanded picker can scroll.
+class _BookmarkMenuLayout extends SingleChildLayoutDelegate {
+  const _BookmarkMenuLayout(this.anchor);
+  final Offset anchor;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final width = (constraints.maxWidth - 24).clamp(0.0, 480.0);
+    return BoxConstraints(
+      minWidth: width,
+      maxWidth: width,
+      maxHeight: (constraints.maxHeight - 24).clamp(0.0, 620.0),
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) => Offset(
+    anchor.dx.clamp(
+      12.0,
+      (size.width - childSize.width - 12).clamp(12.0, double.infinity),
+    ),
+    anchor.dy.clamp(
+      12.0,
+      (size.height - childSize.height - 12).clamp(12.0, double.infinity),
+    ),
+  );
+
+  @override
+  bool shouldRelayout(_BookmarkMenuLayout oldDelegate) =>
+      anchor != oldDelegate.anchor;
 }
 
 class _MarkingGroupPicker extends StatefulWidget {

@@ -27,6 +27,7 @@ class ScriptureVerseText extends StatelessWidget {
     this.onSelectionChanged,
     this.focusNode,
     this.onWordTap,
+    this.trailing,
   });
 
   final Verse verse;
@@ -43,6 +44,9 @@ class ScriptureVerseText extends StatelessWidget {
   final FocusNode? focusNode;
   final void Function(Verse, ScriptureTextRange)? onWordTap;
 
+  /// An inline control outside the selectable source-text coordinates.
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
     final TextSpan span = scriptureVerseSpan(
@@ -57,8 +61,21 @@ class ScriptureVerseText extends StatelessWidget {
       includeWholeVerse: includeWholeVerse,
     );
     return NativeScriptureText(
-      span: span,
-      mapping: ScriptureParagraphTextMap(<Verse>[verse]),
+      span: trailing == null
+          ? span
+          : TextSpan(
+              style: style,
+              children: [
+                span,
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: trailing!,
+                ),
+              ],
+            ),
+      mapping: ScriptureParagraphTextMap(<Verse>[
+        verse,
+      ], verseSuffix: trailing == null ? null : (_) => '\uFFFC'),
       textDirection: textDirection,
       contextMenuBuilder: contextMenuBuilder,
       onSelectionChanged: onSelectionChanged,

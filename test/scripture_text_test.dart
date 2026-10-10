@@ -242,8 +242,9 @@ void main() {
       final ScriptureParagraphTextMap map = ScriptureParagraphTextMap(
         verses,
         versePrefix: (Verse verse) => '\uFFFC',
+        verseSuffix: (Verse verse) => '\uFFFC',
       );
-      expect(map.text, '\uFFFC  First\n \uFFFC😀 second ');
+      expect(map.text, '\uFFFC  First\n\uFFFC \uFFFC😀 second \uFFFC');
       final List<ScriptureVerseSelection> all = map.selections(
         0,
         map.text.length,
@@ -257,6 +258,9 @@ void main() {
       expect(map.selections(secondStart, secondStart + 2).single.quote, '😀');
       expect(map.selections(secondStart + 1, secondStart + 2), isEmpty);
       expect(map.selections(0, 1), isEmpty);
+      final int firstEnd = map.locations.first.$2.end;
+      expect(map.selections(firstEnd, secondStart), isEmpty);
+      expect(map.selections(map.text.length - 1, map.text.length), isEmpty);
     },
   );
 }

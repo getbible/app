@@ -111,6 +111,39 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         await _settle(tester);
         expect(find.byType(StudyWorkspace), findsOneWidget);
+        expect(
+          tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).contextual,
+          isTrue,
+        );
+        expect(find.byType(DropdownButtonFormField<StudyTab>), findsNothing);
+        if (width >= 840) {
+          final bounds = tester.getRect(find.byType(StudyWorkspace));
+          expect(bounds.width, 840);
+          expect(bounds.center.dx, closeTo(width / 2, 1));
+          expect(
+            find.ancestor(
+              of: find.byType(StudyWorkspace),
+              matching: find.byType(Dialog),
+            ),
+            findsOneWidget,
+          );
+        } else {
+          expect(find.byType(BottomSheet), findsOneWidget);
+        }
+
+        await tester.tap(find.byTooltip('Close Study tools'));
+        await _settle(tester);
+        final launcher = find.byTooltip(state.ui('study'));
+        await tester.tap(
+          launcher.evaluate().isNotEmpty
+              ? launcher
+              : find.widgetWithText(OutlinedButton, state.ui('study')),
+        );
+        await _settle(tester);
+        expect(
+          tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).contextual,
+          isFalse,
+        );
 
         await tester.tap(find.byType(DropdownButtonFormField<StudyTab>));
         await tester.pumpAndSettle();

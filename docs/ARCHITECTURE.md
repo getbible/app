@@ -7,7 +7,7 @@ The app uses a layered, local-first architecture. Flutter widgets depend on appl
 Provider/`ChangeNotifier` supplies reader state and bounded feature controllers.
 Search, dictionary, commentary, topics and notebooks own separate lifecycles;
 they do not add service parsing or persistence policy to `AppState` or reader
-widgets. GoRouter is pinned for the planned canonical deep-link graph. A future
+widgets. GoRouter supplies the canonical reader deep-link graph. A future
 state-system change should be one deliberate ADR rather than mixing systems
 feature by feature.
 
@@ -47,13 +47,21 @@ independent versioned roots; adapters retain each service's native envelope.
 `ServiceEnvelopeAdapters` validates discovery/study/search documents into typed
 contracts, without adding HTTP or JSON parsing to widgets.
 
+`ProductIdentity` separately owns the exact display name `getBible`, the
+reader/share origin `https://app.getbible.life`, general documentation
+`https://getbible.net`, and verification documentation
+`https://getbible.net/api/bible/`. Package/executable names use lowercase
+`getbible` where required. Corrected alpha packages use clean installations;
+there is no legacy-name migration layer. This does not change schema migration
+or validated backup-import responsibilities.
+
 Transport validates status before decoding, bounds streamed response bytes and
 request duration, and retries only transient failures within a finite budget.
 Typed failures retain HTTP status and Retry-After. Cache policy accounts for
 Cache-Control, validators, Date/Age and Expires; no-store bodies are not retained,
 no-cache responses are revalidated, and 304 requires an eligible saved body.
 Missing browser-exposed headers imply conservative freshness. This bounded
-HTTP cache is separate from SQLite's saved Scripture and future explicit
+HTTP cache is separate from SQLite's saved Scripture and explicit
 installations. Cancellation is request-scoped: dismissing one surface never
 closes another service's shared client.
 
@@ -96,8 +104,8 @@ Reference lookup follows the same boundaries as reading:
 
 - `ReferenceRequest`, `ReferenceSelection`, `ReferenceChapter` and
   `ReferenceResult` describe selected-translation citations in `domain/`.
-  `QueryRepository` is the adapter boundary for online lookup and a future
-  installed-Bible resolver.
+  `QueryRepository` is the adapter boundary for online lookup and installed-Bible
+  resolution.
 - `QueryApiClient` uses the shared transport and a dedicated compact Query v3
   parser. Optional chapter metadata can be absent; verse identities and all
   supplied lexical/source fields and contributing `ref` arrays survive parsing.
@@ -145,17 +153,23 @@ requests and the same preview component.
 
 `StudyContext` is an immutable snapshot of the opening Scripture, selected
 translation, source verse, language/direction, discovered books and original
-UTF-16 selection. Generated verse numbers and paragraph separators never become
-lookup or marking text. Resource switching follows this snapshot rather than
+UTF-16 selection. Generated verse numbers, bookmark controls and paragraph separators never
+become lookup or marking text. Resource switching follows this snapshot rather than
 silently following later reader navigation.
 
 `NativeScriptureText` uses Flutter's native selectable document without a
 competing word-tap gesture recognizer. A delayed single-word action leaves
 double-click, long-press selection and scrolling in control. Context menus keep
 Copy, marking/remove and inline Note actions and add selected-phrase Search.
-`StudyWorkspace` uses a beside-reader panel on wide windows and a keyboard-aware
-modal sheet on compact screens, with safe areas, focus traversal and Escape/
-back handling. The reader suppresses chapter-turn gestures while a Study/modal
+Toolbar, keyboard and accessibility Copy all map back to source verse ranges;
+a narrow public semantics delegate replaces only the native Copy action while
+preserving selection actions and individual bookmark controls.
+`StudyWorkspace` opens in a centered dialog from 840 logical pixels and a
+keyboard-aware modal sheet below that width. Contextual Study keeps its passage,
+selection, Search selection action and Dictionaries/Commentaries tabs together;
+the management workspace uses a separate resource selector. Safe areas, focus
+traversal and Escape/back handling apply to both. The reader suppresses
+chapter-turn gestures while a Study/modal
 interaction owns focus. Closing leaves its passage/scroll unchanged; explicit
 passage opening respects active inline-note drafts.
 
@@ -320,7 +334,21 @@ remaps transactionally. The database owns identities; a translated display label
 alone never establishes ownership when multiple private matches exist.
 
 `DictionaryDiscovery` owns bounded concurrent index/definition discovery and
-confirmed choices. Installed and online repositories share the actual background
-index parser. A native/Web worker keeps large parsing away from the UI event
-loop; the controller owns cancellation, scope, partial failures and history.
-Widgets render these states without issuing raw HTTP or SQL.
+confirmed choices. Related-entry navigation starts another contextual lookup,
+retaining only resources with confirmed definitions and bounded back history;
+it does not switch to the full catalogue. Installed and online repositories
+share the actual background index parser. A native/Web worker keeps large
+parsing away from the UI event loop; the controller owns cancellation, scope,
+partial failures and history. Widgets render these states without raw HTTP/SQL.
+
+`BookmarkAssignmentMenu` is reachable directly from each verse and shows
+clickable memberships above an expandable, independently scrollable topic
+picker. The same additive repository operations retain personal/global origins.
+`TopicVerseLoader` resolves revealed cards through `GroupedReferenceLookup`:
+eight verses per page, three concurrent requests and a 128-entry reuse cache.
+Installed-Bible and HTTP-cache behavior remain behind the shared repository.
+Each coordinate has an independent result/error, so unavailable verses do not
+hide successful ones. Closing/replacing the topic cancels owned requests and
+rejects late results without closing the shared transport. Fetched Scripture
+never overwrites private quotations. Returning to the originating verse restores
+the captured reader position.

@@ -9,8 +9,11 @@ candidate with surrounding punctuation removed, without changing Scripture.
 
 `DictionaryController` owns discovery, resource selection, requests and bounded
 entry history. `DictionaryDiscovery` searches across resources and exposes only
-confirmed nonempty definitions in the lookup chooser; the full catalogue is
-available separately through **Browse all dictionaries**. `DictionaryRepository`
+confirmed nonempty definitions in the lookup chooser. Contextual Study presents
+the selected word, actionable lexical identifiers and every confirmed definition
+for the chosen resource. The full catalogue is available separately through the
+unbound dictionary browser, never as an escape from a selected-word lookup.
+`DictionaryRepository`
 separates it from HTTP and JSON.
 `ApiDictionaryRepository` uses the shared Dictionaries v1 transport to read
 `dictionaries.json`, the chosen module's `metadata.json` and `index.json`, then
@@ -35,8 +38,13 @@ fallback is visibly attributed in its actual source language. A deliberate
 resource choice is stored per language/family; Scripture and the captured
 selection are never translated or replaced by that choice. Storage failure does
 not hide successfully loaded definitions. Module/context changes and dismissal invalidate
-late results. Link history is bounded and revisiting a loaded ancestor removes
-the cycle without recursively fetching resources.
+late results. Entry history in the unbound browser is bounded; revisiting a
+loaded ancestor removes the cycle without recursively fetching resources.
+Related entries and prefix
+suggestions start a new contextual lookup with the published entry ID and key;
+the dictionary chooser is filtered again, and Back restores the prior lookup.
+Clearing the contextual search restores the original selection rather than
+switching into catalogue browsing.
 
 Dictionary and commentary citations share `StudyCitation` and its strict
 adapter. Source labels and OSIS are retained. Positive verse coordinates use
@@ -84,7 +92,7 @@ again** retries discovery while retaining the deliberate resource preference.
 
 Four workers share index and definition requests. A lookup admits at most
 400,000 index records, 256 definition requests and 2,000,000 retained definition
-characters. A reached limit is visible and offers individual-resource browsing.
+characters. A reached limit is visible and suggests a more specific lookup word.
 Normalized indexes are reused only for the same catalogue publication, expire
 after 15 minutes, and are invalidated when managed installations change. Entry
 navigation rechecks the selected repository snapshot; confirmed lookup bodies
@@ -96,8 +104,8 @@ resources only. **Searching installed dictionaries** states that scope, and
 **Include online dictionaries** explicitly expands it to the published catalogue.
 Thus a local match does not wait for unrelated HTTP timeouts. A no-match result
 in this mode describes only installed resources, not every published dictionary.
-Opening the dictionary browser without a selected word, or clearing a lookup,
-also prefers an installed resource before applying language/default ranking.
+Opening the dictionary browser without a selected word also prefers an
+installed resource before applying language/default ranking.
 A remembered online choice cannot cause an automatic request in that case.
 The browser still lists the full catalogue for a deliberate online selection.
 Choosing an online resource there is an explicit online action. A submitted

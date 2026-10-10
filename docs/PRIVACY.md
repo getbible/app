@@ -6,7 +6,7 @@ reading position and cached Scripture are stored on the user's device. The
 application does not require an account and does not include advertising,
 analytics, behavioral tracking or cross-device synchronization.
 
-The application connects to GetBible services to retrieve translation metadata and Scripture. The network provider may process ordinary connection information such as IP address and request time as necessary to serve requests and protect the service. User notes and markings are not sent with Scripture requests.
+The application connects to getBible services to retrieve translation metadata and Scripture. The network provider may process ordinary connection information such as IP address and request time as necessary to serve requests and protect the service. User notes and markings are not sent with Scripture requests.
 
 Reference previews connect to the public Query v3 service only for an explicitly
 requested Scripture lookup. The request contains the selected Bible translation

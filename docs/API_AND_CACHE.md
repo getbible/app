@@ -1,4 +1,4 @@
-# GetBible API and cache workflow
+# getBible API and cache workflow
 
 ## Offline Web application shell
 
@@ -14,7 +14,7 @@ Build-time limits are 4,096 files, 64 MiB per file and 256 MiB for the complete
 shell. Only a fully populated cache receives its completion marker. Corrupt
 bytes, interrupted requests and quota failures discard the staged generation
 while retaining the previous active cache. Activation removes only older
-GetBible shell caches belonging to the same deployment base path.
+getBible shell caches belonging to the same deployment base path.
 
 Known static assets and friendly passage navigation can then reopen without a
 network connection. A missing cached asset is repaired only with bytes matching

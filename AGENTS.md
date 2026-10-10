@@ -46,11 +46,27 @@ Discover translations/books/chapters dynamically. Use SHA endpoints for chapter 
 
 Scripture is the visual priority. Respect safe areas, RTL, large text, semantics, keyboard focus, reduced motion, and 48dp touch targets. Notes are edited inline below verses. Contextual annotation controls belong near the verse/selection, not permanently at the bottom.
 
+Contextual Study uses a centered wide dialog or compact sheet with Dictionaries
+and Commentaries tabs; personal tools use their separate resource selector.
+Keep selected-word dictionary choices limited to confirmed definitions, including
+related entries. Per-verse bookmark controls preserve additive topic membership;
+topic cards resolve Scripture through the shared typed Query boundary.
+
 ## Product parity and brand assets
 
 The current `getbible/app.getbible.life` default branch and live application are the product source of truth. Treat `docs/WEB_FLUTTER_PARITY.md` as a living, test-backed contract. A web feature is not complete in Flutter until its native equivalent, persistence rules, localization, accessibility behavior, and tests exist. Update both ledgers whenever either implementation changes.
 
-Only the approved GetBible artwork under `assets/branding/` may be used for launchers, favicons, splash screens, window icons, store artwork, or in-app product branding. Never restore Flutter template icons or substitute framework/vendor icons for the application identity. Material/Cupertino icons remain appropriate for ordinary accessible actions such as search, close, share, and settings.
+Use the exact display name `getBible`, including localized text, documentation
+and installer labels; use suffix-free `getbible` for lowercase technical names.
+`ProductIdentity` owns the name, reader/share destination `https://app.getbible.life`,
+documentation destination `https://getbible.net`, and verification link
+`https://getbible.net/api/bible/`. Keep these separate from service API roots.
+The agreed [reader alignment contract](docs/READER_ALIGNMENT.md) takes precedence
+over older product naming and layouts. This alpha identity correction requires
+clean installations, with no legacy-name migration layer; ordinary schema and
+backup validation rules still apply.
+
+Only the approved getBible artwork under `assets/branding/` may be used for launchers, favicons, splash screens, window icons, store artwork, or in-app product branding. Never restore Flutter template icons or substitute framework/vendor icons for the application identity. Material/Cupertino icons remain appropriate for ordinary accessible actions such as search, close, share, and settings.
 
 ## Git and delivery
 

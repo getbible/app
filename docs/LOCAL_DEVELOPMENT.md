@@ -175,3 +175,12 @@ dart compile js -O2 tool/offline_bible_worker.dart -o web/offline_bible_worker.d
 CI rebuilds both the database and offline-index workers. Web packaging refuses
 a bundle missing either worker. Serve the entire output at its configured base
 path; copying only `index.html` and `main.dart.js` is insufficient.
+
+## Clean build after the alpha identity reset
+
+After updating an existing checkout to the corrected package name, run
+`flutter clean` and `flutter pub get` before rebuilding. Flutter can retain a
+generated web entry point from the previous package name even when application
+imports are correct. Fresh CI checkouts do not carry that build cache. This is
+build housekeeping; previous alpha installations still require clean installs
+and receive no identity migration.

@@ -1,6 +1,6 @@
 # getBible
 
-Cross-platform Flutter implementation of [getBible](https://app.getbible.life), maintained at [`getbible/app`](https://github.com/getbible/app). It targets Android, iOS, web, Windows, macOS, and Linux from one native Flutter codebase. Scripture comes from GetBible Bible v3, reference previews use Query v3, and private reader data remains on the device. The reader does not use a WebView.
+Cross-platform Flutter implementation of [getBible](https://app.getbible.life), maintained at [`getbible/app`](https://github.com/getbible/app). It targets Android, iOS, web, Windows, macOS, and Linux from one native Flutter codebase. Scripture comes from getBible Bible v3, reference previews use Query v3, and private reader data remains on the device. The reader does not use a WebView.
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
@@ -45,7 +45,7 @@ flutter pub get
 flutter run
 ```
 
-The application ID and iOS bundle ID are `life.getbible.mobile`. No API key is required for the public GetBible API.
+The application ID and iOS bundle ID are `life.getbible.mobile`. No API key is required for the public getBible API.
 
 ## Scripture and reference previews
 
@@ -57,6 +57,12 @@ preference changes presentation without modifying Scripture or private saved
 text ranges. Personal selected-text markings retain their original UTF-16
 code-unit offsets and quote; a quote mismatch after a source revision stays
 saved without coloring unrelated text.
+
+The verification icon toggles a compact explanation beneath the chapter header.
+It distinguishes verified Scripture from an offline copy whose current hash
+could not be checked, and links to the [Bible API documentation](https://getbible.net/api/bible/).
+Translation licensing ends with the book artwork, “The Word for the world!” and
+“Powered by getBible APIs.”, linking to [general documentation](https://getbible.net).
 
 Open **Reference preview** from the chapter heading, navigation drawer or verse
 context menu. Query v3 at `https://query.getbible.net/v3` resolves the chosen
@@ -83,24 +89,38 @@ a whole translation or silently switch to local corpus search.
 Tap a Scripture word to open its dictionary context, or use native selection
 to search the exact selected phrase. Copy, markings and inline note controls
 remain available. Verse context actions open commentary or related public
-topics; the chapter context opens chapter commentary. Study appears beside
-Scripture on wide windows and in a keyboard-aware sheet on compact screens.
+topics; the chapter context opens chapter commentary. **Study Scripture** opens
+as a centered dialog on wide windows and a keyboard-aware sheet on compact
+screens. Its passage context, selected text, **Search selection** action and
+**Dictionaries / Commentaries** tabs stay together. Personal tools use a separate
+resource selector for topics, markings, notebooks and verse notes.
 Closing restores reader focus and preserves its passage and scroll position.
 
 Dictionary lookup retains source lexical IDs, lemmas, morphology and
 transliteration and confirms definitions across available resource indexes.
 Installed resources are searched first when present; **Include online dictionaries**
 explicitly expands that scope. Suggestions and unavailable resources are distinct
-from confirmed definitions. Commentary uses published book/chapter coverage and
+from confirmed definitions. The chooser contains only dictionaries with a
+confirmed definition for the current lookup, including related-entry navigation.
+Strong's identifiers are actionable and repeated definitions remain visible.
+The full dictionary catalogue remains available through the unbound browser.
+Commentary uses published book/chapter coverage and
 retains ranged and introduction entries. Resource choices display their actual
 source language; unavailable coverage has an explicit state. Dictionary,
 commentary, topic and notebook citations reuse the same selected-Bible Query
 preview and do not navigate the reader until Open is chosen.
 
-Public topics are separate from private marking groups. Follow and Hide are
-local choices. **Copy to my markings** previews an explicit independent private
-copy with collision-safe identities and duplicate-safe repeated copying.
-Public updates cannot edit that private copy or personal notes.
+Each verse has a direct bookmark icon. Its scrollable menu shows linked topics;
+**Add another topic** expands a searchable list and adds a membership without
+removing existing ones. Clicking a topic opens its bookmarks, with **All topics**
+and **Back to verse** navigation. Topic cards load actual Scripture from the
+selected Bible through installed resources or Query, with bounded progressive
+loading, caching and per-verse retry. Fetched text never replaces a saved quotation.
+
+Global and personal topics share a list while memberships retain their separate
+origins. Follow and Hide are local choices. **Copy to my markings** previews an
+independent private copy with collision-safe identities and duplicate-safe
+repeated copying. Public updates cannot edit that copy or personal notes.
 
 **Notebooks** provides local titled documents with ordered text blocks and
 optional attributed Scripture quotations. Autosave, durable draft journals,
@@ -232,7 +252,17 @@ the [privacy policy draft](docs/PRIVACY.md).
 
 ## Branding
 
-All platform launchers, favicons, splash artwork, window icons, and in-app identity use the approved GetBible artwork in `assets/branding/`. CI validates a committed checksum manifest so generated Flutter template icons cannot silently return. The source artwork must be replaced only with explicitly approved GetBible assets.
+The display name is exactly **getBible**; technical package and executable names
+use `getbible` where lowercase is required. `ProductIdentity` centrally owns the
+name and public destinations. Every generated Scripture link points to
+`https://app.getbible.life`; documentation and verification use the distinct
+destinations described above. API service roots remain in `ApiConfiguration`.
+
+All launchers, favicons, splash artwork and window icons use the approved
+getBible artwork in `assets/branding/`. In-app identity combines the book artwork
+with native getBible text. CI checks the artwork manifest and naming contract.
+See the [reader alignment contract](docs/READER_ALIGNMENT.md) and
+[branding guide](docs/BRANDING.md).
 
 ## Documentation index
 
@@ -260,4 +290,4 @@ All platform launchers, favicons, splash artwork, window icons, and in-app ident
 
 ## License
 
-The existing repository license is retained in [LICENSE](LICENSE). Scripture translations remain subject to the license and copyright metadata returned by GetBible Bible v3; the application license does not relicense translation content.
+The existing repository license is retained in [LICENSE](LICENSE). Scripture translations remain subject to the license and copyright metadata returned by getBible Bible v3; the application license does not relicense translation content.

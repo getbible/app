@@ -16,6 +16,15 @@ Both applications now use the v3 Bible, Query and Search services. The
 unified bookmarks and v3 Study workflows. Neither audit replaces the requirement
 to recheck the reference when its behavior changes.
 
+The maintainers' [reader alignment contract](READER_ALIGNMENT.md) additionally
+fixes the native product name as `getBible` and specifies the screenshots'
+interaction hierarchy. `ProductIdentity` owns the reader/share URL
+`https://app.getbible.life`, general documentation `https://getbible.net`, and
+verification link `https://getbible.net/api/bible/`. Lowercase technical names
+use `getbible`; the alpha identity reset requires clean installation and no
+legacy-name migration. Existing schema and bookmark reconciliation remain
+separate responsibilities.
+
 ## Shared concepts and ownership
 
 Paths in the reference column refer to `getbible/app.getbible.life`.
@@ -25,10 +34,13 @@ Paths in the reference column refer to `getbible/app.getbible.life`.
 | Bible v3 and hashes | `lib/getbible.ts`, `lib/cache.ts` | `lib/data/api/`, `CachedBibleRepository`, lossless source models and complete installed Bible indexes. |
 | Query v3 previews | `lib/scripture-api.ts`, `app/components/ReferenceModal.tsx` | `QueryRepository`, `GroupedReferenceLookup`, `ReferencePreviewController`, `ReferencePreview`. |
 | Search v3 | `lib/scripture-api.ts`, `app/page.tsx` | `OnlineSearchController`, `ApiSearchRepository`, `SearchPanel`; 250 ms owned debounce and immediate submit. |
-| Dictionary/context lookup | `lib/study-api.ts`, `lib/dictionary-lookup.ts`, `StudyPanel.tsx` | `DictionaryDiscovery` confirms exact nonempty definitions across bounded resource indexes, distinguishes suggestions/failures and uses real workers for large indexes. Installed-first scope has an explicit online expansion. |
+| Contextual Study layout | `StudyPanel.tsx`, maintainer screenshots | Centered wide dialog or compact sheet with captured passage/selection, Search selection and Dictionaries/Commentaries tabs. Personal tools use a separate management selector. Responsive/native accessibility acceptance remains required. |
+| Dictionary/context lookup | `lib/study-api.ts`, `lib/dictionary-lookup.ts`, `StudyPanel.tsx` | Confirmed-definition choices, repeated definitions and actionable lexical IDs; related entries perform another contextual lookup rather than opening the full catalogue. Bounded discovery separates suggestions/failures; large indexes use workers. Installed-first scope has explicit online expansion. |
 | Commentary | `lib/study-api.ts`, `StudyPanel.tsx` | Typed sparse-coverage/range/citation workflow with explicit complete offline module installation. |
-| Topic identity and migration | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | `UnifiedBookmarksRepository`, SQL transaction store and controller reconcile source identity or unambiguous normalized names/aliases/locales; ambiguous independent private groups remain private. Metadata discovery is lazy on first bookmark use. |
-| Memberships and provenance | `lib/markings.ts`, `BookmarkMenu.tsx` | `annotations.dart`, `AppState`, annotation repository; preservation and full contextual menu are distinct acceptance gates. |
+| Topic identity and reconciliation | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | `UnifiedBookmarksRepository`, SQL transaction store and controller reconcile source identity or unambiguous normalized names/aliases/locales; ambiguous independent private groups remain private. Metadata discovery is lazy on first bookmark use. |
+| Memberships and provenance | `lib/markings.ts`, `BookmarkMenu.tsx` | Direct verse action, clickable memberships and searchable scrollable Add another topic picker; additive assignment and scoped personal/global removal. All topics and Back to verse retain the originating reader position. |
+| Topic Scripture | `lib/scripture-api.ts`, topic views and maintainer screenshots | `TopicVerseLoader` and `TopicVerseList` resolve coordinates through shared installed/Query lookup, with bounded pages/concurrency/cache, independent errors and cancellation. Display text never replaces saved quotations. |
+| Verification and licensing | Reader verification and licensing views, maintainer screenshots | Inline dismissible verification explanation below the chapter header; licensing footer uses approved book artwork, slogan and documentation attribution. Destinations come from `ProductIdentity`. |
 | Canonical notes | `lib/notes.ts`, `app/page.tsx` | `VerseNote`, annotation repository, inline reader editor. |
 | Rich source annotations | `lib/annotations.ts`, `ScriptureText.tsx` | `ScriptureTextMap`/composer, `SourceAnnotations` and native selectable Scripture; source notes/citations below verses/paragraphs, unlocated lexical metadata and red Jesus quotations. |
 | Reader restoration and URLs | `lib/reader-state.ts`, `app/page.tsx` | `ReaderRouter`, `NativeReaderLinks`, `AppState` and persistent reader page; exact visible-verse restoration, friendly URLs/history, custom-scheme platform activation and draft-aware navigation. Verified HTTPS associations require external domain/team setup. |
@@ -105,9 +117,12 @@ The pinned fixture `test/fixtures/ui_locale_contract.json` records the inspected
 reference commit and catalogue. Contract tests compare upstream keys and message
 positions, native call-site coverage and placeholders. The current reference has
 282 source messages and 69 locale packs; empty upstream packs intentionally use
-English. Native extension packs are generated only by the opt-in developer tool,
-committed to the repository, and loaded locally. Runtime and CI do not contact a
-translation service. Mechanical coverage is not a claim of human language review.
+English. The importer adapts the literal app name in `clearAllConfirm` while
+retaining the upstream key and position. Native extension packs are committed
+and loaded locally; provider-generated translations and local AI-assisted
+additions have explicit provenance. Runtime and CI do not contact a translation
+service. Mechanical coverage is not human language approval; see
+[localization](LOCALIZATION.md).
 
 The earlier audit's 199/218 message counts describe its historical commits, not
 this candidate. Re-synchronization must update the pinned fixture as well as the

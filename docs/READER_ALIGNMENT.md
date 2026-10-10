@@ -49,9 +49,30 @@ endpoints. Product-owned links must share one explicit configuration contract.
 
 ## Acceptance evidence
 
-Implementation is in progress. Record exact test/build evidence here before
-marking the pull request ready. Required coverage includes naming in packaged
-metadata and documentation; every Scripture sharing path; inline verification;
-licensing attribution; dictionary selection and related entries; direct verse
-bookmark access; additive memberships; topic verse content; return navigation;
-compact and wide layouts; large text/RTL; offline and failed requests.
+Implemented in [pull request #7](https://github.com/getbible/app/pull/7) for
+`1.0.0-alpha.5+6`, against reference source
+`098eeaa06c75efde4a3c75a9984d66ac987add30`. The alpha identity correction has no
+upgrade/migration layer. Existing database-schema and backup-validation tests
+remain relevant to ordinary data integrity; they do not migrate old app names.
+
+The composed reader tests exercise direct verse bookmarks, additive membership,
+Query-loaded topic Scripture, exact return navigation, canonical outbound links,
+inline verification and the licensing footer. Wide/light and compact/dark/RTL
+layouts are covered, including 200% text, a 320px viewport and a visible keyboard.
+Dictionary tests cover confirmed choices, all definitions, in-flight Back and
+nested lookup cancellation. Actual native Copy semantics, keyboard and toolbar
+paths preserve original Scripture without presentation markers.
+
+Actual Flutter widget captures were inspected with loaded fonts: wide Study,
+compact memberships and the compact keyboard layout. That review found and
+corrected a clipped dictionary selector and excess popup height. Geometry and
+content-height regressions now protect both corrections; very short enlarged
+menus scroll their entire contents to keep all actions reachable.
+
+Local analyzer, formatting, product-identity, locale/inventory and developer/
+release-tool checks pass. Linux and web release compilation succeeded during
+this increment. Full-suite evidence and hosted platform gates are recorded in
+[Testing](TESTING.md#identity-and-reader-alignment-alpha5). Only the checks on the
+final PR head establish native package/runtime acceptance. Signing and store
+submission remain separately configured; physical-device and human translation
+review are not implied by automated results.

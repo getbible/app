@@ -136,7 +136,7 @@ loaded; the final JSON encoder checks the exact serialized byte limit. Unknown c
 versions, duplicate identities, invalid ownership, unsupported private setting
 keys and dangling group/notebook references are rejected. Public cache rows,
 daily Scripture, installation data and downloaded public corpora are excluded.
-No backup is uploaded to a GetBible service.
+No backup is uploaded to a getBible service.
 
 Opening a backup presents its contents before an explicit **Merge backup**.
 The controller first makes open notebook edits durable; a failed journal write

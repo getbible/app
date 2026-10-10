@@ -2,7 +2,7 @@
 
 ## Interactive platform testing
 
-Run `flutter devices` to list available targets. Use `flutter run -d chrome` for the quickest browser test, or `flutter run -d <device-id>` for a connected phone, emulator, simulator, or desktop target. A successful GitHub Actions run exposes versioned packages for every supported target from its Artifacts section; see [distribution](DEPLOYMENT.md).
+Run `flutter devices` to list available targets. Use `flutter run -d chrome` for the quickest browser test, or `flutter run -d <device-id>` for a connected phone, emulator, simulator, or desktop target. Every successful CI run retains versioned packages in its Artifacts section. Successful main runs also promote new versions to [GitHub Releases](https://github.com/getbible/app/releases) without rebuilding; see [installation](INSTALLING.md) and [distribution](DEPLOYMENT.md).
 
 pub.dev distributes Dart/Flutter libraries; it does not host or execute this application. Browser previews should use a locally served web build or an explicitly configured GitHub Pages deployment. Mobile prereleases should use Android APK/Play internal testing and iOS TestFlight.
 
@@ -353,3 +353,76 @@ assets. These checks include real browser storage and file workflows.
 
 The increment's package version is `1.0.0-alpha.2+3`. Package creation does not
 publish a GitHub release or submit to a store; those remain explicit actions.
+
+## Integrated release candidate: steps 16–17
+
+Candidate version: `1.0.0-alpha.3+4`. Reference source:
+`getbible/app.getbible.life@098eeaa06c75efde4a3c75a9984d66ac987add30`.
+The historical evidence above belongs to its stated earlier increments and must
+not be treated as a test result for this candidate. Current source and CI are in
+[pull request #5](https://github.com/getbible/app/pull/5).
+
+### Automated acceptance contract
+
+`integration_test/platform_acceptance_test.dart` combines reader/clipboard,
+Study, private portability, installed-resource reopening, released-schema
+migration and a 20,000-verse background-worker journey. It uses generated,
+test-only fixtures so mobile sandboxes do not depend on the repository's disk
+paths. Production application assets do not contain those fixture documents.
+
+```bash
+python scripts/testing/embed_fixtures.py --check
+flutter drive --driver=test_driver/platform_acceptance.dart \
+  --target=integration_test/platform_acceptance_test.dart -d <device-id>
+```
+
+The native workflow requires Linux, Windows and macOS runtime execution,
+Android phone and tablet emulator profiles with 2 GiB RAM, and both iPhone and
+iPad simulators. Reports retain selected device identity, driver output, mobile
+screenshots and measured worker elapsed time, UI heartbeat and process memory.
+The corpus is synthetic, and its metrics are evidence rather than an arbitrary
+speed threshold. Simulator results do not establish physical-device performance.
+
+The production Web build uses bundled rendering resources, generated static
+shell inventory and Chromium, Firefox and WebKit runtime journeys under plain
+and COOP/COEP-isolated hosting. The journey exercises real browser SQLite,
+private backup download/file-picker restore, installed Bible and dictionary
+workers, unvisited offline chapter/search, and a new page with **all networking
+disabled**, including the static host. WebKit automation is not a claim that
+physical Safari/iOS acceptance has been performed. The separate bounded live
+CORS probe records actual service responses and distinguishes upstream
+availability from deterministic fixture-backed application regressions.
+
+GitHub CI also installs the actual DEB/EXE/DMG outputs where supported, checks
+installed launchers/custom-protocol registration and launches the installed
+application. iOS unsigned device bundles are compile artifacts; use simulator
+APPs or a provisioned signed build for execution. Signed targets retain their
+independent configuration gates. Release publication accepts only the complete
+verified inventory from a successful trusted main run and does not rebuild it.
+
+Focused regressions cover transactional bookmark reconciliation and origin
+removal, exact source annotations/citations, confirmed dictionary discovery,
+Search debounce, friendly/native links, draft-preserving navigation, startup
+storage denial and non-destructive Retry. Localization contract checks pin the
+upstream message catalogue and validate native placeholders/call sites; they
+cannot certify language quality.
+
+### Human acceptance record required before stable release
+
+For each supported desktop, phone and tablet, record the candidate version,
+package checksum, OS/device, tester, date and result. Exercise the complete
+reader → word → dictionary citation → Query → Search result → commentary →
+topic → personal marking → notebook → backup → offline restart sequence using
+rich and plain Bibles, matching and nonmatching resource languages, and missing
+coverage. Check native selection/Copy, pointer anchoring, inline drafts across
+rotation/resizing/suspension, large text, RTL, high contrast, reduced motion,
+keyboard/IME, actual VoiceOver/TalkBack and file/share destinations.
+
+Retain a backup before an actual old-to-new package upgrade and compare private
+IDs, ranges/quotes, origins, notes, notebook blocks/journals and preferences after
+restart. Automated schema fixtures complement this installed-package upgrade;
+they do not replace it. Human linguistic review, physical-device gestures,
+actual Safari, verified HTTPS domain associations, signing credentials and store
+approval are external acceptance evidence. An alpha download may be published
+with these gates explicitly open; it must not be described as a stable,
+store-approved or fully device-certified release.

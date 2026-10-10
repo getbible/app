@@ -83,12 +83,10 @@ Menu and group-picker choices retain their opening passage/chapter ownership;
 navigation while either route is open cannot apply its old action to another
 chapter. Imported group IDs are kept separate from reserved menu actions.
 
-This preserves the current website's backup provenance and whole-verse membership
-contract. Automatic global catalogue/group reconciliation, its unified management
-UI, exact per-topic ranged removal, the complete unified bookmark UI remain separate parity work. The complete
-private backup below includes Flutter's scoped private-copy/follow preferences. Flutter's explicit
-private topic copies remain private; they are not reclassified as live shared
-memberships merely from a group label.
+Schema 4 established this provenance and membership contract. The current unified
+bookmark catalog reconciliation and contextual assignment UI extend it using the
+same columns; their transaction is described below. Explicit private topic copies
+remain personal memberships and are not reclassified as shared from a label.
 
 `test/bookmark_preservation_test.dart` exercises the current web v2 fixture,
 source validation, collisions, legacy remapping, SQLite restart, schema-3 upgrade
@@ -107,7 +105,8 @@ retained inside this complete envelope. Separate `notebooks`, `drafts` and `sett
 arrays retain notebook/block identities, ordered text, saved quotations and
 attribution, creation/update times, document revisions, journal owner and base
 revision, reading position, reader preferences, selected notebook, remembered
-Study resources, topic Follow/Hide and scoped private-copy provenance.
+Study resources, topic Follow/Hide, the six recent bookmark topics and scoped
+private-copy provenance.
 
 A website-compatible export remains available and is labelled as excluding
 notebooks/drafts and complete app settings. Both website schema versions 1 and 2
@@ -137,7 +136,8 @@ installation containing only unchanged bundled starter groups and no private
 annotations/documents, complete restore retains the exported group order and
 timestamps exactly. Merging into an existing private collection keeps its local
 ordering and appends genuinely new groups. Incoming
-active-group preferences and private-copy destinations follow collision remaps.
+active-group preferences, recent bookmark topics and private-copy destinations
+follow collision remaps.
 Different notebook contents with the same ID become a separate document with
 collision-safe notebook/block IDs, preserving both bodies and original times.
 A locally edited imported copy is not overwritten by repeating the same import.
@@ -170,3 +170,43 @@ unchanged. The released schema-4 fixture is
 verifies migration with private notes and source provenance. Ordinary caches,
 complete private backups and explicit installed-resource removal remain separate
 operations with separate ownership.
+
+
+## Unified bookmark reconciliation (step 16)
+
+Opening the bookmark list or contextual picker loads API topic metadata lazily.
+This does not create any global verse memberships. Only explicit global download
+adds those records. A fresh database's unchanged bundled fallback groups are
+replaced by API groups; an existing private collection undergoes conservative
+identity reconciliation instead.
+
+Explicit source IDs outrank labels. Unscoped historical sources belong to the
+official Bookmarks v1 service; an optional `sourceScope` source member identifies
+a configured alternate provider. Semantic global identity includes that provider
+and topic as well as canonical coordinate and group. A renamed linked group cannot
+be matched to another topic by name, and a different provider cannot absorb it.
+Canonical/localized names and aliases use Unicode NFKD matching. Ambiguous matches
+and independent personal groups sharing a label are preserved without guessing.
+
+When an old imported public group is absorbed into one unambiguous local group,
+the local group's ID, name, color, ordering and timestamp survive. Every personal
+marking ID, timestamp, quote and original UTF-16 range survives. Legacy source
+inference happens before remapping; personal and global records at the same verse
+remain independent. Only redundant global semantic memberships are collapsed.
+The catalog transaction remaps active/recent group choices and private-copy
+destinations together with groups and memberships. It does not replace notes,
+notebooks, notebook blocks or independent draft journals. A late SQL failure rolls
+back every reconciliation/download write.
+
+Recent choices use the existing settings table under `bookmarks:v1:recent`, a
+validated list of at most six group IDs. Complete backup import remaps those IDs
+with its group collision map. This additive setting and source metadata use the
+existing schema 5 structure; there is no SQL schema version change in step 16.
+
+Global removal targets only explicit/historical global origins for the selected
+provider, optionally one topic. Personal origin removal targets one group and
+exact verse/range. Neither action deletes topic metadata, personal work in other
+origins, notes or notebooks. Saved global memberships are part of private reader
+backups, while a separately installed public-topic corpus remains excluded.
+See [Unified bookmarks and public topics](public-topics.md) for operation limits,
+UI ownership and the automated coverage added for these behaviors.

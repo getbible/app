@@ -5,9 +5,12 @@ Status meanings: **Implemented core** has native implementation and focused test
 workflow; **Pending verification** requires platform/device confirmation. An
 implemented core is not automatically equivalent to the current reference app.
 
-The current comparison is the [9 October 2026 source audit](PARITY_AUDIT_2026-10.md)
-against web commit `22172efd7ed46722c8f0da42b58222c8f1bc2360`. Its unified bookmark
-model supersedes the July baseline. Complete parity remains unfinished.
+The integrated candidate compares against web commit
+`098eeaa06c75efde4a3c75a9984d66ac987add30` (10 October 2026). The
+[9 October source audit](PARITY_AUDIT_2026-10.md) records the earlier gaps and
+preservation findings; its baseline descriptions are historical. The rows below
+describe current code. Candidate run evidence belongs in [Testing](TESTING.md),
+and physical-device acceptance remains distinct from implemented behavior.
 
 | Area | Status | Implementation / remaining gate |
 |---|---|---|
@@ -21,25 +24,25 @@ model supersedes the July baseline. Complete parity remains unfinished.
 | Last passage persistence | Implemented core | Saved position and reader centering exist; full target lifecycle/restore validation remains. |
 | Daily Scripture | Implemented correction; pending verification | Query alias resolution, complete daily verse selection, truthful unavailable outcomes and retry ownership now have regression cases; see the current testing evidence. |
 | Swipe and cross-book navigation | Implemented core | Shared cross-book turn operation, horizontal swipe, Alt+arrow shortcuts, arrows/mobile row, and tested deliberate double-boundary intent; device gesture QA remains |
-| Deep links/shareable links | Partial | Parser exists; GoRouter/platform association needs integration tests |
+| Deep links/shareable links | Implemented core; target verification required | Persistent GoRouter page, friendly passage paths, browser history and custom `getbible:` cold/warm links. Invalid/unavailable links never substitute a passage. OS-verified HTTPS app associations require domain and signing-team configuration. |
 | RTL and appearance modes | Implemented | Device selection behavior still requires QA |
-| Contextual selection/bookmark menu | Partial | Native Copy, markings, notes and Study entry points exist. The current web assignment menu, separate displayed origins, recent topics and return-to-verse path need full native equivalents. |
-| Whole/text markings and memberships | Partial | Canonical whole verses, UTF-16 selections, overlap rendering and private group management exist. Typed source provenance, additive whole-verse membership, scoped personal removal and schema-4 migration are added with regression cases. The full unified list/menu/migration remains missing; see the October audit. |
-| Unified global/personal topic list | Missing | Flutter still separates public Topics and My markings; API-based defaults, automatic legacy group reconciliation, G badges and origin-aware global-download management are not implemented. |
-| Inline notes | Implemented core | Add/edit/delete editor opens under its verse and saved note folds inline; keyboard-shortcut and full widget journey tests remain |
-| Online Search v3 | Implemented core; interaction differs | Advanced filters, ranked pagination, complete references, cancellation/cooldown and exact-verse opening exist. Flutter requires submission after edits; the web searches with a debounce. Explicit Installed search uses validated local corpora with a documented filter subset; this additional offline capability is not supplied by the current website. |
+| Contextual selection/bookmark menu | Implemented core; target verification required | Anchored assignment surface, recent topics, exact saved selections and separate personal/global removal. Native Copy and Study remain available; physical selection handles and assistive-technology focus require device acceptance. |
+| Whole/text markings and memberships | Implemented core | Canonical whole verses, translation-specific UTF-16 ranges, additive topic assignment and scoped origin removal. Source-scoped identity prevents unrelated providers from merging. Private IDs, custom labels/colors, exact quotes and timestamps survive transactional reconciliation. |
+| Unified global/personal topic list | Implemented core | One topic list, G badges, API metadata reconciliation, explicit global download/removal and independent private copies. API metadata loads on first bookmark use; bundled private starter choices remain usable offline. Ambiguous independent private groups remain separate. |
+| Inline notes | Implemented core; target verification required | Inline add/edit/delete, retained drafts across layout and failed saves, Ctrl/Cmd+Enter, navigation guarding and saved-note folding. Actual platform keyboard/IME behavior remains a device gate. |
+| Online Search v3 | Implemented core | Advanced filters, ranked pagination, complete references, cancellation/cooldown and exact-verse opening. Edits debounce 250 ms; submit flushes immediately. Explicit Installed search has its documented local filter subset, an additional capability beyond the current website. |
 | Adaptive Study workspace | Implemented core | Captured word/phrase/verse/chapter context, responsive side panel/sheet, keyboard/Escape, native selection precedence and six usable tabs. Large-text and nested-dialog regressions complement composed journeys; device/screen-reader QA remains. |
-| Dictionaries and commentaries | Partial | Typed on-demand indexes/coverage/citations work. The current web cross-resource chooser of confirmed definitions is absent. Complete module installation and local indexed adapters are implemented; the remaining gap is the cross-resource interaction. |
-| Public topic browsing and private copies | Implemented core; workflow differs | Lazy browsing, local Follow/Hide and explicit private copies work. They are different from the reference's unified global-download workflow. |
-| Source annotations and references | Partial | Rich source data and styled text survive; the web's below-verse source-note/citation controls and red Jesus quotation presentation are not reproduced. |
+| Dictionaries and commentaries | Implemented core | Bounded cross-resource discovery confirms nonempty exact entries, separates suggestions, and exposes partial failures/retry. Installed-first scope avoids network delays until explicit expansion. Sparse commentary supports independent book/chapter introductions and shared citations. |
+| Public topic browsing and private copies | Implemented core | Lazy browsing and Follow/Hide remain available. Explicit private Copy remains independent from unified global membership download and removal. |
+| Source annotations and references | Implemented core; target verification required | Below-verse/paragraph source notes, unlocated lexical metadata and citation controls; red Jesus quotations. Source text and private offsets remain unchanged; large-text/native selection acceptance remains required. |
 | Personal study/sermon notebooks | Implemented core | Ordered private blocks and references, durable draft journals, revision conflicts, lifecycle flush and schema 3 migrations. The complete private backup includes notebooks, journals and references; Markdown has Save/Copy and supported sharing. |
 | Private-data portability | Implemented core; target verification required | Explicit file import preview/confirmation, legacy v1/v2 import and v2 export, plus a distinct complete private format for notebooks, journals, settings and copy provenance. Atomic merging preserves conflicting work; public corpora are excluded. |
 | Complete offline resources | Implemented core; target verification required | Explicit installs, staged generation activation, integrity/revision checks, restart recovery, cancel/retry/remove, installed Bible/reference/search and dictionary/commentary/topic indexes. Private data is independent of public resource removal. |
 | Markdown generation | Implemented core; device verification required | Scripture and notebook Markdown preview, Save file/Download and Copy; supported mobile/browser share sheets with retained fallback actions. |
-| Complete website localization | Partial | Runtime loading and 69 bundled packs exist, but only some widgets use them. At audit time packs contain 199 messages versus 218 in the reference; the current test checks internal consistency only. |
+| Complete website localization | Implemented candidate; linguistic verification required | Current 282-message reference contract and 69 bundled packs, native extension catalogue, UI-wide lookup and independent RTL direction. Build-time generated translations require human language review; documented upstream historical-language fallbacks are retained. Tests compare pinned upstream keys, placeholders and native call sites, not only pack lengths. |
 | Approved GetBible branding | Implemented | Supplied artwork is installed for Android, iOS, macOS, Windows, Linux, web, splash, and the reader header; CI verifies exact hashes |
 | Accessibility | Partial | Safe area, semantics, scaling foundations; full focus/screen-reader audit remains |
-| CI and versioned packages | Pending target evidence | See [Testing](TESTING.md) and [Deployment](DEPLOYMENT.md) for the current supported-host matrix, downloadable packages and actual run evidence. Passing one target is not validation of another. |
+| CI and versioned packages | Implemented candidate; exact-run evidence required | Versioned DEB, EXE, DMG, APK, simulator APP and Web packages; automatic promotion of successful main artifacts to GitHub Releases. Native desktop/mobile simulator and three browser-engine acceptance jobs complement package builds. Passing one target is not validation of another. |
 | Signed store distribution | External | Requires Apple/Google credentials and store review |
 
 “Ready for distribution” requires every applicable Partial/Missing row to be resolved, automated checks and supported-host builds to pass, versioned packages to be verified, and the target manual QA matrix to be signed off. Mobile, desktop and browser are separate validation targets.
@@ -64,20 +67,21 @@ Independent titled study/sermon notebooks complement canonical inline verse note
 
 Read-only public topic discovery, sparse reverse associations and locale fallback remain separate from private starter marking groups. Follow/Hide save scoped local choices; only explicit previewed Copy creates an independent private UUID group and additive canonical markings. Fifteen focused tests cover published identities, missing selected-Bible coordinates, collisions, repeat copies, source revisions, private-data preservation and native 200% layouts. Seven resource fixtures match the live Bookmarks contract. See [Public topics](public-topics.md).
 
-## Current reference alignment
+## Integrated candidate and deliberate differences
 
-The web application has changed since the first parity implementation. Its latest
-bookmark topics share one list, can have both personal and global membership at
-the same coordinate, and automatically reconcile older groups using stable source
-identity and unambiguous names/aliases/locales. Flutter's independent private
-copy must not be relabelled as that workflow. The [October audit](PARITY_AUDIT_2026-10.md)
-records concrete source paths, preservation risks, the 33 executed reference
-bookmark tests, remaining UX work and the order of implementation.
+Steps 16–17 implement the remaining reader, Study, bookmark and localization
+boundaries against the current reference, together with runtime acceptance and
+downloadable installers. Their automated results, external target limitations
+and release candidate identity are recorded in [Testing](TESTING.md).
 
-Build/package fixes do not close these product gaps. Steps 12–15 add complete
-private-data portability and installed offline resources; their verification is
-recorded in the testing guide. Step 16 covers
-complete localization and integrated parity/accessibility, and step 17 validates
-supported hosts/devices and distribution. Specific correctness bugs, such as
-losing a bookmark's origin during a backup round trip, must be corrected before
-those larger increments are declared finished.
+Flutter preserves two independent private groups when matching is ambiguous;
+it does not guess that identical labels imply identical ownership. Published
+topic metadata is loaded on first use of bookmark management/assignment rather
+than adding startup network work. Dictionary discovery initially uses installed
+modules where available, with an explicit online expansion. Separate private
+notebooks, complete private backups and installed full-text search remain native
+extensions. These choices are visible and preserve existing private data.
+
+Source comparison, deterministic integration, actual installer execution,
+physical-device accessibility and store review are separate evidence. Generated
+locale coverage establishes available messages, not human linguistic approval.

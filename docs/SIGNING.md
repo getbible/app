@@ -15,6 +15,11 @@ usable direct-download package.
 
 See [Android and Windows signing](SIGNING_ANDROID_WINDOWS.md) for those target
 credentials and scripts, and [Deployment](DEPLOYMENT.md) for the package matrix.
+Successful main builds are published as GitHub Releases using the already-built
+unsigned and available signed files. The publisher needs only the workflow's
+automatic `GITHUB_TOKEN`; no signing key is required for unsigned desktop/test
+downloads. Store submission remains a separate future workflow. Configuring one
+platform never makes another platform's signing credentials mandatory.
 
 ## GitHub configuration
 

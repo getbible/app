@@ -90,6 +90,40 @@ async function readerVisible(page) {
   await page.getByRole('group', { name: `Genesis 1:2. ${secondVerse}`, exact: true }).waitFor();
 }
 
+/** Cache verification belongs below the chapter heading, outside a dialog. */
+async function inspectVerification(page, { verified }) {
+  const badgeName = verified ? 'Verified Scripture' : 'Saved Scripture';
+  const badge = page.getByRole('button', { name: badgeName, exact: true });
+  // Flutter may expose paragraph text exclusively through its accessible name.
+  // Observe that semantics node, including when there is no DOM text child.
+  const explanation = page.getByRole('group', { name: verified
+    ? 'This chapter was checked against the hash published by getBible and matches the current source.'
+    : 'This is the last known good copy saved on this device. It remains readable offline, but the current source hash could not be checked.',
+  exact: true });
+  const collapsedBadge = page.getByRole('button', { name: badgeName, exact: true, expanded: false });
+  const expandedBadge = page.getByRole('button', { name: badgeName, exact: true, expanded: true });
+  await badge.waitFor();
+  assert.equal(await badge.count(), 1, 'Verification exposes one accessible button');
+  await collapsedBadge.waitFor();
+  assert.equal(await badge.getAttribute('aria-expanded'), 'false');
+  await badge.click();
+  await explanation.waitFor();
+  await expandedBadge.waitFor();
+  assert.equal(await badge.getAttribute('aria-expanded'), 'true');
+  await page.getByRole('button', { name: 'getBible API', exact: true }).waitFor();
+  assert.equal(await page.getByRole('dialog').count(), 0,
+    'Verification must not cover Scripture with a modal dialog');
+  assert.equal(await page.getByRole('alertdialog').count(), 0,
+    'Verification must not open the former alert dialog');
+  await readerVisible(page);
+  await page.getByRole('button', { name: 'Close verification explanation', exact: true }).click();
+  await explanation.waitFor({ state: 'hidden' });
+  // The text node and button state can land in separate semantics updates.
+  // Wait for the actual collapsed state rather than the preceding DOM frame.
+  await collapsedBadge.waitFor();
+  assert.equal(await badge.getAttribute('aria-expanded'), 'false');
+}
+
 async function runJourney(browser, { isolated, browserName }) {
   const hosting = isolated ? 'cross-origin-isolated' : 'standard-hosting';
   const mode = `${browserName}-${hosting}`;
@@ -222,9 +256,7 @@ async function runJourney(browser, { isolated, browserName }) {
     await enableSemantics(page);
     await readerVisible(page);
     await page.getByRole('button', { name: noteText }).waitFor();
-    await page.getByRole('button', { name: 'Saved Scripture', exact: true }).click();
-    await page.getByText('Saved for offline reading', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await inspectVerification(page, { verified: false });
     assert.ok(requests.some((request) => request.apiOffline),
       'Cached chapter path must attempt current-source verification');
     setApiOffline(false);
@@ -307,9 +339,7 @@ async function runJourney(browser, { isolated, browserName }) {
     await enableSemantics(page);
     await readerVisible(page);
     await page.getByRole('button', { name: restoredNoteText }).waitFor();
-    await page.getByRole('button', { name: 'Verified Scripture', exact: true }).click();
-    await page.getByText('Scripture verified', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await inspectVerification(page, { verified: true });
     await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
     await page.getByRole('button', { name: 'Set up offline use', exact: true }).press('Enter');
     await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary/ }).waitFor();
@@ -420,7 +450,7 @@ async function runJourney(browser, { isolated, browserName }) {
       'Network-disconnected application startup must not fetch public services');
     assert.deepEqual([...errors, ...consoleDiagnostics().unexpected], [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
-    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
+    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'inline cache verification without a modal', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: join(outputDirectory, `${mode}-failure.png`) }).catch(() => {});

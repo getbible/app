@@ -490,7 +490,7 @@ Local validation used the pinned Flutter 3.44.6 / Dart 3.12.2 SDK:
 
 | Check | Evidence |
 |---|---|
-| Complete Flutter unit/widget suite | 467 tests passed |
+| Complete Flutter unit/widget suite | 469 tests passed |
 | Analyzer and formatting | No issues; no formatting changes |
 | Developer/release tooling | 39 developer tests and 64 release-tool tests passed |
 | Branding, assets and localization | Identity gate, approved-asset checksums, 438-template inventory, 69 locale packs and reference synchronization checked |
@@ -504,6 +504,17 @@ semantics Copy and preserve UTF-16 source ranges, including reversed emoji
 selection. Dictionary navigation is tested while requests are still in flight;
 per-module Retry restores all definitions after partial failure. A 320px wide
 keyboard layout and a 300px available-height/200% text menu remain operable.
+
+Compiled-browser CI exposed duplicate accessibility buttons on the verification
+badge that the original widget checks did not detect. The badge now merges its
+expanded state with the native button semantics; dedicated tests count exported
+roles and exercise screen-reader activation, Tab focus and Space. The browser
+journey checks a single button, expansion/dismissal, verified and saved content,
+and the absence of a modal while keeping the persistence/offline checks intact.
+The corrected release passed all four Chromium/WebKit journeys across standard
+and isolated hosting, with no unexpected browser errors or missing assets.
+Local Firefox could not launch even a blank page because this host denied its
+sandbox namespace setup; Firefox acceptance remains a hosted-CI gate.
 
 A pre-rename generated Flutter web entry point initially retained the old Dart
 package import. Clearing that generated cache resolved the build; existing

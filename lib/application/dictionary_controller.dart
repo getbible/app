@@ -56,6 +56,8 @@ final class DictionaryController extends ChangeNotifier {
 
   Future<void> _preferenceTail = Future<void>.value();
   final List<DictionaryEntry> _history = <DictionaryEntry>[];
+  final List<_DictionaryLookupState> _lookupHistory = [];
+  List<DictionaryEntry> _definitions = const [];
   StudyContext? _context;
   DictionaryLookup? _lookup;
   DictionaryCatalogue? _catalogue;
@@ -82,6 +84,9 @@ final class DictionaryController extends ChangeNotifier {
   DictionaryModule? get selectedModule => _selected;
   DictionaryMetadata? get metadata => _metadata;
   DictionaryEntry? get entry => _entry;
+
+  /// Every confirmed definition for the selected resource, in published order.
+  List<DictionaryEntry> get definitions => _definitions;
   List<DictionaryIndexEntry> get matches => _matches;
   String get query => _query;
   Object? get error => _error;
@@ -89,8 +94,9 @@ final class DictionaryController extends ChangeNotifier {
   bool get isLoading => _loading;
   bool get needsResourceChoice =>
       !_loading && !_discovering && _error == null && _selected == null;
-  bool get canGoBack => _history.isNotEmpty;
-  int get historyLength => _history.length;
+  bool get canGoBack => _history.isNotEmpty || _lookupHistory.isNotEmpty;
+  int get historyLength => _history.length + _lookupHistory.length;
+  bool get canBrowse => _lookup?.candidates.isEmpty ?? true;
 
   /// Refresh only installation availability; keep the selected definition,
   /// index results and navigation history intact while a download completes.
@@ -125,6 +131,8 @@ final class DictionaryController extends ChangeNotifier {
   Future<void> open(StudyContext context) async {
     if (_disposed) return;
     _active = true;
+    _lookupHistory.clear();
+    _definitions = const [];
     _includeOnline = false;
     _usingInstalledChoices = false;
     _onlineChoicesAvailable = false;
@@ -273,6 +281,38 @@ final class DictionaryController extends ChangeNotifier {
         return rank(a).compareTo(rank(b));
       });
     notifyListeners();
+    Future<void>? initialSelection;
+    Future<void> loadFirstChoice(DictionaryModule module) async {
+      final selection = _owner.begin();
+      _error = null;
+      _loading = true;
+      try {
+        await _loadModule(module, selection);
+      } on RequestCancelledException {
+        // A user choice or a newer lookup owns the replacement.
+      } catch (error) {
+        if (_owner.owns(selection)) _error = error;
+      } finally {
+        if (_owner.owns(selection) && !_disposed) {
+          _loading = false;
+          notifyListeners();
+        }
+      }
+    }
+
+    void chooseFirstResult() {
+      final selected = _preferred(choices);
+      if (selected == null || selected.id == _selected?.id) return;
+      // Progressive results can improve the automatic language/lexical default,
+      // but never replace a resource the reader chose or an entry they opened.
+      if (_selected != null &&
+          (_history.isNotEmpty ||
+              (_manualModule != null && selected.id != _manualModule))) {
+        return;
+      }
+      initialSelection = loadFirstChoice(selected);
+    }
+
     try {
       final capability = repository;
       var resources = ordered;
@@ -299,25 +339,15 @@ final class DictionaryController extends ChangeNotifier {
         onProgress: (result) {
           if (!_discoveryOwner.owns(request) || _disposed) return;
           _discoveryResult = result;
+          chooseFirstResult();
           notifyListeners();
         },
       );
       if (!_discoveryOwner.owns(request) || _disposed) return;
-      // A choice made while discovery was progressing owns the active entry.
-      if (_selected == null) {
-        final selected = _preferred(choices);
-        if (selected != null) {
-          final selection = _owner.begin();
-          _loading = true;
-          try {
-            await _loadModule(selected, selection);
-          } catch (error) {
-            if (_owner.owns(selection)) _error = error;
-          } finally {
-            if (_owner.owns(selection)) _loading = false;
-          }
-        }
-      }
+      // Show usable content before a slower unrelated dictionary finishes.
+      // An explicit resource choice is retained as other results arrive.
+      chooseFirstResult();
+      await initialSelection;
     } on RequestCancelledException {
       // New lookup, dismissal or disposal owns the replacement state.
     } catch (error) {
@@ -331,9 +361,20 @@ final class DictionaryController extends ChangeNotifier {
   }
 
   /// Searches all resources for a changed word, retaining captured Scripture
-  /// context for citation previews. Clearing the term enters explicit browsing.
-  Future<void> searchWords(String query, {bool preserveChoice = false}) async {
+  /// context for citation previews. An empty contextual lookup restores the
+  /// original selection; only an unbound dictionary browser lists all modules.
+  Future<void> searchWords(String query, {bool preserveChoice = false}) =>
+      _searchWords(query, preserveChoice: preserveChoice);
+
+  Future<void> _searchWords(
+    String query, {
+    bool preserveChoice = false,
+    String? preferredModule,
+    List<String> exactCandidates = const [],
+    _DictionaryLookupState? previousLookup,
+  }) async {
     if (!_active || _disposed || _catalogue == null) return;
+    if (query.trim().isEmpty && !canBrowse) query = _lookup!.sourceWord;
     if (query.length > 500) {
       _error = const FormatException(
         'Dictionary lookup is limited to 500 characters.',
@@ -341,18 +382,32 @@ final class DictionaryController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final previousChoice = preserveChoice
-        ? (_manualModule ?? _selected?.id)
-        : null;
+    final previousChoice =
+        preferredModule ??
+        (preserveChoice ? (_manualModule ?? _selected?.id) : null);
+    if (previousLookup == null) {
+      _lookupHistory.clear();
+    } else {
+      // History belongs to the navigation action, not to eventual network
+      // completion. Back is usable during discovery, and another linked lookup
+      // cannot cancel away its predecessor's snapshot.
+      _lookupHistory.add(previousLookup);
+      if (_lookupHistory.length > historyLimit) _lookupHistory.removeAt(0);
+    }
     _owner.cancel();
     _discoveryOwner.cancel();
     _query = query;
-    _candidates = query == _lookup?.sourceWord ? _lookup!.candidates : [query];
-    _browsing = query.trim().isEmpty;
+    _candidates = exactCandidates.isNotEmpty
+        ? exactCandidates
+        : query == _lookup?.sourceWord
+        ? _lookup!.candidates
+        : [query];
+    _browsing = canBrowse && query.trim().isEmpty;
     _selected = null;
     _metadata = null;
     _index = null;
     _entry = null;
+    _definitions = const [];
     _history.clear();
     _requestedEntry = null;
     _matches = const [];
@@ -390,15 +445,31 @@ final class DictionaryController extends ChangeNotifier {
 
   Future<void> openSuggestion(DictionarySuggestion suggestion) async {
     if (!_active || _disposed) return;
-    _discoveryOwner.cancel();
-    _discovering = false;
-    _browsing = true;
-    _query = suggestion.entry.key;
-    _candidates = [suggestion.entry.id];
-    await selectModule(suggestion.module.id);
-    if (_selected?.id == suggestion.module.id && _active && !_disposed) {
-      await openEntry(suggestion.entry.id);
+    await _followLookup(suggestion.module.id, suggestion.entry);
+  }
+
+  /// A related word is a new contextual lookup, not a switch into browsing.
+  /// The exact published ID participates alongside its display key, preserving
+  /// duplicate entries and lexical identifiers without guessing document URLs.
+  Future<void> followLink(String id) async {
+    final target = _index?.entryById(id);
+    final module = _selected;
+    if (target == null || module == null) {
+      await openEntry(id); // Existing missing-link validation never sends HTTP.
+      return;
     }
+    await _followLookup(module.id, target);
+  }
+
+  Future<void> _followLookup(String module, DictionaryIndexEntry target) async {
+    if (!_active || _disposed) return;
+    final previous = _DictionaryLookupState.capture(this);
+    await _searchWords(
+      target.key,
+      preferredModule: module,
+      exactCandidates: [target.id, target.key],
+      previousLookup: previous,
+    );
   }
 
   bool _compatible(DictionaryModule module) {
@@ -421,8 +492,8 @@ final class DictionaryController extends ChangeNotifier {
         .where((DictionaryModule item) => item.id == id)
         .firstOrNull;
     if (module == null || _context == null || !_active || _disposed) return;
+    if (!_browsing && _confirmed(id) == null) return;
     _manualModule = id;
-    if (!_browsing && _confirmed(id) == null) _browsing = true;
     final RequestCancellation request = _owner.begin();
     _loading = true;
     _error = null;
@@ -432,6 +503,7 @@ final class DictionaryController extends ChangeNotifier {
     _metadata = null;
     _index = null;
     _entry = null;
+    _definitions = const [];
     _matches = const <DictionaryIndexEntry>[];
     _selected = module;
     notifyListeners();
@@ -469,6 +541,12 @@ final class DictionaryController extends ChangeNotifier {
     RequestCancellation request,
   ) async {
     _selected = module;
+    _metadata = null;
+    _index = null;
+    _entry = null;
+    _definitions = const [];
+    _matches = const [];
+    _requestedEntry = null;
     final statusGeneration = ++_installationStatusGeneration;
     isInstalled = false;
     final capability = repository;
@@ -512,15 +590,28 @@ final class DictionaryController extends ChangeNotifier {
               .toList();
     if (!_owner.owns(request)) return;
     _entry = null;
-    if (_matches.isNotEmpty) {
-      final String id = _matches.first.id;
-      _requestedEntry = id;
-      final DictionaryEntry entry = await repository.entry(
-        module.id,
-        id,
-        cancellation: request,
-      );
-      if (_owner.owns(request)) _entry = entry;
+    _definitions = const [];
+    // Re-read from the active repository generation. Discovery bodies must not
+    // leak across an installed-resource update while the chooser is open.
+    try {
+      for (final match in _matches) {
+        _requestedEntry ??= match.id;
+        final DictionaryEntry entry = await repository.entry(
+          module.id,
+          match.id,
+          cancellation: request,
+        );
+        if (!_owner.owns(request)) return;
+        if (entry.text.trim().isEmpty) continue;
+        _entry ??= entry;
+        _definitions = List.unmodifiable([..._definitions, entry]);
+        notifyListeners();
+      }
+    } catch (_) {
+      // A partial multi-definition load must retry the module, not reopen its
+      // first successful entry and silently discard the remaining matches.
+      if (_owner.owns(request)) _requestedEntry = null;
+      rethrow;
     }
   }
 
@@ -573,6 +664,7 @@ final class DictionaryController extends ChangeNotifier {
     );
     if (previous >= 0) {
       _entry = _history[previous];
+      _definitions = [_entry!];
       _history.removeRange(previous, _history.length);
       _requestedEntry = id;
       _loading = false;
@@ -597,6 +689,7 @@ final class DictionaryController extends ChangeNotifier {
         if (_history.length > historyLimit) _history.removeAt(0);
       }
       _entry = result;
+      _definitions = [result];
     } catch (error) {
       if (_owner.owns(request)) _error = error;
     } finally {
@@ -608,9 +701,21 @@ final class DictionaryController extends ChangeNotifier {
   }
 
   void goBack() {
-    if (_history.isEmpty) return;
+    if (_history.isEmpty) {
+      if (_lookupHistory.isEmpty) return;
+      _owner.cancel();
+      _discoveryOwner.cancel();
+      final previous = _lookupHistory.removeLast();
+      previous.restore(this);
+      _discovering = false;
+      _loading = false;
+      _error = null;
+      notifyListeners();
+      return;
+    }
     _owner.cancel();
     _entry = _history.removeLast();
+    _definitions = [_entry!];
     _requestedEntry = _entry!.id;
     _loading = false;
     _error = null;
@@ -638,6 +743,7 @@ final class DictionaryController extends ChangeNotifier {
     _discovering = false;
     _loading = false;
     _history.clear();
+    _lookupHistory.clear();
   }
 
   @override
@@ -648,6 +754,58 @@ final class DictionaryController extends ChangeNotifier {
     _owner.cancel();
     _discoveryOwner.cancel();
     super.dispose();
+  }
+}
+
+/// Bounded navigation snapshots restore the complete visible lookup, including
+/// its filtered chooser, instead of showing an old entry under a new word.
+final class _DictionaryLookupState {
+  _DictionaryLookupState.capture(DictionaryController controller)
+    : query = controller._query,
+      candidates = controller._candidates,
+      result = controller._discoveryResult,
+      module = controller._selected,
+      metadata = controller._metadata,
+      index = controller._index,
+      entry = controller._entry,
+      definitions = controller._definitions,
+      matches = controller._matches,
+      history = List.of(controller._history),
+      browsing = controller._browsing,
+      installed = controller.isInstalled,
+      manualModule = controller._manualModule,
+      requestedEntry = controller._requestedEntry;
+
+  final String query;
+  final List<String> candidates;
+  final DictionaryDiscoveryResult? result;
+  final DictionaryModule? module;
+  final DictionaryMetadata? metadata;
+  final DictionaryIndex? index;
+  final DictionaryEntry? entry;
+  final List<DictionaryEntry> definitions, history;
+  final List<DictionaryIndexEntry> matches;
+  final bool browsing, installed;
+  final String? manualModule, requestedEntry;
+
+  void restore(DictionaryController controller) {
+    controller
+      .._query = query
+      .._candidates = candidates
+      .._discoveryResult = result
+      .._selected = module
+      .._metadata = metadata
+      .._index = index
+      .._entry = entry
+      .._definitions = definitions
+      .._matches = matches
+      .._browsing = browsing
+      ..isInstalled = installed
+      .._manualModule = manualModule
+      .._requestedEntry = requestedEntry;
+    controller._history
+      ..clear()
+      ..addAll(history);
   }
 }
 

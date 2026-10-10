@@ -8,6 +8,70 @@ import 'support/dictionary_fixture.dart';
 
 void main() {
   testWidgets(
+    'word lookup shows every definition and actionable lexical chips',
+    (tester) async {
+      final fixture = DictionaryFixture();
+      final controller = DictionaryController(
+        repository: fixture.repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DictionaryPanel(
+              controller: controller,
+              context: dictionaryContext(strongs: ['G3056', 'G4487']),
+              onPreviewReference: (_) async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Browse all dictionaries'), findsNothing);
+      expect(find.text('Look up'), findsOneWidget);
+      final chooser = tester.widget<DropdownButton<String>>(
+        find.descendant(
+          of: find.byKey(const ValueKey('dictionary-resource-choice')),
+          matching: find.byType(DropdownButton<String>),
+        ),
+      );
+      expect(
+        chooser.items!.map((item) => item.value),
+        isNot(contains('oddgreek')),
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const ValueKey('dictionary-definition-strongsgreek/G3056--2'),
+        ),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('A distinct definition.'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.widgetWithText(ActionChip, 'G4487'),
+        -150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, 'G4487'));
+      await tester.pumpAndSettle();
+      expect(controller.query, 'G4487');
+      expect(controller.definitions.single.id, 'G4487');
+      expect(controller.choices.map((module) => module.id), ['strongsgreek']);
+      expect(controller.isBrowsing, isFalse);
+      final field = tester.widget<TextField>(
+        find.byKey(const ValueKey('dictionary-lookup-query')),
+      );
+      expect(field.controller!.text, 'G4487');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'native dictionary lookup, links and shared selected-Bible citation work',
     (WidgetTester tester) async {
       final DictionaryFixture fixture = DictionaryFixture();

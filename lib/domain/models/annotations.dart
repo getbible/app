@@ -4,7 +4,7 @@ import 'passage.dart';
 /// Published bookmark origin, independent of a user's group name and ID.
 /// Personal membership in a linked group deliberately has no source of its own.
 final class SharedBookmarkSource {
-  const SharedBookmarkSource({required this.topicId});
+  const SharedBookmarkSource({required this.topicId, this.sourceScope});
 
   factory SharedBookmarkSource.fromJson(Object? value) {
     final JsonMap json = requireJsonMap(value, 'bookmark source');
@@ -13,10 +13,20 @@ final class SharedBookmarkSource {
         !isValidTopicId(topicId)) {
       throw const FormatException('A bookmark contains an invalid source.');
     }
-    return SharedBookmarkSource(topicId: topicId);
+    final String? scope = json['sourceScope'] == null
+        ? null
+        : requireString(json, 'sourceScope');
+    if (scope != null && (scope.isEmpty || scope.length > 2048)) {
+      throw const FormatException('Invalid bookmark source scope.');
+    }
+    return SharedBookmarkSource(topicId: topicId, sourceScope: scope);
   }
 
   final String topicId;
+  final String? sourceScope;
+  static const String defaultScope =
+      'bookmarks:v1:https://bookmarks.getbible.net/v1';
+  String get effectiveScope => sourceScope ?? defaultScope;
 
   static bool isValidTopicId(String value) =>
       value.length <= 80 &&
@@ -25,6 +35,7 @@ final class SharedBookmarkSource {
   JsonMap toJson() => <String, Object?>{
     'type': 'shared-bookmark',
     'topicId': topicId,
+    if (sourceScope != null) 'sourceScope': sourceScope,
   };
 }
 
@@ -186,7 +197,7 @@ final class Marking {
 
   bool get isSharedBookmark => sharedSource != null;
   String get identity => isWholeVerse
-      ? '${passage.canonicalKey}|$verse|${isSharedBookmark ? 'shared' : 'all'}|$groupId'
+      ? '${passage.canonicalKey}|$verse|${isSharedBookmark ? 'shared:${sharedSource!.effectiveScope}:${sharedSource!.topicId}' : 'all'}|$groupId'
       : '${passage.key}|$verse|$start|$end|$quote|$groupId';
 
   bool matchesPassage(Passage other) => isWholeVerse

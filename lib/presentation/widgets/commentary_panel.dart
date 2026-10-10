@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../application/commentary_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/commentary.dart';
 import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
@@ -95,11 +96,11 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
                 initialValue: controller.selectedModule?.id,
                 isExpanded: true,
                 itemHeight: null,
-                decoration: const InputDecoration(
-                  labelText: 'Commentary resource',
+                decoration: InputDecoration(
+                  labelText: UiStrings.of(context).text('Commentary resource'),
                   border: OutlineInputBorder(),
                 ),
-                hint: const Text('Choose a commentary'),
+                hint: Text(UiStrings.of(context).text('Choose a commentary')),
                 items: controller.modules
                     .map(
                       (CommentaryModule module) => DropdownMenuItem<String>(
@@ -125,12 +126,18 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
                 runSpacing: 8,
                 children: <Widget>[
                   ChoiceChip(
-                    label: Text('Verse ${widget.context.verseNumber}'),
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                    label: Text(
+                      UiStrings.of(context).text('Verse {verse}', {
+                        'verse': widget.context.verseNumber!,
+                      }),
+                    ),
                     selected: controller.verseMode,
                     onSelected: (_) => controller.setVerseMode(true),
                   ),
                   ChoiceChip(
-                    label: const Text('Whole chapter'),
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                    label: Text(UiStrings.of(context).text('Whole chapter')),
                     selected: !controller.verseMode,
                     onSelected: (_) => controller.setVerseMode(false),
                   ),
@@ -143,17 +150,49 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
                 )) ...<Widget>[
               const SizedBox(height: 12),
               Text(
-                'This resource is in ${controller.selectedModule!.language}; your Bible is in ${widget.context.language}.',
+                UiStrings.of(context).text(
+                  'This resource is in {sourceLanguage}; your Bible is in {bibleLanguage}.',
+                  {
+                    'sourceLanguage': controller.selectedModule!.language,
+                    'bibleLanguage': widget.context.language,
+                  },
+                ),
               ),
             ],
             if (controller.preferenceWarning != null) ...<Widget>[
               const SizedBox(height: 12),
-              Text(controller.preferenceWarning!),
+              Text(UiStrings.of(context).text(controller.preferenceWarning!)),
             ],
             const SizedBox(height: 16),
+            if (controller.introduction != null)
+              _Introduction(
+                title: UiStrings.of(context).text('Book introduction'),
+                entries: controller.introduction!.entries,
+                studyContext: widget.context,
+                language: metadata?.language ?? widget.context.language,
+                onPreviewReference: widget.onPreviewReference,
+              ),
+            if (controller.chapter?.entries.any((entry) => entry.verse == 0) ??
+                false)
+              _Introduction(
+                title: UiStrings.of(context).text('Chapter introduction'),
+                entries: controller.chapter!.entries
+                    .where((entry) => entry.verse == 0)
+                    .toList(),
+                studyContext: widget.context,
+                language: metadata?.language ?? widget.context.language,
+                onPreviewReference: widget.onPreviewReference,
+              ),
+            if (controller.introductionError != null)
+              _Status(
+                message: UiStrings.of(context).text(
+                  'The book introduction could not be loaded. Chapter commentary remains available.',
+                ),
+                onRetry: controller.retry,
+              ),
             if (controller.isLoading)
               Semantics(
-                label: 'Loading commentary',
+                label: UiStrings.of(context).text('Loading commentary'),
                 liveRegion: true,
                 child: const LinearProgressIndicator(),
               )
@@ -164,26 +203,37 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
               )
             else if (controller.availability ==
                 CommentaryAvailability.selectResource)
-              const Text(
-                'No commentary in this Bible’s language is selected. Choose an available resource explicitly; its source language will be shown.',
+              Text(
+                UiStrings.of(context).text(
+                  'No commentary in this Bible’s language is selected. Choose an available resource explicitly; its source language will be shown.',
+                ),
               )
             else if (controller.availability ==
                 CommentaryAvailability.unavailableChapter)
               _Status(
-                message:
-                    'This resource has no published commentary for ${widget.context.label}.',
+                message: UiStrings.of(context).text(
+                  'This resource has no published commentary for {reference}.',
+                  {'reference': widget.context.label},
+                ),
                 onRetry: controller.retry,
               )
             else if (controller.availability ==
                 CommentaryAvailability.unavailableVerse)
               Text(
                 controller.verseMode
-                    ? 'This chapter has no commentary covering verse ${widget.context.verseNumber}. Try Whole chapter to read its other material.'
-                    : 'This published chapter contains no commentary entries.',
+                    ? UiStrings.of(context).text(
+                        'This chapter has no commentary covering verse {verse}. Try Whole chapter to read its other material.',
+                        {'verse': widget.context.verseNumber!},
+                      )
+                    : UiStrings.of(context).text(
+                        'This published chapter contains no commentary entries.',
+                      ),
               )
             else
               for (final CommentaryQuotation quotation
-                  in CommentaryQuotation.group(controller.entries))
+                  in CommentaryQuotation.group(
+                    controller.entries.where((entry) => !entry.isIntroduction),
+                  ))
                 _Quotation(
                   quotation: quotation,
                   studyContext: widget.context,
@@ -193,7 +243,10 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
             if (metadata != null) ...<Widget>[
               const Divider(height: 32),
               Text(
-                'Source: ${metadata.name} · ${metadata.language}',
+                UiStrings.of(context).text('Source: {name} · {language}', {
+                  'name': metadata.name,
+                  'language': metadata.language,
+                }),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -202,7 +255,16 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Citations were resolved by ${metadata.references.api} (${metadata.references.versification}). Preview requests use ${widget.context.translationName ?? widget.context.translation.toUpperCase()}; availability and versification may differ.',
+                UiStrings.of(context).text(
+                  'Citations were resolved by {api} ({versification}). Preview requests use {bible}; availability and versification may differ.',
+                  {
+                    'api': metadata.references.api,
+                    'versification': metadata.references.versification,
+                    'bible':
+                        widget.context.translationName ??
+                        widget.context.translation.toUpperCase(),
+                  },
+                ),
               ),
               if (metadata.about.isNotEmpty)
                 Padding(
@@ -231,7 +293,7 @@ final class _Status extends StatelessWidget {
       OutlinedButton.icon(
         onPressed: () => unawaited(onRetry()),
         icon: const Icon(Icons.refresh),
-        label: const Text('Retry'),
+        label: Text(UiStrings.of(context).text('Retry')),
       ),
     ],
   );
@@ -275,7 +337,7 @@ final class _Quotation extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                '${entry.coverageLabel}${entry.osis == null ? '' : ' · ${entry.osis}'}',
+                '${_coverage(context, entry)}${entry.osis == null ? '' : ' · ${entry.osis}'}',
                 style: Theme.of(context).textTheme.labelLarge,
               ),
             ),
@@ -307,12 +369,60 @@ final class _Quotation extends StatelessWidget {
             if (citations.any(
               (StudyCitation citation) => !citation.isScripture,
             ))
-              const Text(
-                'An introduction citation has no Scripture verse to preview.',
+              Text(
+                UiStrings.of(context).text(
+                  'An introduction citation has no Scripture verse to preview.',
+                ),
               ),
           ],
         ],
       ),
     );
   }
+}
+
+/// Introductions keep their source chapter/verse-zero identity and never become
+/// fabricated Scripture coordinates. Each section can be expanded by keyboard.
+final class _Introduction extends StatelessWidget {
+  const _Introduction({
+    required this.title,
+    required this.entries,
+    required this.studyContext,
+    required this.language,
+    required this.onPreviewReference,
+  });
+  final String title;
+  final List<CommentaryEntry> entries;
+  final StudyContext studyContext;
+  final String language;
+  final Future<void> Function(ReferenceRequest) onPreviewReference;
+  @override
+  Widget build(BuildContext context) => ExpansionTile(
+    title: Text(title),
+    children: [
+      for (final quotation in CommentaryQuotation.group(entries))
+        _Quotation(
+          quotation: quotation,
+          studyContext: studyContext,
+          language: language,
+          onPreviewReference: onPreviewReference,
+        ),
+    ],
+  );
+}
+
+String _coverage(BuildContext context, CommentaryEntry entry) {
+  final ui = UiStrings.of(context);
+  if (entry.chapter == 0) return ui.text('Book introduction');
+  if (entry.verse == 0) return ui.text('Chapter introduction');
+  final verses = entry.verses.isEmpty ? [entry.verse] : entry.verses;
+  return verses.length == 1
+      ? ui.text('Chapter {chapter} · verse {verses}', {
+          'chapter': entry.chapter,
+          'verses': verses.join(', '),
+        })
+      : ui.text('Chapter {chapter} · verses {verses}', {
+          'chapter': entry.chapter,
+          'verses': verses.join(', '),
+        });
 }

@@ -15,14 +15,19 @@ import 'study_api_fixture.dart';
 
 /// Exercises public resources and private editing through the production reader.
 /// The same journey runs in widget CI and the native Linux runner.
-void studyWorkspaceJourney() {
+void studyWorkspaceJourney({
+  bool useDeviceViewport = false,
+  Size viewport = const Size(1250, 900),
+}) {
   testWidgets(
     'Study dictionaries, commentary, topics and local notebooks compose without changing Scripture',
     (tester) async {
-      tester.view.physicalSize = const Size(1250, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      if (!useDeviceViewport) {
+        tester.view.physicalSize = viewport;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+      }
       final StudyApiFixture fixture = StudyApiFixture();
       const Passage origin = Passage(
         translation: 'tst',
@@ -93,6 +98,15 @@ void studyWorkspaceJourney() {
       await tester.tap(find.text('Whole chapter'));
       await settle();
       expect(find.textContaining('First ranged comment.'), findsOneWidget);
+      final introduction = find.widgetWithText(
+        ExpansionTile,
+        'Chapter introduction',
+      );
+      await tester.ensureVisible(introduction);
+      await tester.pumpAndSettle();
+      expect(introduction.hitTestable(), findsOneWidget);
+      await tester.tap(introduction);
+      await settle();
       expect(find.text('Chapter introduction.'), findsOneWidget);
       expect(
         fixture.requests.any((uri) => uri.path == '/v1/fixture/1/1.json'),
@@ -129,16 +143,13 @@ void studyWorkspaceJourney() {
         TextFormField,
         'Study or sermon notes',
       );
-      await tester.scrollUntilVisible(
-        block,
-        250,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const ValueKey<String>('notes-panel-list')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      final Finder notebookScroll = find
+          .descendant(
+            of: find.byKey(const ValueKey<String>('notes-panel-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(block, 250, scrollable: notebookScroll);
       await tester.pumpAndSettle();
       await tester.enterText(block, 'Private draft survives closing Study.');
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -161,6 +172,11 @@ void studyWorkspaceJourney() {
       fixture.offline = true;
       await openWord();
       await choose(StudyTab.notes);
+      // On a phone the reopened list starts above the editor, outside its
+      // lazy viewport. Scroll the actual notes panel to the saved block.
+      await tester.scrollUntilVisible(block, 250, scrollable: notebookScroll);
+      await tester.pumpAndSettle();
+      expect(block.hitTestable(), findsOneWidget);
       expect(
         find.text('Private draft survives closing Study.'),
         findsOneWidget,

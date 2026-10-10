@@ -223,6 +223,7 @@ final class PrivateSetting {
       key == 'readerPreferences' ||
       key == 'lastReadingPosition' ||
       key == 'notebooks:v1:selected' ||
+      key == 'bookmarks:v1:recent' ||
       key.startsWith('study:v1:dictionary:') ||
       key.startsWith('study:v1:commentary:') ||
       key.startsWith('study:v1:topic-followed:') ||
@@ -252,6 +253,14 @@ final class PrivateSetting {
           position.updatedAt.millisecondsSinceEpoch < 0) {
         throw const FormatException('The saved reading position is invalid.');
       }
+    } else if (key == 'bookmarks:v1:recent') {
+      if (value is! List ||
+          (value! as List).length > 6 ||
+          (value! as List).any(
+            (item) => item is! String || item.isEmpty || item.length > 4096,
+          )) {
+        throw const FormatException('Invalid recent bookmark topics.');
+      }
     } else if (isTopicCopy) {
       final JsonMap json = requireJsonMap(value, 'topic copy provenance');
       if (json['version'] != 1 || requireString(json, 'groupId').isEmpty) {
@@ -272,7 +281,8 @@ final class PrivateSetting {
     }
     if (key != 'readerPreferences' &&
         key != 'lastReadingPosition' &&
-        key != 'notebooks:v1:selected') {
+        key != 'notebooks:v1:selected' &&
+        key != 'bookmarks:v1:recent') {
       final List<String> parts = key.split(':');
       final int expected = key.startsWith('study:v1:dictionary:')
           ? 5

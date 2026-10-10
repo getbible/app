@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../application/app_state.dart';
 import '../application/reference_preview_controller.dart';
+import '../core/ui_strings.dart';
 import '../data/platform/platform_text_file_service.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
@@ -20,7 +22,9 @@ import '../services/markdown_service.dart';
 import '../services/scripture_layout.dart';
 import '../services/scripture_text.dart';
 import '../services/search_match_emphasis.dart';
+import '../services/source_annotations.dart';
 import 'boundary_turn_controller.dart';
+import 'widgets/bookmark_assignment_menu.dart';
 import 'widgets/commentary_panel.dart';
 import 'widgets/dictionary_panel.dart';
 import 'widgets/my_annotations_panel.dart';
@@ -36,6 +40,7 @@ import 'widgets/scripture_study_actions.dart';
 import 'widgets/scripture_verification_badge.dart';
 import 'widgets/scripture_verse_text.dart';
 import 'widgets/search_panel.dart';
+import 'widgets/source_annotations.dart';
 import 'widgets/study_workspace.dart';
 import 'widgets/text_export_actions.dart';
 import 'widgets/topics_panel.dart';
@@ -49,6 +54,7 @@ class ReaderScreen extends StatefulWidget {
 
 class _ReaderScreenState extends State<ReaderScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _viewportKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _verseKeys = <int, GlobalKey>{};
   final BoundaryTurnController _boundaryTurns = BoundaryTurnController();
@@ -66,6 +72,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _studyModal = false;
   bool _compactStudyScheduled = false;
   FocusNode? _readerFocusBeforeStudy;
+  final FocusNode _readerFocus = FocusNode(debugLabel: 'Scripture reader');
+  final ValueNotifier<int> _studyRevision = ValueNotifier(0);
+  AppState? _owner;
+  Passage? _restoredPassage;
+  BibleChapter? _restoredChapter;
+  Timer? _positionTimer;
+  bool _userScrolled = false;
+  _InlineNoteSession? _noteSession;
+  String? _bookmarkGroup;
 
   @override
   void initState() {
@@ -81,6 +96,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
+    _positionTimer?.cancel();
+    _owner?.readerNavigationBlocked = false;
+    _noteSession?.controller.dispose();
+    _readerFocus.dispose();
+    _studyRevision.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -88,6 +108,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   Widget build(BuildContext context) {
     final AppState state = context.watch<AppState>();
+    _owner = state;
+    if (state.current != null &&
+        !state.loading &&
+        (_restoredPassage != state.passage ||
+            !identical(_restoredChapter, state.current))) {
+      _restoredPassage = state.passage;
+      _restoredChapter = state.current;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && state.passage == _restoredPassage) {
+          unawaited(_scrollToVerse(state.passage.verse));
+        }
+      });
+    }
     return PopScope<void>(
       canPop: _studyContext == null || _studyModal,
       onPopInvokedWithResult: (didPop, result) {
@@ -175,10 +208,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   onPreview: () => _showReferencePreview(),
                 ),
               if (state.legacyScripture)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Text(
-                    'Saved legacy Scripture (API v2). Connect to refresh this passage from v3.',
+                    UiStrings.of(context).text(
+                      'Saved legacy Scripture (API v2). Connect to refresh this passage from v3.',
+                    ),
                   ),
                 ),
               if (state.error != null)
@@ -187,15 +222,31 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     horizontal: 20,
                     vertical: 8,
                   ),
-                  child: Text(
-                    state.error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        state.error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton(
+                          onPressed:
+                              state.readerNavigationBlocked || state.loading
+                              ? null
+                              : () => unawaited(state.retryReading()),
+                          child: Text(UiStrings.of(context).text('Retry')),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               Expanded(
                 child: GestureDetector(
+                  key: _viewportKey,
                   behavior: HitTestBehavior.translucent,
                   onHorizontalDragEnd: (DragEndDetails details) {
                     final double velocity = details.primaryVelocity ?? 0;
@@ -217,6 +268,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     },
                     child: Focus(
                       autofocus: true,
+                      focusNode: _readerFocus,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (ScrollNotification notice) =>
                             _onScrollNotification(notice, state),
@@ -225,7 +277,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               identical(state.current, _arrivalChapter) &&
                                   verse.verse == _arrivalVerse
                               ? _arrivalEmphasis
-                              : state.dailyVerses.contains(verse.verse) &&
+                              : (state.dailyVerses.contains(verse.verse) ||
+                                        state.passage.verse == verse.verse) &&
                                     verse.text.isNotEmpty
                               ? <ScriptureTextEmphasis>[
                                   ScriptureTextEmphasis(
@@ -251,13 +304,28 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             ),
                           ),
                           onNote: (verse) => _editVerseNote(verse.verse),
-                          child: _ReaderBody(
-                            state: state,
-                            controller: _scrollController,
-                            verseKeys: _verseKeys,
-                            editingNote: _editingNote,
-                            onEditNote: _editVerseNote,
-                            onOpenVerseMenu: _showVerseMenu,
+                          onBookmarks: _openBookmarks,
+                          onReference: (reference) => unawaited(
+                            _showReferencePreview(
+                              TextReferenceRequest(
+                                translation: state.passage.translation,
+                                reference: reference,
+                                translationName:
+                                    state.currentTranslation?.translation,
+                                translationDirection: state.current?.direction,
+                              ),
+                            ),
+                          ),
+                          child: _InlineNoteSessionScope(
+                            session: _noteSession,
+                            child: _ReaderBody(
+                              state: state,
+                              controller: _scrollController,
+                              verseKeys: _verseKeys,
+                              editingNote: _editingNote,
+                              onEditNote: _editVerseNote,
+                              onOpenVerseMenu: _showVerseMenu,
+                            ),
                           ),
                         ),
                       ),
@@ -276,6 +344,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   bool _onScrollNotification(ScrollNotification notice, AppState state) {
+    if (notice is UserScrollNotification &&
+        notice.direction != ScrollDirection.idle) {
+      _userScrolled = true;
+    }
+    if (notice is ScrollEndNotification && !state.loading && _userScrolled) {
+      _userScrolled = false;
+      _positionTimer?.cancel();
+      _positionTimer = Timer(const Duration(milliseconds: 250), () {
+        if (!mounted || state.loading) return;
+        final viewport = _viewportKey.currentContext?.findRenderObject();
+        if (viewport is! RenderBox || !viewport.attached) return;
+        final bounds = viewport.localToGlobal(Offset.zero) & viewport.size;
+        for (final verse in state.current?.verses ?? const <Verse>[]) {
+          final target = _verseKeys[verse.verse]?.currentContext;
+          final render = target?.findRenderObject();
+          if (render is! RenderBox || !render.attached) continue;
+          final y = render.localToGlobal(Offset.zero).dy;
+          if (y + render.size.height > bounds.top && y < bounds.bottom) {
+            unawaited(
+              state
+                  .recordReadingPosition(verse.verse)
+                  .catchError((Object _) {}),
+            );
+            break;
+          }
+        }
+      });
+    }
     if (notice is ScrollStartNotification) {
       _boundaryRecordedForGesture = false;
       return false;
@@ -328,7 +424,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('The daily passage could not be opened. $error'),
+            content: Text(
+              UiStrings.of(context).text(
+                'The daily passage could not be opened. {error}',
+                {'error': error},
+              ),
+            ),
           ),
         );
       }
@@ -340,9 +441,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _editVerseNote(int? verse) {
     if (verse != null && (_openingDaily || context.read<AppState>().loading)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Wait for the passage to finish opening before editing a verse note.',
+            UiStrings.of(context).text(
+              'Wait for the passage to finish opening before editing a verse note.',
+            ),
           ),
         ),
       );
@@ -352,13 +455,32 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _noteNavigationNotice();
       return;
     }
+    if (verse != _editingNote) {
+      _noteSession?.controller.dispose();
+      _noteSession = null;
+      if (verse != null) {
+        final state = context.read<AppState>();
+        final note = state.notes
+            .where((item) => item.verse == verse)
+            .firstOrNull;
+        _noteSession = _InlineNoteSession(
+          state.passage.canonicalKey,
+          verse,
+          '${state.current!.bookName} ${state.current!.chapter}:$verse',
+          note,
+        );
+      }
+    }
     setState(() => _editingNote = verse);
+    context.read<AppState>().readerNavigationBlocked = verse != null;
   }
 
   void _noteNavigationNotice() => ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
+    SnackBar(
       content: Text(
-        'Save or close the verse note before opening another passage.',
+        UiStrings.of(
+          context,
+        ).text('Save or close the verse note before opening another passage.'),
       ),
     ),
   );
@@ -373,9 +495,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _showPortability() async {
     if (_editingNote != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Save or close the verse note before backing up or importing private data.',
+            UiStrings.of(context).text(
+              'Save or close the verse note before backing up or importing private data.',
+            ),
           ),
         ),
       );
@@ -390,13 +514,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
             canPop: !state.portability.busy,
             child: Scaffold(
               appBar: AppBar(
-                title: const Text('Backup and restore'),
+                title: Text(UiStrings.of(context).text('Backup and restore')),
                 automaticallyImplyLeading: !state.portability.busy,
               ),
               body: SafeArea(
                 child: PortabilityPanel(
                   controller: state.portability,
-                  files: PlatformTextFileService(),
+                  files: PlatformTextFileService(
+                    textFilesLabel: UiStrings.of(
+                      context,
+                    ).text('Text and JSON files'),
+                  ),
                 ),
               ),
             ),
@@ -428,9 +556,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Resource choices could not refresh. Reopen the reader to retry.',
+              UiStrings.of(context).text(
+                'Resource choices could not refresh. Reopen the reader to retry.',
+              ),
             ),
           ),
         );
@@ -546,8 +676,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
         labels: ReferencePreviewLabels(copy: state.ui('copy')),
         onOpenInReader: (Passage selected) async {
           if (_editingNote != null) {
-            throw const ReferenceLookupException(
-              'Save or close the note editor before opening another reference.',
+            throw ReferenceLookupException(
+              UiStrings.of(context).text(
+                'Save or close the note editor before opening another reference.',
+              ),
             );
           }
           final ReferenceResult? citation = controller.result;
@@ -557,7 +689,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
           if (!mounted || !ownsNavigation()) return;
           if (state.error != null || state.passage != selected) {
             throw StateError(
-              state.error ?? 'The selected verse could not be opened.',
+              state.error ??
+                  UiStrings.of(
+                    context,
+                  ).text('The selected verse could not be opened.'),
             );
           }
           await _scrollToVerse(selected.verse);
@@ -594,7 +729,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final String? choice = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(target, Offset.zero & overlay.size),
-      semanticLabel: 'Choose marking for $reference',
+      semanticLabel: UiStrings.of(
+        context,
+      ).text('Choose marking for {reference}', {'reference': reference}),
       items: <PopupMenuEntry<String>>[
         if (active != null)
           PopupMenuItem<String>(
@@ -603,25 +740,33 @@ class _ReaderScreenState extends State<ReaderScreen> {
             child: _GroupChoice(group: active),
           ),
         if (state.groups.length > 1)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: '__groups__',
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.palette_outlined),
-              title: Text('More marking groups…'),
+              title: Text(UiStrings.of(context).text('More marking groups…')),
             ),
           ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
+          value: '__bookmarks__',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.bookmarks_outlined),
+            title: Text(UiStrings.of(context).text('Bookmark topics')),
+          ),
+        ),
+        PopupMenuItem<String>(
           value: '__preview__',
           child: ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.find_in_page_outlined),
-            title: Text('Reference preview'),
+            title: Text(UiStrings.of(context).text('Reference preview')),
           ),
         ),
         for (final (String value, String label) in <(String, String)>[
-          ('__commentary__', 'Verse commentary'),
-          ('__topics__', 'Verse topics'),
+          ('__commentary__', UiStrings.of(context).text('Verse commentary')),
+          ('__topics__', UiStrings.of(context).text('Verse topics')),
         ])
           PopupMenuItem<String>(value: value, child: Text(label)),
         const PopupMenuDivider(),
@@ -629,16 +774,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
           value: '__note__',
           child: Text(
             state.notes.any((VerseNote note) => note.verse == verse.verse)
-                ? 'Edit note'
-                : 'Add note',
+                ? UiStrings.of(context).text('Edit note')
+                : UiStrings.of(context).text('Add note'),
           ),
         ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: '__share__',
           child: ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.share_outlined),
-            title: Text('Copy or share Scripture'),
+            title: Text(UiStrings.of(context).text('Copy or share Scripture')),
           ),
         ),
         for (final MarkingGroup group in state.groups.where(
@@ -652,7 +797,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ))
           PopupMenuItem<String>(
             value: '__remove__:${group.id}',
-            child: Text('Remove from ${group.name}'),
+            child: Text(
+              UiStrings.of(
+                context,
+              ).text('Remove from {name}', {'name': group.name}),
+            ),
           ),
         if (state.markings
                 .where(
@@ -665,14 +814,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 .toSet()
                 .length >
             1)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: '__none__',
-            child: Text('Remove all personal verse markings'),
+            child: Text(
+              UiStrings.of(context).text('Remove all personal verse markings'),
+            ),
           ),
       ],
     );
     if (choice == null || !mounted || !ownsVerse()) return;
-    if (choice == '__preview__') {
+    if (choice == '__bookmarks__') {
+      if (!anchorContext.mounted) return;
+      await _showBookmarkAssignments(
+        anchorContext,
+        state,
+        verse,
+        reference,
+        onOpenTopic: _openBookmarks,
+      );
+    } else if (choice == '__preview__') {
       await _showReferencePreview(
         StructuredReferenceRequest(
           translation: state.passage.translation,
@@ -747,9 +907,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: Column(
             children: [
               AppBar(
-                title: Text('Search ${translation.toUpperCase()}'),
+                title: Text(
+                  UiStrings.of(context).text('Search {toUpperCase}', {
+                    'toUpperCase': translation.toUpperCase(),
+                  }),
+                ),
                 leading: IconButton(
-                  tooltip: 'Close search',
+                  tooltip: UiStrings.of(context).text('Close search'),
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(dialogContext).pop(),
                 ),
@@ -768,8 +932,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   showSourceStyles: state.preferences.showSourceStyles,
                   onOpen: (OnlineSearchHit hit) async {
                     if (_editingNote != null) {
-                      throw const ReferenceLookupException(
-                        'Save or close the verse note before opening another passage.',
+                      throw ReferenceLookupException(
+                        UiStrings.of(context).text(
+                          'Save or close the verse note before opening another passage.',
+                        ),
                       );
                     }
                     final Passage target = Passage(
@@ -794,9 +960,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     );
                     if (!ownsNavigation()) return;
                     if (state.passage != target || state.error != null) {
+                      if (!context.mounted) return;
                       throw ReferenceLookupException(
                         state.error ??
-                            'This search result is unavailable in the selected Bible.',
+                            UiStrings.of(context).text(
+                              'This search result is unavailable in the selected Bible.',
+                            ),
                       );
                     }
                     final criteria = state.onlineSearch.request?.criteria;
@@ -880,7 +1049,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
           ),
           child: SizedBox(
             height: MediaQuery.sizeOf(sheetContext).height * .92,
-            child: _studyWorkspace(context.read<AppState>()),
+            child: AnimatedBuilder(
+              animation: Listenable.merge([
+                context.read<AppState>(),
+                _studyRevision,
+              ]),
+              builder: (context, _) =>
+                  _studyWorkspace(context.read<AppState>()),
+            ),
           ),
         ),
       );
@@ -906,16 +1082,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
     setState(() => _studyContext = null);
     final FocusNode? focus = _readerFocusBeforeStudy;
     _readerFocusBeforeStudy = null;
-    if (focus?.context != null) focus!.requestFocus();
+    if (focus?.context != null) {
+      focus!.requestFocus();
+    } else {
+      _readerFocus.requestFocus();
+    }
   }
 
   Future<void> _openStudyPassage(Passage passage) async {
     final AppState state = context.read<AppState>();
     if (_editingNote != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Save or close the verse note before opening another passage.',
+            UiStrings.of(context).text(
+              'Save or close the verse note before opening another passage.',
+            ),
           ),
         ),
       );
@@ -928,7 +1110,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            state.error ?? 'This passage is unavailable in the selected Bible.',
+            state.error ??
+                UiStrings.of(
+                  context,
+                ).text('This passage is unavailable in the selected Bible.'),
           ),
         ),
       );
@@ -963,6 +1148,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       switch (tab) {
         StudyTab.markings => MyAnnotationsPanel(
           state: state,
+          initialGroupId: _bookmarkGroup,
           onOpenPassage: (passage) => unawaited(_openStudyPassage(passage)),
         ),
         StudyTab.verseNotes => MyAnnotationsPanel(
@@ -984,6 +1170,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
         StudyTab.topics => TopicsPanel(
           controller: state.study.topics,
+          bookmarks: state.bookmarks,
+          onOpenBookmarks: (topicId) {
+            final group = state.groups
+                .where(
+                  (group) =>
+                      group.source?.topicId == topicId &&
+                      group.source?.effectiveScope ==
+                          state.bookmarks.publicTopics.sourceScope,
+                )
+                .firstOrNull;
+            setState(() {
+              _bookmarkGroup = group?.id;
+              _studyTab = StudyTab.markings;
+            });
+            _studyRevision.value++;
+          },
           context: captured,
           onPreviewReference: _showReferencePreview,
           onPrivateCopyCommitted: state.refreshAnnotations,
@@ -996,6 +1198,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
           onOpenPassage: _openStudyPassage,
         ),
       };
+
+  void _openBookmarks(String? groupId) {
+    _bookmarkGroup = groupId;
+    _openStudy(tab: StudyTab.markings);
+  }
 }
 
 class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -1044,10 +1251,10 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: InkWell(
               onTap: onHome,
               borderRadius: BorderRadius.circular(6),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
                 child: Text(
-                  'getBible.Life',
+                  UiStrings.of(context).text('getBible.Life'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
@@ -1064,8 +1271,8 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                 onTap: onSearch,
                 child: IgnorePointer(
                   child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search',
+                    decoration: InputDecoration(
+                      hintText: UiStrings.of(context).text('Search'),
                       prefixIcon: Icon(Icons.search),
                       isDense: true,
                     ),
@@ -1340,30 +1547,55 @@ class _ParagraphReader extends StatelessWidget {
           else if (block is ScriptureParagraphBlock)
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
-              child: _paragraph(context, block.verses),
+              child: _paragraphWithNotes(context, block.verses),
             ),
-        for (final VerseNote note in state.notes)
-          if (editingNote == note.verse)
-            _InlineNoteEditor(
-              state: state,
-              verse: note.verse,
-              reference: note.reference,
-              note: note,
-              onClose: () => onEditNote(null),
-            )
-          else
-            _SavedNote(note: note, onTap: () => onEditNote(note.verse)),
-        if (editingNote != null &&
-            !state.notes.any((VerseNote note) => note.verse == editingNote))
-          _InlineNoteEditor(
-            state: state,
-            verse: editingNote!,
-            reference: '${chapter.bookName} ${chapter.chapter}:$editingNote',
-            note: null,
-            onClose: () => onEditNote(null),
-          ),
         _ChapterFooter(state: state),
       ],
+    );
+  }
+
+  Widget _paragraphWithNotes(BuildContext context, List<Verse> verses) {
+    final children = <Widget>[];
+    var pending = <Verse>[];
+    for (final verse in verses) {
+      pending.add(verse);
+      final note = state.notes
+          .where((item) => item.verse == verse.verse)
+          .firstOrNull;
+      final editing = editingNote == verse.verse;
+      final hasAnnotations = verseSourceAnnotations(verse).isNotEmpty;
+      if (note == null && !editing && !hasAnnotations) continue;
+      children.add(_paragraph(context, pending));
+      pending = [];
+      if (hasAnnotations) {
+        children.add(
+          ScriptureSourceAnnotations(
+            verse: verse,
+            onReference: ScriptureStudyActions.maybeOf(context)?.onReference,
+          ),
+        );
+      }
+      if (editing) {
+        children.add(
+          _InlineNoteEditor(
+            state: state,
+            verse: verse.verse,
+            reference:
+                '${state.current!.bookName} ${state.current!.chapter}:${verse.verse}',
+            note: note,
+            onClose: () => onEditNote(null),
+          ),
+        );
+      } else if (note != null) {
+        children.add(
+          _SavedNote(note: note, onTap: () => onEditNote(verse.verse)),
+        );
+      }
+    }
+    if (pending.isNotEmpty) children.add(_paragraph(context, pending));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
     );
   }
 
@@ -1387,18 +1619,18 @@ class _ParagraphReader extends StatelessWidget {
             key: verseKeys.putIfAbsent(verse.verse, GlobalKey.new),
             builder: (BuildContext anchor) => InkWell(
               onTap: () => onOpenVerseMenu(anchor, verse, reference),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  end: 6,
-                  top: 5,
-                  bottom: 5,
-                ),
-                child: Text(
-                  '${verse.verse}',
-                  style: TextStyle(
-                    fontSize: state.preferences.textSize * .55,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                child: Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: Text(
+                    '${verse.verse}',
+                    style: TextStyle(
+                      fontSize: state.preferences.textSize * .55,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
@@ -1466,7 +1698,7 @@ class _ParagraphReader extends StatelessWidget {
                   button,
               if (ranges.isNotEmpty) ...[
                 ContextMenuButtonItem(
-                  label: 'Search selected phrase',
+                  label: UiStrings.of(context).text('Search selected phrase'),
                   onPressed: () {
                     editable.hideToolbar();
                     ScriptureStudyActions.maybeOf(
@@ -1475,7 +1707,7 @@ class _ParagraphReader extends StatelessWidget {
                   },
                 ),
                 ContextMenuButtonItem(
-                  label: 'Study selected word',
+                  label: UiStrings.of(context).text('Study selected word'),
                   onPressed: () {
                     editable.hideToolbar();
                     final selected = ranges.first;
@@ -1485,7 +1717,7 @@ class _ParagraphReader extends StatelessWidget {
                   },
                 ),
                 ContextMenuButtonItem(
-                  label: 'Add or edit verse note',
+                  label: UiStrings.of(context).text('Add or edit verse note'),
                   onPressed: () {
                     editable.hideToolbar();
                     ScriptureStudyActions.maybeOf(
@@ -1494,9 +1726,31 @@ class _ParagraphReader extends StatelessWidget {
                   },
                 ),
               ],
+              if (ranges.isNotEmpty)
+                ContextMenuButtonItem(
+                  label: UiStrings.of(context).text('Bookmark topics'),
+                  onPressed: () {
+                    editable.hideToolbar();
+                    final selected = ranges.first;
+                    unawaited(
+                      _showBookmarkAssignments(
+                        context,
+                        state,
+                        selected.verse,
+                        '$bookName ${origin.chapter}:${selected.verse.verse}',
+                        selections: ranges,
+                        onOpenTopic: ScriptureStudyActions.maybeOf(
+                          context,
+                        )?.onBookmarks,
+                      ),
+                    );
+                  },
+                ),
               if (ranges.isNotEmpty && state.activeGroup != null)
                 ContextMenuButtonItem(
-                  label: 'Mark: ${state.activeGroup!.name}',
+                  label: UiStrings.of(
+                    context,
+                  ).text('Mark: {name}', {'name': state.activeGroup!.name}),
                   onPressed: () {
                     editable.hideToolbar();
                     unawaited(
@@ -1511,7 +1765,7 @@ class _ParagraphReader extends StatelessWidget {
                 ),
               if (ranges.isNotEmpty && state.groups.length > 1)
                 ContextMenuButtonItem(
-                  label: 'More marking groups…',
+                  label: UiStrings.of(context).text('More marking groups…'),
                   onPressed: () async {
                     editable.hideToolbar();
                     final String? groupId = await showDialog<String>(
@@ -1537,7 +1791,7 @@ class _ParagraphReader extends StatelessWidget {
                 ),
               ))
                 ContextMenuButtonItem(
-                  label: 'Remove highlighting',
+                  label: UiStrings.of(context).text('Remove highlighting'),
                   onPressed: () {
                     editable.hideToolbar();
                     unawaited(state.removeTextSelections(origin, ranges));
@@ -1585,7 +1839,8 @@ class _VerseLine extends StatelessWidget {
         ? null
         : _hexColor(wholeGroup.color).withAlpha(45);
     return Semantics(
-      label: '$reference. ${verse.text}',
+      label: reference,
+      container: true,
       child: ColoredBox(
         color: wholeColor ?? Colors.transparent,
         child: Padding(
@@ -1602,8 +1857,8 @@ class _VerseLine extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 36,
+                          minWidth: 48,
+                          minHeight: 48,
                         ),
                         child: Center(
                           child: Text(
@@ -1626,6 +1881,12 @@ class _VerseLine extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              ScriptureSourceAnnotations(
+                verse: verse,
+                onReference: ScriptureStudyActions.maybeOf(
+                  context,
+                )?.onReference,
               ),
               if (editing)
                 _InlineNoteEditor(
@@ -1683,7 +1944,7 @@ class _SelectableMarkedVerse extends StatelessWidget {
               ...editableTextState.contextMenuButtonItems,
               if (valid) ...[
                 ContextMenuButtonItem(
-                  label: 'Search selected phrase',
+                  label: UiStrings.of(context).text('Search selected phrase'),
                   onPressed: () {
                     editableTextState.hideToolbar();
                     ScriptureStudyActions.maybeOf(context)?.onSearch(
@@ -1692,7 +1953,7 @@ class _SelectableMarkedVerse extends StatelessWidget {
                   },
                 ),
                 ContextMenuButtonItem(
-                  label: 'Study selected word',
+                  label: UiStrings.of(context).text('Study selected word'),
                   onPressed: () {
                     editableTextState.hideToolbar();
                     ScriptureStudyActions.maybeOf(context)?.onWord(
@@ -1702,16 +1963,45 @@ class _SelectableMarkedVerse extends StatelessWidget {
                   },
                 ),
                 ContextMenuButtonItem(
-                  label: 'Add or edit verse note',
+                  label: UiStrings.of(context).text('Add or edit verse note'),
                   onPressed: () {
                     editableTextState.hideToolbar();
                     ScriptureStudyActions.maybeOf(context)?.onNote(verse);
                   },
                 ),
               ],
+              if (valid)
+                ContextMenuButtonItem(
+                  label: UiStrings.of(context).text('Bookmark topics'),
+                  onPressed: () {
+                    editableTextState.hideToolbar();
+                    unawaited(
+                      _showBookmarkAssignments(
+                        context,
+                        state,
+                        verse,
+                        reference,
+                        selections: [
+                          ScriptureVerseSelection(
+                            verse: verse,
+                            range: ScriptureTextRange(
+                              selection.start,
+                              selection.end,
+                            ),
+                          ),
+                        ],
+                        onOpenTopic: ScriptureStudyActions.maybeOf(
+                          context,
+                        )?.onBookmarks,
+                      ),
+                    );
+                  },
+                ),
               if (valid && state.activeGroup != null)
                 ContextMenuButtonItem(
-                  label: 'Mark: ${state.activeGroup!.name}',
+                  label: UiStrings.of(
+                    context,
+                  ).text('Mark: {name}', {'name': state.activeGroup!.name}),
                   onPressed: () {
                     editableTextState.hideToolbar();
                     unawaited(
@@ -1727,7 +2017,7 @@ class _SelectableMarkedVerse extends StatelessWidget {
                 ),
               if (valid && state.groups.length > 1)
                 ContextMenuButtonItem(
-                  label: 'More marking groups…',
+                  label: UiStrings.of(context).text('More marking groups…'),
                   onPressed: () async {
                     editableTextState.hideToolbar();
                     final String? groupId = await showDialog<String>(
@@ -1754,7 +2044,7 @@ class _SelectableMarkedVerse extends StatelessWidget {
                     selection.end,
                   ))
                 ContextMenuButtonItem(
-                  label: 'Remove highlighting',
+                  label: UiStrings.of(context).text('Remove highlighting'),
                   onPressed: () {
                     editableTextState.hideToolbar();
                     unawaited(
@@ -1774,6 +2064,29 @@ class _SelectableMarkedVerse extends StatelessWidget {
           },
     );
   }
+}
+
+final class _InlineNoteSession {
+  _InlineNoteSession(
+    this.canonicalKey,
+    this.verse,
+    this.reference,
+    VerseNote? note,
+  ) : hadNote = note != null,
+      controller = TextEditingController(text: note?.text ?? '');
+  final String canonicalKey;
+  final int verse;
+  final String reference;
+  final bool hadNote;
+  final TextEditingController controller;
+}
+
+class _InlineNoteSessionScope extends InheritedWidget {
+  const _InlineNoteSessionScope({required this.session, required super.child});
+  final _InlineNoteSession? session;
+  @override
+  bool updateShouldNotify(_InlineNoteSessionScope oldWidget) =>
+      session != oldWidget.session;
 }
 
 class _InlineNoteEditor extends StatefulWidget {
@@ -1801,91 +2114,143 @@ class _InlineNoteEditorState extends State<_InlineNoteEditor> {
   late final String _reference;
   late final int _sourceVerse;
   late final bool _hadNote;
+  bool _initialized = false;
+  bool _ownsController = false;
+  bool _saving = false;
+  String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.note?.text ?? '');
-    _canonicalKey = widget.state.passage.canonicalKey;
-    _reference = widget.reference;
-    _sourceVerse = widget.verse;
-    _hadNote = widget.note != null;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+    final session = context
+        .dependOnInheritedWidgetOfExactType<_InlineNoteSessionScope>()
+        ?.session;
+    _ownsController = session == null;
+    _controller =
+        session?.controller ??
+        TextEditingController(text: widget.note?.text ?? '');
+    _canonicalKey = session?.canonicalKey ?? widget.state.passage.canonicalKey;
+    _reference = session?.reference ?? widget.reference;
+    _sourceVerse = session?.verse ?? widget.verse;
+    _hadNote = session?.hadNote ?? widget.note != null;
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsetsDirectional.fromSTEB(44, 8, 0, 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    _reference,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () =>
+            unawaited(_save()),
+        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () =>
+            unawaited(_save()),
+      },
+      child: Card(
+        margin: EdgeInsetsDirectional.fromSTEB(
+          MediaQuery.sizeOf(context).width < 480 ? 0 : 44,
+          8,
+          0,
+          8,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      _reference,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Close note editor',
-                  onPressed: widget.onClose,
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            TextField(
-              controller: _controller,
-              autofocus: true,
-              minLines: 3,
-              maxLines: 8,
-              decoration: const InputDecoration(hintText: 'Write your note…'),
-              onSubmitted: (_) => _save(),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: <Widget>[
-                if (_hadNote)
                   IconButton(
-                    tooltip: 'Delete note',
-                    onPressed: () async {
-                      if (!_canWriteToSource()) return;
-                      await widget.state.deleteVerseNote(_sourceVerse);
-                      if (mounted) widget.onClose();
-                    },
-                    icon: const Icon(Icons.delete_outline),
+                    tooltip: UiStrings.of(context).text('Close note editor'),
+                    onPressed: _saving ? null : widget.onClose,
+                    icon: const Icon(Icons.close),
                   ),
-                FilledButton.icon(
-                  onPressed: _save,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Save note'),
+                ],
+              ),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 8,
+                decoration: InputDecoration(
+                  hintText: UiStrings.of(context).text('Write your note…'),
                 ),
-              ],
-            ),
-          ],
+                onSubmitted: (_) => _save(),
+              ),
+              const SizedBox(height: 8),
+              if (_error != null)
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  if (_hadNote)
+                    IconButton(
+                      tooltip: UiStrings.of(context).text('Delete note'),
+                      onPressed: () async {
+                        if (!_canWriteToSource()) return;
+                        await widget.state.deleteVerseNote(_sourceVerse);
+                        if (mounted) widget.onClose();
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: const Icon(Icons.check),
+                    label: Text(UiStrings.of(context).text('Save note')),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (_controller.text.trim().isEmpty) return;
     if (!_canWriteToSource()) return;
-    await widget.state.saveVerseNote(
-      _sourceVerse,
-      _reference,
-      _controller.text,
-    );
-    if (mounted) widget.onClose();
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.state.saveVerseNote(
+        _sourceVerse,
+        _reference,
+        _controller.text,
+      );
+      if (mounted) widget.onClose();
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = UiStrings.of(context).text(
+            'The note could not be saved. Your draft is kept. {error}',
+            {'error': error},
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   /// The visible draft belongs to its original canonical passage, even if an
@@ -1896,7 +2261,10 @@ class _InlineNoteEditorState extends State<_InlineNoteEditor> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Return to $_reference before changing this retained verse-note draft.',
+            UiStrings.of(context).text(
+              'Return to {reference} before changing this retained verse-note draft.',
+              {'reference': _reference},
+            ),
           ),
         ),
       );
@@ -1923,7 +2291,10 @@ class _SavedNote extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('NOTE', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              UiStrings.of(context).text('NOTE'),
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
             const SizedBox(height: 3),
             Text(note.text, maxLines: 3, overflow: TextOverflow.ellipsis),
           ],
@@ -1960,10 +2331,12 @@ class _ReaderDrawer extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           if (!navigationEnabled)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                'Save or close the verse note before changing the passage. Passage controls are temporarily unavailable.',
+                UiStrings.of(context).text(
+                  'Save or close the verse note before changing the passage. Passage controls are temporarily unavailable.',
+                ),
               ),
             ),
           ReaderTranslationField(
@@ -2016,7 +2389,9 @@ class _ReaderDrawer extends StatelessWidget {
                   (ChapterInfo item) => DropdownMenuItem(
                     value: item.chapter,
                     child: Text(
-                      item.isIntroduction ? 'Introduction' : '${item.chapter}',
+                      item.isIntroduction
+                          ? UiStrings.of(context).text('Introduction')
+                          : '${item.chapter}',
                     ),
                   ),
                 )
@@ -2039,7 +2414,7 @@ class _ReaderDrawer extends StatelessWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.find_in_page_outlined),
-            title: const Text('Reference preview'),
+            title: Text(UiStrings.of(context).text('Reference preview')),
             onTap: () {
               Navigator.of(context).pop();
               unawaited(onReferencePreview());
@@ -2048,7 +2423,7 @@ class _ReaderDrawer extends StatelessWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.backup_outlined),
-            title: const Text('Backup and restore'),
+            title: Text(UiStrings.of(context).text('Backup and restore')),
             onTap: navigationEnabled
                 ? () {
                     Navigator.of(context).pop();
@@ -2059,7 +2434,7 @@ class _ReaderDrawer extends StatelessWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.download_for_offline_outlined),
-            title: const Text('Set up offline use'),
+            title: Text(UiStrings.of(context).text('Set up offline use')),
             onTap: () {
               Navigator.of(context).pop();
               unawaited(onOffline());
@@ -2068,8 +2443,8 @@ class _ReaderDrawer extends StatelessWidget {
           if (state.resourceChoicesError != null)
             Text(state.resourceChoicesError!),
           const Divider(height: 32),
-          const Text(
-            'Appearance',
+          Text(
+            UiStrings.of(context).text('Appearance'),
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
@@ -2113,14 +2488,26 @@ class _ReaderDrawer extends StatelessWidget {
           DropdownButtonFormField<String>(
             key: ValueKey<String>('light-${state.preferences.lightPalette}'),
             initialValue: state.preferences.lightPalette,
-            decoration: const InputDecoration(
-              labelText: 'Light reading palette',
+            decoration: InputDecoration(
+              labelText: UiStrings.of(context).text('Light reading palette'),
             ),
-            items: const <DropdownMenuItem<String>>[
-              DropdownMenuItem(value: 'white', child: Text('Pure white')),
-              DropdownMenuItem(value: 'paper', child: Text('Warm paper')),
-              DropdownMenuItem(value: 'ivory', child: Text('Soft ivory')),
-              DropdownMenuItem(value: 'mist', child: Text('Cool mist')),
+            items: <DropdownMenuItem<String>>[
+              DropdownMenuItem(
+                value: 'white',
+                child: Text(UiStrings.of(context).text('Pure white')),
+              ),
+              DropdownMenuItem(
+                value: 'paper',
+                child: Text(UiStrings.of(context).text('Warm paper')),
+              ),
+              DropdownMenuItem(
+                value: 'ivory',
+                child: Text(UiStrings.of(context).text('Soft ivory')),
+              ),
+              DropdownMenuItem(
+                value: 'mist',
+                child: Text(UiStrings.of(context).text('Cool mist')),
+              ),
             ],
             onChanged: (String? value) {
               if (value != null) unawaited(state.setLightPalette(value));
@@ -2130,14 +2517,26 @@ class _ReaderDrawer extends StatelessWidget {
           DropdownButtonFormField<String>(
             key: ValueKey<String>('dark-${state.preferences.darkPalette}'),
             initialValue: state.preferences.darkPalette,
-            decoration: const InputDecoration(
-              labelText: 'Dark reading palette',
+            decoration: InputDecoration(
+              labelText: UiStrings.of(context).text('Dark reading palette'),
             ),
-            items: const <DropdownMenuItem<String>>[
-              DropdownMenuItem(value: 'black', child: Text('Pure black')),
-              DropdownMenuItem(value: 'brown', child: Text('Warm brown')),
-              DropdownMenuItem(value: 'charcoal', child: Text('Soft charcoal')),
-              DropdownMenuItem(value: 'navy', child: Text('Midnight blue')),
+            items: <DropdownMenuItem<String>>[
+              DropdownMenuItem(
+                value: 'black',
+                child: Text(UiStrings.of(context).text('Pure black')),
+              ),
+              DropdownMenuItem(
+                value: 'brown',
+                child: Text(UiStrings.of(context).text('Warm brown')),
+              ),
+              DropdownMenuItem(
+                value: 'charcoal',
+                child: Text(UiStrings.of(context).text('Soft charcoal')),
+              ),
+              DropdownMenuItem(
+                value: 'navy',
+                child: Text(UiStrings.of(context).text('Midnight blue')),
+              ),
             ],
             onChanged: (String? value) {
               if (value != null) unawaited(state.setDarkPalette(value));
@@ -2148,19 +2547,43 @@ class _ReaderDrawer extends StatelessWidget {
             key: ValueKey<String>('font-${state.preferences.readerFont}'),
             initialValue: state.preferences.readerFont,
             decoration: InputDecoration(labelText: state.ui('readingFont')),
-            items: const <DropdownMenuItem<String>>[
-              DropdownMenuItem(value: 'serif', child: Text('Classic serif')),
-              DropdownMenuItem(value: 'book', child: Text('Book serif')),
+            items: <DropdownMenuItem<String>>[
+              DropdownMenuItem(
+                value: 'serif',
+                child: Text(UiStrings.of(context).text('Classic serif')),
+              ),
+              DropdownMenuItem(
+                value: 'book',
+                child: Text(UiStrings.of(context).text('Book serif')),
+              ),
               DropdownMenuItem(
                 value: 'baskerville',
-                child: Text('Baskerville'),
+                child: Text(UiStrings.of(context).text('Baskerville')),
               ),
-              DropdownMenuItem(value: 'garamond', child: Text('Garamond')),
-              DropdownMenuItem(value: 'charter', child: Text('Charter')),
-              DropdownMenuItem(value: 'cambria', child: Text('Cambria')),
-              DropdownMenuItem(value: 'times', child: Text('Times New Roman')),
-              DropdownMenuItem(value: 'sans', child: Text('Clean sans')),
-              DropdownMenuItem(value: 'system', child: Text('System sans')),
+              DropdownMenuItem(
+                value: 'garamond',
+                child: Text(UiStrings.of(context).text('Garamond')),
+              ),
+              DropdownMenuItem(
+                value: 'charter',
+                child: Text(UiStrings.of(context).text('Charter')),
+              ),
+              DropdownMenuItem(
+                value: 'cambria',
+                child: Text(UiStrings.of(context).text('Cambria')),
+              ),
+              DropdownMenuItem(
+                value: 'times',
+                child: Text(UiStrings.of(context).text('Times New Roman')),
+              ),
+              DropdownMenuItem(
+                value: 'sans',
+                child: Text(UiStrings.of(context).text('Clean sans')),
+              ),
+              DropdownMenuItem(
+                value: 'system',
+                child: Text(UiStrings.of(context).text('System sans')),
+              ),
             ],
             onChanged: (String? value) {
               if (value != null) unawaited(state.setReaderFont(value));
@@ -2184,12 +2607,28 @@ class _ReaderDrawer extends StatelessWidget {
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Source text styles'),
-            subtitle: const Text(
-              'Show emphasis provided by this Bible edition',
+            title: Text(UiStrings.of(context).text('Source text styles')),
+            subtitle: Text(
+              UiStrings.of(
+                context,
+              ).text('Show emphasis provided by this Bible edition'),
             ),
             value: state.preferences.showSourceStyles,
             onChanged: (bool value) => unawaited(state.setSourceStyles(value)),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(UiStrings.of(context).text('Reduce motion')),
+            value: state.preferences.reduceMotion,
+            onChanged: (value) =>
+                unawaited(state.setAccessibility(reduceMotion: value)),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(UiStrings.of(context).text('High contrast')),
+            value: state.preferences.highContrast,
+            onChanged: (value) =>
+                unawaited(state.setAccessibility(highContrast: value)),
           ),
         ],
       ),
@@ -2213,7 +2652,7 @@ class _MobileChapterNavigation extends StatelessWidget {
           Expanded(
             child: TextButton(
               onPressed: state.canGoPrevious ? () => onTurn(state, -1) : null,
-              child: const Text('Previous'),
+              child: Text(UiStrings.of(context).text('Previous')),
             ),
           ),
           Expanded(
@@ -2226,7 +2665,7 @@ class _MobileChapterNavigation extends StatelessWidget {
           Expanded(
             child: TextButton(
               onPressed: state.canGoNext ? () => onTurn(state, 1) : null,
-              child: const Text('Next'),
+              child: Text(UiStrings.of(context).text('Next')),
             ),
           ),
         ],
@@ -2331,7 +2770,10 @@ class _ChapterFooter extends StatelessWidget {
                   onPressed: () =>
                       launchUrl(Uri.parse('https://getbible.life')),
                   child: Text(
-                    'getBible.Life — ${state.ui('wordsOfEternalLife')}',
+                    UiStrings.of(context).text(
+                      'getBible.Life — {wordsOfEternalLife}',
+                      {'wordsOfEternalLife': state.ui('wordsOfEternalLife')},
+                    ),
                   ),
                 ),
               ),
@@ -2350,7 +2792,14 @@ class _ChapterFooter extends StatelessWidget {
                     children: <Widget>[
                       Flexible(
                         child: Text(
-                          '${state.ui('lovinglyMaintainedBy')} Vast Development Method',
+                          UiStrings.of(context).text(
+                            '{lovinglyMaintainedBy} Vast Development Method',
+                            {
+                              'lovinglyMaintainedBy': state.ui(
+                                'lovinglyMaintainedBy',
+                              ),
+                            },
+                          ),
                           textAlign: TextAlign.end,
                         ),
                       ),
@@ -2422,7 +2871,7 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
     title: Text(
       widget.initialVerse == null
           ? widget.state.ui('openAsMarkdown')
-          : 'Copy or share Scripture',
+          : UiStrings.of(context).text('Copy or share Scripture'),
     ),
     content: SizedBox(
       width: 640,
@@ -2431,9 +2880,15 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             SegmentedButton<bool>(
-              segments: const <ButtonSegment<bool>>[
-                ButtonSegment(value: false, label: Text('Share text')),
-                ButtonSegment(value: true, label: Text('Markdown')),
+              segments: <ButtonSegment<bool>>[
+                ButtonSegment(
+                  value: false,
+                  label: Text(UiStrings.of(context).text('Share text')),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text(UiStrings.of(context).text('Markdown')),
+                ),
               ],
               selected: <bool>{_markdown},
               onSelectionChanged: (Set<bool> value) =>
@@ -2442,7 +2897,10 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
             const SizedBox(height: 14),
             if (_chapter.verses.length > 1) ...<Widget>[
               Text(
-                'Verses ${_chapter.verses[_first].verse}\u2013${_chapter.verses[_last].verse}',
+                UiStrings.of(context).text('Verses {firstVerse}–{lastVerse}', {
+                  'firstVerse': _chapter.verses[_first].verse,
+                  'lastVerse': _chapter.verses[_last].verse,
+                }),
                 textAlign: TextAlign.center,
               ),
               RangeSlider(
@@ -2478,7 +2936,11 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
                   'getbible-${_translation.abbreviation}-${_chapter.bookNumber}-${_chapter.chapter}.${_markdown ? 'md' : 'txt'}',
               mimeType: _markdown ? 'text/markdown' : 'text/plain',
               subject: '${_chapter.bookName} ${_chapter.chapter}',
-              files: PlatformTextFileService(),
+              files: PlatformTextFileService(
+                textFilesLabel: UiStrings.of(
+                  context,
+                ).text('Text and JSON files'),
+              ),
             ),
           ],
         ),
@@ -2498,20 +2960,41 @@ Future<void> _showTranslationDetails(
   Translation translation,
 ) {
   final List<(String, String)> details = <(String, String)>[
-    ('Language', translation.resolvedLanguage),
-    ('Abbreviation', translation.abbreviation.toUpperCase()),
-    ('Version', translation.distributionVersion),
-    ('Version date', translation.distributionVersionDate),
-    ('Description', translation.description),
-    ('About', translation.distributionAbout),
-    ('License and copyright', translation.distributionLicense),
-    ('Source type', translation.distributionSourceType),
-    ('Source', translation.distributionSource),
-    ('Versification', translation.distributionVersification),
-    ('Catalog subject', translation.distributionLcsh),
+    (UiStrings.of(context).text('Language'), translation.resolvedLanguage),
+    (
+      UiStrings.of(context).text('Abbreviation'),
+      translation.abbreviation.toUpperCase(),
+    ),
+    (UiStrings.of(context).text('Version'), translation.distributionVersion),
+    (
+      UiStrings.of(context).text('Version date'),
+      translation.distributionVersionDate,
+    ),
+    (UiStrings.of(context).text('Description'), translation.description),
+    (UiStrings.of(context).text('About'), translation.distributionAbout),
+    (
+      UiStrings.of(context).text('License and copyright'),
+      translation.distributionLicense,
+    ),
+    (
+      UiStrings.of(context).text('Source type'),
+      translation.distributionSourceType,
+    ),
+    (UiStrings.of(context).text('Source'), translation.distributionSource),
+    (
+      UiStrings.of(context).text('Versification'),
+      translation.distributionVersification,
+    ),
+    (
+      UiStrings.of(context).text('Catalog subject'),
+      translation.distributionLcsh,
+    ),
     for (final MapEntry<String, String> item
         in translation.distributionHistory.entries)
-      ('History — ${item.key}', item.value),
+      (
+        UiStrings.of(context).text('History — {key}', {'key': item.key}),
+        item.value,
+      ),
   ].where(((String, String) item) => item.$2.trim().isNotEmpty).toList();
   return showDialog<void>(
     context: context,
@@ -2538,15 +3021,112 @@ Future<void> _showTranslationDetails(
           TextButton.icon(
             onPressed: () => unawaited(launchUrl(Uri.parse(translation.url))),
             icon: const Icon(Icons.open_in_new),
-            label: const Text('Translation source'),
+            label: Text(UiStrings.of(context).text('Translation source')),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: Text(UiStrings.of(context).text('Close')),
         ),
       ],
     ),
   );
+}
+
+/// Constrain the assignment surface beside its originating verse/selection.
+/// It is a route so native Escape/back, keyboard traversal and focus restoration
+/// work consistently; tall topic lists scroll within the available safe area.
+Future<void> _showBookmarkAssignments(
+  BuildContext anchor,
+  AppState state,
+  Verse verse,
+  String reference, {
+  List<ScriptureVerseSelection>? selections,
+  ValueChanged<String?>? onOpenTopic,
+}) async {
+  final origin = state.passage;
+  final chapter = state.current;
+  final previousFocus = FocusManager.instance.primaryFocus;
+  final render = anchor.findRenderObject();
+  final anchorPoint = render is RenderBox
+      ? render.localToGlobal(Offset.zero)
+      : Offset.zero;
+  final selected = selections?.firstOrNull;
+  var openTopic = false;
+  String? selectedGroup;
+  bool ownsVerse() =>
+      state.passage == origin && identical(state.current, chapter);
+  await showDialog<void>(
+    context: anchor,
+    builder: (dialogContext) => SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = (constraints.maxWidth - 24).clamp(0.0, 480.0);
+          final height = (constraints.maxHeight - 24).clamp(0.0, 620.0);
+          final left = anchorPoint.dx.clamp(
+            12.0,
+            (constraints.maxWidth - width - 12).clamp(12.0, double.infinity),
+          );
+          final top = anchorPoint.dy.clamp(
+            12.0,
+            (constraints.maxHeight - height - 12).clamp(12.0, double.infinity),
+          );
+          return Stack(
+            children: [
+              Positioned(
+                left: left,
+                top: top,
+                width: width,
+                height: height,
+                child: Material(
+                  elevation: 12,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: BookmarkAssignmentMenu(
+                    selections: selections,
+                    state: state,
+                    passage: origin,
+                    verse: verse.verse,
+                    quote: selected?.quote ?? verse.text,
+                    reference: reference,
+                    start: selected?.range.start,
+                    end: selected?.range.end,
+                    onAdd: (groupId) async {
+                      if (!ownsVerse()) {
+                        throw StateError(
+                          UiStrings.of(context).text(
+                            'This passage changed. Reopen its bookmark menu.',
+                          ),
+                        );
+                      }
+                      if (selections != null) {
+                        await state.markTextSelections(
+                          origin,
+                          selections,
+                          chapter!.bookName,
+                          groupId,
+                        );
+                      } else {
+                        await state.markWholeVerse(verse, reference, groupId);
+                      }
+                    },
+                    onOpenTopic: (id) {
+                      openTopic = true;
+                      selectedGroup = id;
+                      Navigator.of(dialogContext).pop();
+                    },
+                    onClose: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+  if (!anchor.mounted || !ownsVerse()) return;
+  if (previousFocus?.context != null) previousFocus!.requestFocus();
+  if (openTopic) onOpenTopic?.call(selectedGroup);
 }
 
 class _MarkingGroupPicker extends StatefulWidget {
@@ -2571,7 +3151,7 @@ class _MarkingGroupPickerState extends State<_MarkingGroupPicker> {
         )
         .toList(growable: false);
     return AlertDialog(
-      title: const Text('Choose a marking'),
+      title: Text(UiStrings.of(context).text('Choose a marking')),
       content: SizedBox(
         width: 560,
         height: (MediaQuery.sizeOf(context).height * 0.65)
@@ -2581,8 +3161,8 @@ class _MarkingGroupPickerState extends State<_MarkingGroupPicker> {
           children: <Widget>[
             TextField(
               autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Find a marking group',
+              decoration: InputDecoration(
+                hintText: UiStrings.of(context).text('Find a marking group'),
                 prefixIcon: Icon(Icons.search),
               ),
               onChanged: (String value) => setState(() => _query = value),
@@ -2622,7 +3202,7 @@ class _MarkingGroupPickerState extends State<_MarkingGroupPicker> {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(UiStrings.of(context).text('Cancel')),
         ),
       ],
     );
@@ -2647,7 +3227,7 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: state.retryReading,
-            child: const Text('Retry'),
+            child: Text(UiStrings.of(context).text('Retry')),
           ),
         ],
       ),
@@ -2687,8 +3267,10 @@ class CacheStatusNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool verified = freshness == CacheFreshness.cachedVerified;
     final String message = verified
-        ? 'Verified cached Scripture'
-        : 'Offline cached Scripture — verification unavailable';
+        ? UiStrings.of(context).text('Verified cached Scripture')
+        : UiStrings.of(
+            context,
+          ).text('Offline cached Scripture — verification unavailable');
     final ColorScheme colors = Theme.of(context).colorScheme;
     return Semantics(
       container: true,

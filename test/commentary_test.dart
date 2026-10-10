@@ -334,19 +334,44 @@ void main() {
         controller.availability,
         CommentaryAvailability.unavailableChapter,
       );
-      expect(repository.chapterReads, isEmpty);
+      expect(repository.chapterReads, ['fixture/1/0']);
+      expect(controller.introduction!.entries.single.isIntroduction, isTrue);
       expect(controller.error, isNull);
       await controller.open(_context(verse: 2));
       expect(controller.availability, CommentaryAvailability.unavailableVerse);
       expect(controller.error, isNull);
       controller.setVerseMode(false);
       expect(controller.entries, hasLength(4));
-      expect(repository.chapterReads, hasLength(1));
+      expect(repository.chapterReads, hasLength(3));
     },
   );
 
   test(
-    'nonmatching language requires explicit choice and never silently substitutes',
+    'book introduction failure preserves readable chapter and captured context',
+    () async {
+      final repository = _Repository(fixture)..failIntroduction = true;
+      final controller = CommentaryController(
+        repository: repository,
+        preferences: _Preferences(),
+      );
+      addTearDown(controller.dispose);
+      final context = _context();
+      await controller.open(context);
+      expect(controller.chapter, isNotNull);
+      expect(controller.entries, hasLength(2));
+      expect(controller.error, isNull);
+      expect(controller.introductionError, isNotNull);
+      expect(controller.context, same(context));
+      repository.failIntroduction = false;
+      await controller.retry();
+      expect(controller.introductionError, isNull);
+      expect(controller.introduction!.chapter, 0);
+      expect(controller.entries, hasLength(2));
+    },
+  );
+
+  test(
+    'foreign commentary fallback keeps source language and explicit choice survives restart',
     () async {
       final _Repository repository = _Repository(fixture);
       final _Preferences preferences = _Preferences();
@@ -356,12 +381,45 @@ void main() {
       );
       addTearDown(controller.dispose);
       await controller.open(_context(language: 'ar'));
-      expect(controller.availability, CommentaryAvailability.selectResource);
-      expect(repository.metadataReads, isEmpty);
+      expect(controller.availability, CommentaryAvailability.available);
+      expect(controller.metadata!.language, 'en');
       await controller.selectModule('fixture');
       expect(controller.entries, isNotEmpty);
       expect(controller.isCompatible(controller.selectedModule!), isFalse);
-      expect(preferences.saved, isEmpty);
+      expect(preferences.saved['ar'], 'fixture');
+      controller.close();
+      controller.clearRememberedPreferences();
+      await controller.open(_context(language: 'ar'));
+      expect(controller.selectedModule!.id, 'fixture');
+    },
+  );
+
+  test(
+    'TSK is the reference default; saved and installed choices retain priority',
+    () async {
+      final repository = _Repository(
+        fixture,
+        secondModule: true,
+        includeTsk: true,
+      );
+      final preferences = _Preferences();
+      final controller = CommentaryController(
+        repository: repository,
+        preferences: preferences,
+      );
+      addTearDown(controller.dispose);
+      await controller.open(_context());
+      expect(controller.selectedModule!.id, 'tsk');
+      await controller.selectModule('second');
+      controller.close();
+      await controller.open(_context());
+      expect(controller.selectedModule!.id, 'second');
+      preferences.saved.clear();
+      controller.clearRememberedPreferences();
+      controller.close();
+      repository.installedIds.add('fixture');
+      await controller.open(_context());
+      expect(controller.selectedModule!.id, 'fixture');
     },
   );
 
@@ -461,9 +519,22 @@ void main() {
       (request! as StructuredReferenceRequest).selections.single.verses,
       <int>[1, 2],
     );
+    await tester.ensureVisible(find.text('Whole chapter'));
     await tester.tap(find.text('Whole chapter'));
     await tester.pump();
+    expect(find.text('Chapter introduction.'), findsNothing);
+    await tester.ensureVisible(find.text('Chapter introduction').first);
+    await tester.tap(find.text('Chapter introduction').first);
+    await tester.pumpAndSettle();
     expect(find.text('Chapter introduction.'), findsOneWidget);
+    await tester.ensureVisible(find.text('Book introduction').first);
+    await tester.tap(find.text('Book introduction').first);
+    await tester.pumpAndSettle();
+    expect(controller.introduction!.chapter, 0);
+    expect(
+      find.text(controller.introduction!.entries.single.text),
+      findsOneWidget,
+    );
   });
 
   testWidgets('panel replacement and tab dismissal cancel late repaint', (
@@ -515,7 +586,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(oldRepository.chapterReads, hasLength(1));
+    expect(oldRepository.chapterReads, hasLength(2));
     expect(oldController.isLoading, isTrue);
     final int beforeReplacement = oldNotifications;
     rebuild(() => active = newController);
@@ -523,7 +594,7 @@ void main() {
     await tester.pump();
     expect(oldController.context, isNull);
     expect(oldController.isLoading, isFalse);
-    expect(newRepository.chapterReads, hasLength(1));
+    expect(newRepository.chapterReads, hasLength(2));
     oldResult.complete(
       CommentaryAdapter.chapter(fixture['chapter'], 'fixture', 1, 1),
     );
@@ -607,17 +678,25 @@ StudyContext _context({
 
 final class _Repository
     implements CommentaryRepository, InstalledStudyResource {
-  _Repository(this.fixture, {this.secondModule = false});
+  _Repository(
+    this.fixture, {
+    this.secondModule = false,
+    this.includeTsk = false,
+  });
   bool installed = false;
+  final Set<String> installedIds = {};
+  final bool includeTsk;
   Completer<bool>? statusPending;
   @override
   Future<bool> isInstalled(String id) =>
-      statusPending?.future ?? Future.value(installed);
+      statusPending?.future ??
+      Future.value(installed || installedIds.contains(id));
   final JsonMap fixture;
   final bool secondModule;
   final List<String> metadataReads = <String>[];
   final List<String> chapterReads = <String>[];
   Completer<CommentaryChapter>? delayedChapter;
+  bool failIntroduction = false;
 
   @override
   Future<CommentaryCatalogue> catalogue({
@@ -630,6 +709,13 @@ final class _Repository
         ..['name'] = 'Second Commentary';
       (value['commentaries'] as List).add(second);
       value['module_count'] = 2;
+    }
+    if (includeTsk) {
+      final tsk = _clone((value['commentaries'] as List).first)
+        ..['id'] = 'tsk'
+        ..['name'] = 'TSK';
+      (value['commentaries'] as List).add(tsk);
+      value['module_count'] = (value['commentaries'] as List).length;
     }
     return ServiceEnvelopeAdapters.commentaries(value);
   }
@@ -663,7 +749,10 @@ final class _Repository
     RequestCancellation? cancellation,
   }) async {
     chapterReads.add('$module/$book/$chapter');
-    if (delayedChapter != null) return delayedChapter!.future;
+    if (chapter == 0 && failIntroduction) {
+      throw const NetworkException('Unavailable introduction');
+    }
+    if (delayedChapter != null && chapter != 0) return delayedChapter!.future;
     return CommentaryAdapter.chapter(
       _clone(fixture[chapter == 0 ? 'book_intro' : 'chapter'])
         ..['commentary'] = module,

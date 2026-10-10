@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../application/offline_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/offline_resource.dart';
 
 /// A native, scrollable resource manager. Opening it only reads durable local
@@ -58,11 +59,13 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ListTile(
-                title: const Text('Offline resources'),
+                title: Text(UiStrings.of(context).text('Offline resources')),
                 trailing: widget.onClose == null
                     ? null
                     : IconButton(
-                        tooltip: 'Close offline resources',
+                        tooltip: UiStrings.of(
+                          context,
+                        ).text('Close offline resources'),
                         onPressed: widget.onClose,
                         icon: const Icon(Icons.close),
                       ),
@@ -71,12 +74,20 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    const Text(
-                      'Install public Bibles and Study resources for use without a connection. Downloads start only when you choose Install. Notes and notebooks remain separate.',
+                    Text(
+                      UiStrings.of(context).text(
+                        'Install public Bibles and Study resources for use without a connection. Downloads start only when you choose Install. Notes and notebooks remain separate.',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '${_size(controller.usedBytes)} of ${_size(controller.quotaBytes)} offline content budget used. Device or browser storage may have a lower limit.',
+                      UiStrings.of(context).text(
+                        '{usedBytes} of {quotaBytes} offline content budget used. Device or browser storage may have a lower limit.',
+                        {
+                          'usedBytes': _size(controller.usedBytes),
+                          'quotaBytes': _size(controller.quotaBytes),
+                        },
+                      ),
                     ),
                     if (controller.error != null) ...[
                       const SizedBox(height: 12),
@@ -95,7 +106,12 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       Semantics(
                         liveRegion: true,
                         child: Text(
-                          '${progress.label} · ${_size(progress.bytes)} saved',
+                          UiStrings.of(
+                            context,
+                          ).text('{label} · {bytes} saved', {
+                            'label': _progressLabel(progress),
+                            'bytes': _size(progress.bytes),
+                          }),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -105,20 +121,24 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                         child: TextButton.icon(
                           onPressed: controller.cancel,
                           icon: const Icon(Icons.cancel_outlined),
-                          label: const Text('Cancel download'),
+                          label: Text(
+                            UiStrings.of(context).text('Cancel download'),
+                          ),
                         ),
                       ),
                     ],
                     const SizedBox(height: 16),
                     Text(
-                      'Installed',
+                      UiStrings.of(context).text('Installed'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     if (controller.installed.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'No complete resources installed yet. Previously opened online chapters may still be cached.',
+                          UiStrings.of(context).text(
+                            'No complete resources installed yet. Previously opened online chapters may still be cached.',
+                          ),
                         ),
                       ),
                     Align(
@@ -126,7 +146,9 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       child: TextButton.icon(
                         onPressed: controller.refreshInstalled,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Refresh download status'),
+                        label: Text(
+                          UiStrings.of(context).text('Refresh download status'),
+                        ),
                       ),
                     ),
                     for (final installed in controller.installed)
@@ -142,18 +164,24 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                                 attempt.resource.title,
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
-                              Text(attempt.message),
+                              Text(UiStrings.of(context).text(attempt.message)),
                               if (attempt.state != OfflineAttemptState.running)
                                 TextButton.icon(
                                   onPressed: controller.installing
                                       ? null
                                       : () => _install(attempt.resource),
                                   icon: const Icon(Icons.refresh),
-                                  label: const Text('Retry download'),
+                                  label: Text(
+                                    UiStrings.of(
+                                      context,
+                                    ).text('Retry download'),
+                                  ),
                                 )
                               else
-                                const Text(
-                                  'A running download is protected. If its window closed unexpectedly, retry after two minutes.',
+                                Text(
+                                  UiStrings.of(context).text(
+                                    'A running download is protected. If its window closed unexpectedly, retry after two minutes.',
+                                  ),
                                 ),
                             ],
                           ),
@@ -166,7 +194,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          'Available resources',
+                          UiStrings.of(context).text('Available resources'),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         OutlinedButton.icon(
@@ -176,8 +204,10 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                           icon: const Icon(Icons.refresh),
                           label: Text(
                             controller.catalog.isEmpty
-                                ? 'Browse catalogue'
-                                : 'Check for updates',
+                                ? UiStrings.of(context).text('Browse catalogue')
+                                : UiStrings.of(
+                                    context,
+                                  ).text('Check for updates'),
                           ),
                         ),
                       ],
@@ -192,20 +222,24 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       DropdownButtonFormField<OfflineResourceKind>(
                         key: const ValueKey<String>('offline-resource-kind'),
                         initialValue: _kind,
-                        hint: const Text('All resources'),
+                        hint: Text(UiStrings.of(context).text('All resources')),
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Resource type',
+                        decoration: InputDecoration(
+                          labelText: UiStrings.of(
+                            context,
+                          ).text('Resource type'),
                         ),
                         items: [
-                          const DropdownMenuItem(
+                          DropdownMenuItem(
                             value: null,
-                            child: Text('All resources'),
+                            child: Text(
+                              UiStrings.of(context).text('All resources'),
+                            ),
                           ),
                           for (final kind in OfflineResourceKind.values)
                             DropdownMenuItem(
                               value: kind,
-                              child: Text(_kindLabel(kind)),
+                              child: Text(_kindLabel(context, kind)),
                             ),
                         ],
                         onChanged: (value) => setState(() => _kind = value),
@@ -215,8 +249,10 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                         key: const ValueKey<String>('offline-resource-filter'),
                         controller: _filterController,
                         focusNode: _filterFocus,
-                        decoration: const InputDecoration(
-                          labelText: 'Find a resource',
+                        decoration: InputDecoration(
+                          labelText: UiStrings.of(
+                            context,
+                          ).text('Find a resource'),
                           prefixIcon: Icon(Icons.search),
                         ),
                         onChanged: (_) => setState(() {}),
@@ -225,10 +261,15 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       for (final resource in items.take(100))
                         _catalogCard(resource),
                       if (items.length > 100)
-                        const Text(
-                          'Showing the first 100 resources. Narrow your search to find more.',
+                        Text(
+                          UiStrings.of(context).text(
+                            'Showing the first 100 resources. Narrow your search to find more.',
+                          ),
                         ),
-                      if (items.isEmpty) const Text('No matching resources.'),
+                      if (items.isEmpty)
+                        Text(
+                          UiStrings.of(context).text('No matching resources.'),
+                        ),
                     ],
                   ],
                 ),
@@ -239,6 +280,26 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
       );
     },
   );
+
+  String _progressLabel(OfflineProgress progress) {
+    final strings = UiStrings.of(context);
+    final resource = <OfflineResourceDescriptor>[
+      ...widget.controller.catalog,
+      ...widget.controller.installed.map((item) => item.resource),
+    ].where((item) => item.key == progress.resourceKey).firstOrNull;
+    if (resource != null) {
+      if (progress.label == 'Downloading ${resource.title}') {
+        return strings.text('Downloading {name}', {'name': resource.title});
+      }
+      if (progress.label == 'Indexing ${resource.title}') {
+        return strings.text('Indexing {name}', {'name': resource.title});
+      }
+      if (progress.label == 'Verified ${resource.title}') {
+        return strings.text('Verified {name}', {'name': resource.title});
+      }
+    }
+    return strings.text(progress.label);
+  }
 
   Widget _installedCard(OfflineInstalledResource installed) => Card(
     child: Padding(
@@ -251,10 +312,14 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
             style: Theme.of(context).textTheme.titleSmall,
           ),
           Text(
-            '${_kindLabel(installed.resource.kind)} · ${_size(installed.byteCount)} · ${_hasUpdate(installed.resource) ? 'Update available' : 'Installed'}',
+            '${_kindLabel(context, installed.resource.kind)} · ${_size(installed.byteCount)} · ${_hasUpdate(installed.resource) ? UiStrings.of(context).text('Update available') : UiStrings.of(context).text('Installed')}',
           ),
           Text(
-            'Verified source revision: ${installed.resource.revision.isEmpty ? 'source snapshot' : installed.resource.revision}',
+            UiStrings.of(context).text('Verified source revision: {revision}', {
+              'revision': installed.resource.revision.isEmpty
+                  ? 'source snapshot'
+                  : installed.resource.revision,
+            }),
           ),
           if (installed.resource.attribution.isNotEmpty)
             Text(installed.resource.attribution),
@@ -266,14 +331,14 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                     ? null
                     : () => _install(_latest(installed.resource)),
                 icon: const Icon(Icons.system_update_alt),
-                label: const Text('Update / verify'),
+                label: Text(UiStrings.of(context).text('Update / verify')),
               ),
               TextButton.icon(
                 onPressed: widget.controller.installing
                     ? null
                     : () => _remove(installed),
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Remove download'),
+                label: Text(UiStrings.of(context).text('Remove download')),
               ),
             ],
           ),
@@ -306,7 +371,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
           children: [
             Text(resource.title, style: Theme.of(context).textTheme.titleSmall),
             Text(
-              '${_kindLabel(resource.kind)} · ${resource.estimatedBytes == null ? 'Download size not published' : 'Estimated download: ${_size(resource.estimatedBytes!)}'}',
+              '${_kindLabel(context, resource.kind)} · ${resource.estimatedBytes == null ? UiStrings.of(context).text('Download size not published') : UiStrings.of(context).text('Estimated download: {estimatedBytes}', {'estimatedBytes': _size(resource.estimatedBytes!)})}',
             ),
             if (resource.attribution.isNotEmpty) Text(resource.attribution),
             Text(
@@ -318,7 +383,11 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                   ? null
                   : () => _install(resource),
               icon: Icon(installed ? Icons.system_update_alt : Icons.download),
-              label: Text(installed ? 'Update / verify' : 'Install'),
+              label: Text(
+                installed
+                    ? UiStrings.of(context).text('Update / verify')
+                    : UiStrings.of(context).text('Install'),
+              ),
             ),
           ],
         ),
@@ -330,14 +399,25 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Install ${resource.title}?'),
+        title: Text(
+          UiStrings.of(
+            context,
+          ).text('Install {title}?', {'title': resource.title}),
+        ),
         content: SingleChildScrollView(
           child: Text(
             [
               resource.estimatedBytes == null
-                  ? 'The source does not publish a download size.'
-                  : 'Estimated download: ${_size(resource.estimatedBytes!)}.',
-              'An update temporarily needs space for both versions. The previous installation remains readable until every file is verified.',
+                  ? UiStrings.of(
+                      context,
+                    ).text('The source does not publish a download size.')
+                  : UiStrings.of(context).text(
+                      'Estimated download: {estimatedBytes}.',
+                      {'estimatedBytes': _size(resource.estimatedBytes!)},
+                    ),
+              UiStrings.of(context).text(
+                'An update temporarily needs space for both versions. The previous installation remains readable until every file is verified.',
+              ),
               if (resource.attribution.isNotEmpty) resource.attribution,
             ].join('\n\n'),
           ),
@@ -345,11 +425,11 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(UiStrings.of(context).text('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Install'),
+            child: Text(UiStrings.of(context).text('Install')),
           ),
         ],
       ),
@@ -361,18 +441,24 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Remove ${resource.resource.title}?'),
-        content: const Text(
-          'This removes only the installed public resource and its search index. Your notes, notebooks, copied markings and preferences are preserved.',
+        title: Text(
+          UiStrings.of(
+            context,
+          ).text('Remove {title}?', {'title': resource.resource.title}),
+        ),
+        content: Text(
+          UiStrings.of(context).text(
+            'This removes only the installed public resource and its search index. Your notes, notebooks, copied markings and preferences are preserved.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(UiStrings.of(context).text('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove download'),
+            child: Text(UiStrings.of(context).text('Remove download')),
           ),
         ],
       ),
@@ -383,11 +469,14 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
   }
 }
 
-String _kindLabel(OfflineResourceKind kind) => switch (kind) {
-  OfflineResourceKind.bible => 'Bible',
-  OfflineResourceKind.dictionary => 'Dictionary',
-  OfflineResourceKind.commentary => 'Commentary',
-  OfflineResourceKind.bookmarks => 'Public topics',
+String _kindLabel(
+  BuildContext context,
+  OfflineResourceKind kind,
+) => switch (kind) {
+  OfflineResourceKind.bible => UiStrings.of(context).text('Bible'),
+  OfflineResourceKind.dictionary => UiStrings.of(context).text('Dictionary'),
+  OfflineResourceKind.commentary => UiStrings.of(context).text('Commentary'),
+  OfflineResourceKind.bookmarks => UiStrings.of(context).text('Public topics'),
 };
 
 String _size(int bytes) => bytes < 1024 * 1024

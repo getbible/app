@@ -12,12 +12,16 @@ class ScriptureStudyActions extends InheritedWidget {
     required this.onSearch,
     required this.onNote,
     this.emphasisFor,
+    this.onReference,
+    this.onBookmarks,
   });
 
   final void Function(Verse, ScriptureTextRange) onWord;
   final ValueChanged<String> onSearch;
   final ValueChanged<Verse> onNote;
   final List<ScriptureTextEmphasis> Function(Verse)? emphasisFor;
+  final ValueChanged<String>? onReference;
+  final ValueChanged<String?>? onBookmarks;
 
   static ScriptureStudyActions? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ScriptureStudyActions>();
@@ -27,5 +31,7 @@ class ScriptureStudyActions extends InheritedWidget {
       onWord != oldWidget.onWord ||
       onSearch != oldWidget.onSearch ||
       onNote != oldWidget.onNote ||
+      onReference != oldWidget.onReference ||
+      onBookmarks != oldWidget.onBookmarks ||
       emphasisFor != oldWidget.emphasisFor;
 }

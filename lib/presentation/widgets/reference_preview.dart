@@ -5,10 +5,12 @@ import 'package:flutter/services.dart';
 
 import '../../application/reference_preview_controller.dart';
 import '../../core/errors.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/bible.dart';
 import '../../domain/models/passage.dart';
 import '../../domain/models/reference.dart';
 import 'scripture_verse_text.dart';
+import 'source_annotations.dart';
 
 /// Labels can be supplied by the application's locale layer. Scripture and
 /// source citation labels are always displayed exactly as the API supplies them.
@@ -31,6 +33,23 @@ final class ReferencePreviewLabels {
     this.offline =
         'Unable to load this reference. Check your connection and try again.',
   });
+
+  ReferencePreviewLabels localized(UiStrings strings) => ReferencePreviewLabels(
+    title: strings.text(title),
+    reference: strings.text(reference),
+    preview: strings.text(preview),
+    close: strings.text(close),
+    back: strings.text(back),
+    copy: strings.text(copy),
+    copied: strings.text(copied),
+    open: strings.text(open),
+    loading: strings.text(loading),
+    retry: strings.text(retry),
+    empty: strings.text(empty),
+    unavailable: strings.text(unavailable),
+    offline: strings.text(offline),
+    hint: hint,
+  );
 
   final String title;
   final String reference;
@@ -80,6 +99,9 @@ class ReferencePreview extends StatefulWidget {
 
 class _ReferencePreviewState extends State<ReferencePreview> {
   final TextEditingController _input = TextEditingController();
+  ReferencePreviewLabels get _labels =>
+      widget.labels.localized(UiStrings.of(context));
+
   bool _opening = false;
   String? _actionError;
   ReferenceRequest? _actionRequest;
@@ -145,7 +167,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(
         context,
-      )?.showSnackBar(SnackBar(content: Text(widget.labels.copied)));
+      )?.showSnackBar(SnackBar(content: Text(_labels.copied)));
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -180,13 +202,13 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                         minWidth: 48,
                         minHeight: 48,
                       ),
-                      tooltip: widget.labels.back,
+                      tooltip: _labels.back,
                       onPressed: () => unawaited(state.goBack()),
                       icon: const Icon(Icons.arrow_back),
                     ),
                   Expanded(
                     child: Text(
-                      widget.labels.title,
+                      _labels.title,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
@@ -195,7 +217,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                       minWidth: 48,
                       minHeight: 48,
                     ),
-                    tooltip: widget.labels.close,
+                    tooltip: _labels.close,
                     onPressed: widget.onClose,
                     icon: const Icon(Icons.close),
                   ),
@@ -233,8 +255,8 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                                   textInputAction: TextInputAction.search,
                                   onSubmitted: (_) => _submit(),
                                   decoration: InputDecoration(
-                                    labelText: widget.labels.reference,
-                                    hintText: widget.labels.hint,
+                                    labelText: _labels.reference,
+                                    hintText: _labels.hint,
                                     border: const OutlineInputBorder(),
                                   ),
                                 ),
@@ -242,7 +264,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                                 FilledButton.tonalIcon(
                                   onPressed: _submit,
                                   icon: const Icon(Icons.menu_book),
-                                  label: Text(widget.labels.preview),
+                                  label: Text(_labels.preview),
                                 ),
                               ],
                             ),
@@ -284,7 +306,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                     OutlinedButton.icon(
                       onPressed: () => unawaited(_copy(result)),
                       icon: const Icon(Icons.copy),
-                      label: Text(widget.labels.copy),
+                      label: Text(_labels.copy),
                     ),
                     FilledButton.icon(
                       onPressed: _opening
@@ -298,7 +320,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                               ),
                             ),
                       icon: const Icon(Icons.open_in_new),
-                      label: Text(widget.labels.open),
+                      label: Text(_labels.open),
                     ),
                   ],
                 ),
@@ -315,7 +337,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
         hasScrollBody: false,
         child: Center(
           child: Semantics(
-            label: widget.labels.loading,
+            label: _labels.loading,
             liveRegion: true,
             child: const CircularProgressIndicator(),
           ),
@@ -325,11 +347,11 @@ class _ReferencePreviewState extends State<ReferencePreview> {
     final Object? error = state.error;
     if (error != null) {
       final String message = switch (error) {
-        ResourceUnavailableException() => widget.labels.unavailable,
+        ResourceUnavailableException() => _labels.unavailable,
         RateLimitException() => error.message,
         InvalidApiRequestException() => error.message,
         HttpStatusException() => error.message,
-        NetworkException() => widget.labels.offline,
+        NetworkException() => _labels.offline,
         FormatException() => error.message,
         _ => error.toString(),
       };
@@ -343,7 +365,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
               OutlinedButton.icon(
                 onPressed: () => unawaited(state.retry()),
                 icon: const Icon(Icons.refresh),
-                label: Text(widget.labels.retry),
+                label: Text(_labels.retry),
               ),
             ],
           ),
@@ -354,7 +376,7 @@ class _ReferencePreviewState extends State<ReferencePreview> {
       return SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Text(widget.labels.empty),
+          child: Text(_labels.empty),
         ),
       );
     }
@@ -404,16 +426,39 @@ class _ReferencePreviewState extends State<ReferencePreview> {
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: ScriptureVerseText(
-                            verse: verse,
-                            showSourceStyles: widget.showSourceStyles,
-                            style: Theme.of(context).textTheme.bodyLarge!,
-                            textDirection: _direction(chapter, state.request),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ScriptureVerseText(
+                                verse: verse,
+                                showSourceStyles: widget.showSourceStyles,
+                                style: Theme.of(context).textTheme.bodyLarge!,
+                                textDirection: _direction(
+                                  chapter,
+                                  state.request,
+                                ),
+                              ),
+                              ScriptureSourceAnnotations(
+                                verse: verse,
+                                onReference: (reference) => unawaited(
+                                  widget.controller.open(
+                                    TextReferenceRequest(
+                                      translation: result.translation,
+                                      reference: reference,
+                                      translationName:
+                                          state.request?.translationName,
+                                      translationDirection:
+                                          state.request?.translationDirection,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                       IconButton(
-                        tooltip: '${widget.labels.open}: ${verse.verse}',
+                        tooltip: '${_labels.open}: ${verse.verse}',
                         constraints: const BoxConstraints(
                           minWidth: 48,
                           minHeight: 48,

@@ -99,10 +99,13 @@ TextSpan scriptureVerseSpan({
           text: segment.text,
           style: TextStyle(
             fontStyle: segment.sourceStyle.italic ? FontStyle.italic : null,
+            color: segment.sourceStyle.jesusWords
+                ? (Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xffffa8a8)
+                      : const Color(0xffa31524))
+                : null,
             fontWeight:
-                segment.sourceStyle.bold ||
-                    segment.sourceStyle.divineName ||
-                    segment.sourceStyle.jesusWords
+                segment.sourceStyle.bold || segment.sourceStyle.divineName
                 ? FontWeight.w600
                 : null,
             backgroundColor: segment.markingGroup == null

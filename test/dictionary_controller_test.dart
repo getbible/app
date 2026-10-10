@@ -102,7 +102,7 @@ void main() {
   );
 
   test(
-    'missing language has explicit choice; remembered foreign choice is clearly retained',
+    'confirmed foreign-language fallback stays attributed and an explicit choice is retained',
     () async {
       final DictionaryFixture fixture = DictionaryFixture();
       final MemoryStudyPreferences preferences = MemoryStudyPreferences();
@@ -119,9 +119,14 @@ void main() {
         language: 'ar',
       );
       await controller.open(context);
-      expect(controller.needsResourceChoice, isTrue);
-      expect(controller.entry, isNull);
-      expect(fixture.requests.length, 1);
+      expect(controller.selectedModule!.id, 'easton');
+      expect(controller.entry, isNotNull);
+      expect(controller.metadata!.language, 'en');
+      expect(controller.choices.map((module) => module.id), contains('easton'));
+      expect(
+        fixture.requests.any((uri) => uri.path.endsWith('/index.json')),
+        isTrue,
+      );
       await controller.selectModule('easton');
       expect(controller.metadata!.language, 'en');
       expect(controller.matches.length, 2);
@@ -216,6 +221,102 @@ void main() {
     },
   );
 
+  test(
+    'choosing a confirmed resource during discovery preserves selection and context',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository)
+        ..delayModule = 'oddgreek';
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      final context = dictionaryContext(strongs: ['G3056']);
+      final lookup = controller.open(context);
+      await repository.started.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.isDiscovering, isTrue);
+      expect(
+        controller.choices.map((module) => module.id),
+        contains('strongsgreek'),
+      );
+      await controller.selectModule('strongsgreek');
+      await controller.openEntry('G3056--2');
+      final entry = controller.entry;
+      repository.pending.complete(await fixture.repository.index('oddgreek'));
+      await lookup;
+      expect(controller.entry, same(entry));
+      expect(controller.context, same(context));
+      expect(controller.historyLength, 1);
+      expect(controller.isDiscovering, isFalse);
+    },
+  );
+
+  test(
+    'new word cancels discovery and never keeps old lexical candidates',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository)
+        ..delayModule = 'oddgreek';
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      final older = controller.open(dictionaryContext(strongs: ['G3056']));
+      await repository.started.future;
+      repository.delayModule = null;
+      await controller.searchWords('Kadesh');
+      final current = controller.entry;
+      expect(current!.id, 'kadesh');
+      expect(controller.selectedModule!.id, 'easton');
+      repository.pending.complete(await fixture.repository.index('oddgreek'));
+      await older;
+      expect(controller.entry, same(current));
+      expect(controller.choices.map((module) => module.id), ['easton']);
+    },
+  );
+
+  test(
+    'installed discovery remains local until online expansion is explicit',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository)
+        ..installedIds.add('strongsgreek');
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      expect(controller.usingInstalledChoices, isTrue);
+      expect(controller.onlineChoicesAvailable, isTrue);
+      expect(
+        fixture.requests
+            .where((uri) => uri.path.endsWith('/index.json'))
+            .map((uri) => uri.path),
+        ['/v1/strongsgreek/index.json'],
+      );
+      await controller.includeOnlineDictionaries();
+      expect(controller.usingInstalledChoices, isFalse);
+      expect(
+        fixture.requests.any((uri) => uri.path == '/v1/easton/index.json'),
+        isTrue,
+      );
+      expect(controller.selectedModule!.id, 'strongsgreek');
+    },
+  );
+
   test('failed preference write retains usable definition', () async {
     final DictionaryFixture fixture = DictionaryFixture();
     final MemoryStudyPreferences preferences = MemoryStudyPreferences()
@@ -234,6 +335,53 @@ void main() {
     expect(controller.preferenceError, isNotNull);
     expect(controller.error, isNull);
   });
+
+  test(
+    'opening or returning to dictionary browsing prefers an installed resource',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository)
+        ..installedIds.add('strongsgreek');
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences()
+          ..dictionaries['en:surface'] = 'easton',
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      final source = dictionaryContext();
+      await controller.open(
+        StudyContext(
+          passage: source.passage,
+          bookName: source.bookName,
+          language: source.language,
+          verse: source.verse,
+        ),
+      );
+      expect(controller.isBrowsing, isTrue);
+      expect(controller.selectedModule!.id, 'strongsgreek');
+      expect(controller.isInstalled, isTrue);
+      expect(controller.choices.map((module) => module.id), contains('easton'));
+      await controller.searchWords('G3056');
+      expect(controller.entry!.id, 'G3056');
+      await controller.searchWords('');
+      expect(controller.isBrowsing, isTrue);
+      expect(controller.selectedModule!.id, 'strongsgreek');
+      expect(
+        fixture.requests.map((uri) => uri.path),
+        everyElement(
+          anyOf('/v1/dictionaries.json', startsWith('/v1/strongsgreek/')),
+        ),
+        reason: 'Automatic defaults must never request an online-only module.',
+      );
+      // A deliberate online choice remains possible from the full catalogue.
+      await controller.selectModule('easton');
+      expect(controller.selectedModule!.id, 'easton');
+      expect(controller.metadata!.id, 'easton');
+    },
+  );
 
   test('a dismissed late entry cannot reopen the dictionary', () async {
     final DictionaryFixture fixture = DictionaryFixture();
@@ -295,10 +443,12 @@ final class DelayedDictionaryRepository
     implements DictionaryRepository, InstalledStudyResource {
   DelayedDictionaryRepository(this.delegate);
   bool installed = false;
+  final Set<String> installedIds = {};
   Completer<bool>? statusPending;
   @override
   Future<bool> isInstalled(String id) =>
-      statusPending?.future ?? Future.value(installed);
+      statusPending?.future ??
+      Future.value(installed || installedIds.contains(id));
   final DictionaryRepository delegate;
   String? delayModule;
   String? delayEntry;

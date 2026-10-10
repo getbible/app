@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui_strings.dart';
 import '../../services/text_file_service.dart';
 
 /// Platform actions shared by Scripture, notebook Markdown and private backups.
@@ -114,30 +115,35 @@ class _TextExportActionsState extends State<TextExportActions> {
           FilledButton.icon(
             onPressed: _busy ? null : () => _run(_save),
             icon: const Icon(Icons.save_alt),
-            label: const Text('Save file'),
+            label: Text(UiStrings.of(context).text('Save file')),
           ),
           if (widget.allowShare)
             OutlinedButton.icon(
               onPressed: _busy ? null : () => _run(_share),
               icon: const Icon(Icons.share),
-              label: const Text('Share'),
+              label: Text(UiStrings.of(context).text('Share')),
             ),
           OutlinedButton.icon(
             onPressed: _busy ? null : () => _run(_copy),
             icon: const Icon(Icons.copy),
-            label: const Text('Copy'),
+            label: Text(UiStrings.of(context).text('Copy')),
           ),
         ],
       ),
       if (_busy)
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(top: 8),
-          child: LinearProgressIndicator(semanticsLabel: 'Export in progress'),
+          child: LinearProgressIndicator(
+            semanticsLabel: UiStrings.of(context).text('Export in progress'),
+          ),
         ),
       if (_status != null)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Semantics(liveRegion: true, child: Text(_status!)),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(UiStrings.of(context).text(_status!)),
+          ),
         ),
     ],
   );

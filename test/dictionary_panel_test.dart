@@ -34,15 +34,25 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Word; speech.\n\nA second paragraph.'), findsOneWidget);
-      expect(find.text('Source language: en'), findsOneWidget);
-      expect(find.text('G3056--2 · definition 2'), findsOneWidget);
+      expect(controller.metadata!.language, 'en');
+      expect(controller.matches.map((match) => match.id), contains('G3056--2'));
       await tester.scrollUntilVisible(
-        find.widgetWithText(ActionChip, 'John 1:1'),
+        find.text('Word; speech.\n\nA second paragraph.'),
         150,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.widgetWithText(ActionChip, 'John 1:1'));
+      expect(find.text('Word; speech.\n\nA second paragraph.'), findsOneWidget);
+      final Finder citation = find.widgetWithText(ActionChip, 'John 1:1');
+      await tester.scrollUntilVisible(
+        citation,
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      // ensureVisible changes the scroll position synchronously, but the
+      // resulting layout must be painted before a pointer can hit the chip.
+      await tester.pumpAndSettle();
+      expect(citation.hitTestable(), findsOneWidget);
+      await tester.tap(citation);
       await tester.pump();
       expect(preview, isA<StructuredReferenceRequest>());
       expect(preview!.translation, 'kjv');
@@ -53,15 +63,23 @@ void main() {
         150,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
+      expect(link.hitTestable(), findsOneWidget);
       await tester.tap(link);
       await tester.pumpAndSettle();
       expect(find.text('A saying.'), findsOneWidget);
+      final Finder previous = find.widgetWithText(
+        TextButton,
+        'Previous dictionary word',
+      );
       await tester.scrollUntilVisible(
-        find.text('Previous dictionary word'),
+        previous,
         -150,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Previous dictionary word'));
+      await tester.pumpAndSettle();
+      expect(previous.hitTestable(), findsOneWidget);
+      await tester.tap(previous);
       await tester.pumpAndSettle();
       expect(find.text('Word; speech.\n\nA second paragraph.'), findsOneWidget);
     },
@@ -119,7 +137,9 @@ void main() {
         -100,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Ka\u0301de\u0301sh');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       expect(controller.matches.length, 2);
       expect(tester.takeException(), isNull);
@@ -129,6 +149,8 @@ void main() {
         -150,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
+      expect(moduleField.hitTestable(), findsOneWidget);
       await tester.tap(moduleField);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

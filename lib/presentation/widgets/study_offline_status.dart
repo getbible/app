@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui_strings.dart';
+
 /// A complete installation is distinct from an opportunistically cached page.
 final class StudyOfflineStatus extends StatelessWidget {
   const StudyOfflineStatus({
@@ -19,15 +21,19 @@ final class StudyOfflineStatus extends StatelessWidget {
         if (installed != null)
           Text(
             installed!
-                ? 'Installed on this device · available offline'
-                : 'Online resource · not installed on this device',
+                ? UiStrings.of(
+                    context,
+                  ).text('Installed on this device · available offline')
+                : UiStrings.of(
+                    context,
+                  ).text('Online resource · not installed on this device'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         if (onSetUpOffline != null)
           TextButton.icon(
             onPressed: onSetUpOffline,
             icon: const Icon(Icons.download_outlined),
-            label: const Text('Set up offline use'),
+            label: Text(UiStrings.of(context).text('Set up offline use')),
           ),
       ],
     ),

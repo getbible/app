@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+
 import 'package:flutter/services.dart';
+
+import '../../core/ui_strings.dart';
 
 import '../../domain/models/study_context.dart';
 
@@ -13,6 +16,14 @@ enum StudyTab {
 
   const StudyTab(this.label);
   final String label;
+  String localizedLabel(BuildContext context) => switch (this) {
+    dictionary => UiStrings.of(context).text('Dictionary'),
+    commentary => UiStrings.of(context).text('Commentary'),
+    topics => UiStrings.of(context).text('Topics'),
+    markings => UiStrings.of(context).text('My markings'),
+    notes => UiStrings.of(context).text('Notebooks'),
+    verseNotes => UiStrings.of(context).text('Verse notes'),
+  };
 }
 
 /// One adaptive surface, with resource loading owned by its selected panel.
@@ -41,6 +52,15 @@ class StudyWorkspace extends StatefulWidget {
 
 class _StudyWorkspaceState extends State<StudyWorkspace> {
   late StudyTab _tab = widget.initialTab;
+  final FocusNode _resourceFocus = FocusNode(
+    debugLabel: 'Study resource chooser',
+  );
+
+  @override
+  void dispose() {
+    _resourceFocus.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(StudyWorkspace oldWidget) {
@@ -75,10 +95,17 @@ class _StudyWorkspaceState extends State<StudyWorkspace> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
                           ListTile(
-                            title: const Text('Study tools'),
+                            title: Semantics(
+                              header: true,
+                              child: Text(
+                                UiStrings.of(context).text('Study tools'),
+                              ),
+                            ),
                             subtitle: Text(widget.context.label),
                             trailing: IconButton(
-                              tooltip: 'Close Study tools',
+                              tooltip: UiStrings.of(
+                                context,
+                              ).text('Close Study tools'),
                               onPressed: widget.onClose,
                               icon: const Icon(Icons.close),
                             ),
@@ -87,16 +114,22 @@ class _StudyWorkspaceState extends State<StudyWorkspace> {
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: DropdownButtonFormField<StudyTab>(
                               initialValue: _tab,
+                              focusNode: _resourceFocus,
+                              itemHeight: null,
                               key: ValueKey<StudyTab>(_tab),
                               isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Study resource',
+                              decoration: InputDecoration(
+                                labelText: UiStrings.of(
+                                  context,
+                                ).text('Study resource'),
                               ),
                               items: <DropdownMenuItem<StudyTab>>[
                                 for (final StudyTab tab in StudyTab.values)
                                   DropdownMenuItem<StudyTab>(
                                     value: tab,
-                                    child: Text(tab.label),
+                                    child: Text(
+                                      UiStrings.of(context).text(tab.label),
+                                    ),
                                   ),
                               ],
                               onChanged: (StudyTab? tab) {
@@ -113,7 +146,11 @@ class _StudyWorkspaceState extends State<StudyWorkspace> {
                               child: OutlinedButton.icon(
                                 onPressed: widget.onSearchSelection,
                                 icon: const Icon(Icons.search),
-                                label: const Text('Search selected text'),
+                                label: Text(
+                                  UiStrings.of(
+                                    context,
+                                  ).text('Search selected text'),
+                                ),
                               ),
                             ),
                           const Divider(),

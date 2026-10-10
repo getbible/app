@@ -13,11 +13,14 @@ import '../../domain/models/offline_resource.dart';
 import '../../domain/models/passage.dart';
 import '../../domain/models/preferences.dart';
 import '../../domain/models/private_backup.dart';
+import '../../domain/models/public_topic.dart';
+import '../../domain/models/unified_bookmarks.dart';
 import '../../domain/repositories/offline_resource_repository.dart';
 import 'database_connection.dart';
 
 part 'offline_resource_store.dart';
 part 'private_data_store.dart';
+part 'unified_bookmark_store.dart';
 
 const int localDatabaseSchemaVersion = 5;
 
@@ -55,9 +58,20 @@ final class LocalDatabase {
 
   static Future<LocalDatabase> fromExecutor(QueryExecutor executor) async {
     final LocalDatabase database = LocalDatabase._(executor);
-    await executor.ensureOpen(_DatabaseUser());
-    await database._ensureStarterGroups();
-    return database;
+    try {
+      await executor.ensureOpen(_DatabaseUser());
+      await database._ensureStarterGroups();
+      return database;
+    } on Object catch (error, stack) {
+      // A failed open/migration must release its worker and file lock before
+      // startup offers Retry. Never reset or replace the existing database.
+      try {
+        await executor.close();
+      } on Object {
+        // Preserve the original initialization failure if cleanup also fails.
+      }
+      Error.throwWithStackTrace(error, stack);
+    }
   }
 
   final QueryExecutor _executor;

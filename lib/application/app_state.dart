@@ -20,6 +20,7 @@ import '../data/repositories/installed_search_repository.dart';
 import '../data/repositories/sql_annotation_repository.dart';
 import '../data/repositories/sql_private_data_repository.dart';
 import '../data/repositories/sql_settings_repository.dart';
+import '../data/repositories/sql_unified_bookmarks_repository.dart';
 import '../domain/models/annotations.dart';
 import '../domain/models/bible.dart';
 import '../domain/models/cache.dart';
@@ -37,6 +38,7 @@ import 'offline_controller.dart';
 import 'online_search_controller.dart';
 import 'portability_controller.dart';
 import 'study_services.dart';
+import 'unified_bookmarks_controller.dart';
 
 export '../domain/models/preferences.dart'
     show AppearanceMode, ReaderLayout, ReadingWidth;
@@ -53,6 +55,14 @@ final class AppState extends ChangeNotifier {
     this.study,
     this.offline,
   ) {
+    bookmarks = UnifiedBookmarksController(
+      storage: SqlUnifiedBookmarksRepository(database),
+      publicTopics: study.topics.repository,
+      onChanged: () async {
+        preferences = await settings.getPreferences();
+        await refreshAnnotations();
+      },
+    );
     onlineSearch.addListener(_searchChanged);
     offline.addListener(_offlineChanged);
     portability = PortabilityController(
@@ -127,12 +137,28 @@ final class AppState extends ChangeNotifier {
   }
 
   static Future<AppState> create({bool initialize = true}) async {
-    final AppState state = AppState.fromDatabase(await LocalDatabase.open());
-    if (initialize) await state.initialize();
-    return state;
+    final database = await LocalDatabase.open();
+    AppState? state;
+    try {
+      state = AppState.fromDatabase(database);
+      if (initialize) await state.initialize();
+      return state;
+    } catch (_) {
+      try {
+        if (state == null) {
+          await database.close();
+        } else {
+          await state.close();
+        }
+      } catch (_) {
+        /* Preserve the original startup failure. */
+      }
+      rethrow;
+    }
   }
 
   final StudyServices study;
+  late final UnifiedBookmarksController bookmarks;
   final OfflineController offline;
   late final PortabilityController portability;
   final OnlineSearchController onlineSearch;
@@ -171,6 +197,9 @@ final class AppState extends ChangeNotifier {
   String _installedSignature = '';
   Future<void>? _resourceRefresh;
   String? resourceChoicesError;
+  Uri? _failedLink;
+  bool readerNavigationBlocked = false;
+  Future<void>? _positionWrite;
 
   bool get searchLoading => onlineSearch.isLoading;
   String? get searchError => onlineSearch.error?.toString();
@@ -226,7 +255,7 @@ final class AppState extends ChangeNotifier {
             (bookIndex >= 0 && bookIndex < books.length - 1));
   }
 
-  Future<void> initialize() async {
+  Future<void> initialize({Uri? initialUri}) async {
     try {
       // Recovery is local-only; opening the reader never starts bulk downloads.
       await offline.initialize();
@@ -234,8 +263,12 @@ final class AppState extends ChangeNotifier {
       preferences = await settings.getPreferences();
       final LastReadingPosition? last = await settings.getLastReadingPosition();
       groups = await annotations.getGroups();
-      if (last != null) {
-        passage = last.passage;
+      if (initialUri != null && initialUri.toString() != '/') {
+        await openPassageLink(initialUri);
+      } else if (last != null) {
+        passage = last.passage.copyWith(
+          verse: last.verse > 0 ? last.verse : null,
+        );
         await loadPassage(passage);
       } else {
         await openDailyScripture();
@@ -248,11 +281,103 @@ final class AppState extends ChangeNotifier {
   }
 
   /// Retrying a failed daily lookup must not open the initial reader default.
-  Future<void> retryReading() => _dailyRequest == _passageRequest
+  Future<void> retryReading() => _failedLink != null
+      ? openPassageLink(_failedLink!)
+      : _dailyRequest == _passageRequest
       ? openDailyScripture()
       : loadPassage(passage);
 
+  /// Resolve published friendly names against this Bible's own catalogue.
+  /// An invalid, missing or ambiguous source never becomes the default passage.
+  Future<void> openPassageLink(Uri uri) async {
+    if (readerNavigationBlocked) {
+      _failedLink = uri;
+      error = 'Save or close the verse note before opening another passage.';
+      notifyListeners();
+      return;
+    }
+    final request = ++_passageRequest;
+    _failedLink = uri;
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final link = parsePassageLink(uri);
+      if (link == null) {
+        throw const FormatException('This Scripture link is invalid.');
+      }
+      final result = await bibles.getBooks(link.translation);
+      if (request != _passageRequest) return;
+      final matches = result.data
+          .where((book) => bookMatchesSlug(book.name, link.bookSlug))
+          .toList();
+      if (matches.length != 1) {
+        throw const FormatException(
+          'The linked book is unavailable or ambiguous in this Bible.',
+        );
+      }
+      await _loadPassage(
+        Passage(
+          translation: link.translation,
+          book: matches.single.number,
+          chapter: link.chapter,
+          verse: link.verse,
+        ),
+        request,
+      );
+      if (request == _passageRequest && error == null) _failedLink = null;
+    } catch (exception) {
+      if (request == _passageRequest) error = exception.toString();
+    } finally {
+      if (request == _passageRequest) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Save the first visible source verse without changing the selected passage
+  /// or browser history. Serialized writes cannot restore an older chapter over
+  /// a later navigation, including when SQLite is temporarily slow.
+  Future<void> recordReadingPosition(int verse) {
+    if (_closing ||
+        loading ||
+        current == null ||
+        !current!.verses.any((item) => item.verse == verse)) {
+      return Future.value();
+    }
+    return _savePosition(passage, verse);
+  }
+
+  Future<void> _savePosition(Passage source, int verse) {
+    final previous = _positionWrite;
+    late final Future<void> next;
+    next =
+        () async {
+          if (previous != null) {
+            try {
+              await previous;
+            } catch (_) {}
+          }
+          await settings.saveLastReadingPosition(
+            LastReadingPosition(
+              passage: source,
+              verse: verse,
+              updatedAt: DateTime.now().toUtc(),
+            ),
+          );
+        }().whenComplete(() {
+          // Retain only in-flight work. Completed futures may belong to a caller's
+          // scheduling zone, and shutdown should not depend on that zone staying
+          // alive after its reader surface has been disposed.
+          if (identical(_positionWrite, next)) _positionWrite = null;
+        });
+    _positionWrite = next;
+    return next;
+  }
+
   Future<void> openDailyScripture() async {
+    _failedLink = null;
     final int request = ++_passageRequest;
     _dailyRequest = request;
     loading = true;
@@ -298,8 +423,10 @@ final class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> loadPassage(Passage next, {bool Function()? ownsRequest}) =>
-      _loadPassage(next, ++_passageRequest, ownsRequest: ownsRequest);
+  Future<void> loadPassage(Passage next, {bool Function()? ownsRequest}) {
+    _failedLink = null;
+    return _loadPassage(next, ++_passageRequest, ownsRequest: ownsRequest);
+  }
 
   Future<void> _loadPassage(
     Passage next,
@@ -378,13 +505,9 @@ final class AppState extends ChangeNotifier {
       notes = nextNotes;
       savedMarkings = nextSavedMarkings;
       savedNotes = nextSavedNotes;
-      await settings.saveLastReadingPosition(
-        LastReadingPosition(
-          passage: next,
-          verse:
-              next.verse ?? chapterResult.data.verses.firstOrNull?.verse ?? 0,
-          updatedAt: DateTime.now().toUtc(),
-        ),
+      await _savePosition(
+        next,
+        next.verse ?? chapterResult.data.verses.firstOrNull?.verse ?? 0,
       );
     } catch (exception) {
       if (request == _passageRequest && ownsRequest?.call() != false) {
@@ -400,6 +523,7 @@ final class AppState extends ChangeNotifier {
 
   /// A book opens at its discovered first chapter or its introduction node.
   Future<void> openBook(int book, {bool atEnd = false}) async {
+    _failedLink = null;
     final int request = ++_passageRequest;
     final String translation = passage.translation;
     loading = true;
@@ -467,6 +591,7 @@ final class AppState extends ChangeNotifier {
   }
 
   Future<void> selectActiveGroup(String groupId) async {
+    await bookmarks.rememberGroup(groupId);
     preferences = preferences.copyWith(activeMarkingGroupId: groupId);
     await settings.savePreferences(preferences);
     notifyListeners();
@@ -762,6 +887,18 @@ final class AppState extends ChangeNotifier {
     await settings.savePreferences(preferences);
   }
 
+  Future<void> setAccessibility({
+    bool? reduceMotion,
+    bool? highContrast,
+  }) async {
+    preferences = preferences.copyWith(
+      reduceMotion: reduceMotion,
+      highContrast: highContrast,
+    );
+    notifyListeners();
+    await settings.savePreferences(preferences);
+  }
+
   Future<void> setTextSize(double size) async {
     preferences = preferences.copyWith(textSize: size);
     notifyListeners();
@@ -799,23 +936,30 @@ final class AppState extends ChangeNotifier {
         _closing = false;
         portability.resume();
         offline.resume();
+        bookmarks.resume();
         _offlineChanged();
         Error.throwWithStackTrace(error, stack);
       });
 
   Future<void> _close() async {
     _closing = true;
+    // Invalidate network work before draining writes. A late chapter must not
+    // activate or enqueue a reading-position write after the drain starts.
+    _passageRequest++;
+    loading = false;
     onlineSearch.cancel(notify: false);
     await portability.close();
     await offline.close();
+    await bookmarks.close();
     await _resourceRefresh;
+    await _positionWrite;
     await study.close();
-    _passageRequest++;
     onlineSearch.removeListener(_searchChanged);
     offline.removeListener(_offlineChanged);
     onlineSearch.dispose();
     portability.dispose();
     offline.dispose();
+    bookmarks.dispose();
     _api.close();
     await database.close();
   }
@@ -833,7 +977,7 @@ final class AppState extends ChangeNotifier {
     preferences = await settings.getPreferences();
     await study.notebooks.reloadAfterImport();
     study.reloadImportedPreferences();
-    await refreshAnnotations();
+    await bookmarks.reload();
   }
 
   /// Refresh visible choices after explicit setup without an online catalogue

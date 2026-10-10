@@ -17,12 +17,15 @@ import '../api/commentary_adapter.dart';
 import '../api/dictionary_adapters.dart';
 import '../api/public_topic_adapter.dart';
 import '../api/service_envelope_adapters.dart';
-import '../offline/bible_index_worker.dart';
+import '../offline/dictionary_index_reader.dart';
 
 /// Installed modules always answer locally, including after application restart.
 /// A missing installed entry is never replaced with a different online revision.
 final class InstalledDictionaryRepository
-    implements DictionaryRepository, InstalledStudyResource {
+    implements
+        DictionaryRepository,
+        InstalledStudyResource,
+        DictionaryLookupSession {
   InstalledDictionaryRepository({
     required OfflineResourceStore store,
     required Uri sourceUri,
@@ -34,6 +37,9 @@ final class InstalledDictionaryRepository
        );
   final DictionaryRepository online;
   final _InstalledReader _reader;
+
+  @override
+  void beginLookup() => _reader.resetSnapshots();
 
   @override
   Future<bool> isInstalled(String id) async => await _reader.find(id) != null;
@@ -88,55 +94,10 @@ final class InstalledDictionaryRepository
   }) async {
     final raw = await _reader.readRaw(module, 'index.json', cancellation);
     if (raw == null) return online.index(module, cancellation: cancellation);
-    if (raw.length < 256 * 1024) {
-      return DictionaryAdapters.index(jsonDecode(raw), module);
-    }
-    JsonMap? header;
-    final entries = <DictionaryIndexEntry>[];
-    final normalized = <List<String>>[];
-    await indexStudyInWorker(
-      {'kind': 'dictionary-index', 'module': module, 'bytes': utf8.encode(raw)},
-      (batch) async {
-        if (batch['header'] != null) {
-          header = requireJsonMap(batch['header'], 'dictionary index header');
-          return;
-        }
-        for (final value in requireJsonList(
-          batch['entries'],
-          'dictionary index entries',
-        )) {
-          final record = requireJsonMap(value, 'index entry');
-          entries.add(
-            DictionaryIndexEntry(
-              id: requireString(record, 'id'),
-              key: requireString(record, 'key'),
-              search: requireString(record, 'search'),
-              occurrence: record['occurrence'] as int? ?? 1,
-              aliases: (record['aliases'] as List?)?.cast<String>() ?? const [],
-            ),
-          );
-        }
-        normalized.addAll(
-          (batch['normalized']! as List).map(
-            (value) => (value as List).cast<String>(),
-          ),
-        );
-        await Future<void>.delayed(Duration.zero);
-      },
-      cancellation ?? RequestCancellation(),
-    );
-    if (header == null) {
-      throw const StorageException(
-        'The installed dictionary index is incomplete. Reinstall it.',
-      );
-    }
-    return DictionaryIndex(
-      dictionary: requireString(header!, 'dictionary'),
-      language: requireString(header!, 'language'),
-      name: requireString(header!, 'name'),
-      uniqueKeyCount: requireInt(header!, 'unique_key_count'),
-      entries: entries,
-      normalizedLookupKeys: normalized,
+    return readDictionaryIndex(
+      utf8.encode(raw),
+      module,
+      cancellation: cancellation,
     );
   }
 
@@ -435,6 +396,7 @@ final class _InstalledReader {
   final Uri sourceUri;
   final OfflineResourceKind kind;
   final _snapshots = <String, Future<OfflineInstalledResource?>>{};
+  void resetSnapshots() => _snapshots.clear();
   Future<OfflineInstalledResource?> find(String id) =>
       store.find(kind, id, sourceUri);
   Future<OfflineInstalledResource?> snapshot(String id) =>

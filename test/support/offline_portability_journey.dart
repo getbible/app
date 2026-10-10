@@ -23,6 +23,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
+import 'fixture_documents.dart';
 import 'study_installation_fixture.dart';
 
 const _origin = Passage(
@@ -35,14 +36,20 @@ const _origin = Passage(
 /// One production AppState composition, exercised by widget CI and the native
 /// runner. Only the public HTTP boundary is replaced; installation workers,
 /// private backup parsing, SQLite transactions and restart are real.
-void offlinePortabilityJourney() {
+void offlinePortabilityJourney({
+  bool useDeviceViewport = false,
+  Size viewport = const Size(1250, 900),
+  Future<void> Function()? capture,
+}) {
   testWidgets(
     'installed resources and imported private work survive restart with no HTTP',
     (tester) async {
-      tester.view.physicalSize = const Size(1250, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      if (!useDeviceViewport) {
+        tester.view.physicalSize = viewport;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+      }
 
       final restoredApp = (await tester.runAsync(() async {
         final fixture = _OfflineAppFixture();
@@ -278,6 +285,7 @@ void offlinePortabilityJourney() {
         restoredApp.requestCount,
         reason: 'Rendering the reopened reader must also remain offline.',
       );
+      await capture?.call();
       await tester.pumpWidget(const SizedBox.shrink());
     },
     timeout: const Timeout(Duration(minutes: 2)),
@@ -288,9 +296,7 @@ void offlinePortabilityJourney() {
 /// no granular Scripture, Query, Search or Study routes to mask missing installs.
 final class _OfflineAppFixture {
   _OfflineAppFixture()
-    : bible = File(
-        'test/fixtures/bible_v3/rich_translation.json',
-      ).readAsBytesSync(),
+    : bible = fixtureBytes('bible_v3/rich_translation.json'),
       studies = [
         StudyInstallationFixture(OfflineResourceKind.dictionary),
         StudyInstallationFixture(OfflineResourceKind.commentary),

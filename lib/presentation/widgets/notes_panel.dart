@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../application/notebook_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../data/platform/platform_text_file_service.dart';
 import '../../domain/models/notebook.dart';
 import '../../domain/models/passage.dart';
@@ -94,16 +95,20 @@ final class _NotesPanelState extends State<NotesPanel>
             padding: const EdgeInsets.all(16),
             children: <Widget>[
               Text(
-                'Personal notebooks',
+                UiStrings.of(context).text('Personal notebooks'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Study and sermon notes stay on this device. Verse notes remain inline under Scripture.',
+              Text(
+                UiStrings.of(context).text(
+                  'Study and sermon notes stay on this device. Verse notes remain inline under Scripture.',
+                ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Use Complete private backup to save notebooks and retained drafts. Website-compatible backups contain verse notes and markings only.',
+              Text(
+                UiStrings.of(context).text(
+                  'Use Complete private backup to save notebooks and retained drafts. Website-compatible backups contain verse notes and markings only.',
+                ),
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 12),
@@ -116,7 +121,7 @@ final class _NotesPanelState extends State<NotesPanel>
                         ? null
                         : () => controller.createNotebook(),
                     icon: const Icon(Icons.add),
-                    label: const Text('New notebook'),
+                    label: Text(UiStrings.of(context).text('New notebook')),
                   ),
                   if (notebook != null)
                     OutlinedButton.icon(
@@ -124,17 +129,19 @@ final class _NotesPanelState extends State<NotesPanel>
                       icon: const Icon(Icons.save_outlined),
                       label: Text(
                         controller.isSaving
-                            ? 'Saving…'
+                            ? UiStrings.of(context).text('Saving…')
                             : controller.isDirty
-                            ? 'Save now'
-                            : 'Saved locally',
+                            ? UiStrings.of(context).text('Save now')
+                            : UiStrings.of(context).text('Saved locally'),
                       ),
                     ),
                   if (notebook != null)
                     OutlinedButton.icon(
                       onPressed: _preparingExport ? null : _exportMarkdown,
                       icon: const Icon(Icons.download_outlined),
-                      label: const Text('Export notebook Markdown'),
+                      label: Text(
+                        UiStrings.of(context).text('Export notebook Markdown'),
+                      ),
                     ),
                 ],
               ),
@@ -151,17 +158,24 @@ final class _NotesPanelState extends State<NotesPanel>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'The notebook could not be saved or loaded. Your open draft is retained. ${controller.error}',
+                            UiStrings.of(context).text(
+                              'The notebook could not be saved or loaded. Your open draft is retained. {error}',
+                              {'error': controller.error.toString()},
+                            ),
                           ),
                           TextButton.icon(
                             onPressed: controller.retry,
                             icon: const Icon(Icons.refresh),
-                            label: const Text('Retry'),
+                            label: Text(UiStrings.of(context).text('Retry')),
                           ),
                           if (controller.hasConflict)
                             TextButton(
                               onPressed: controller.recoverDraftAsNewNotebook,
-                              child: const Text('Save draft as new notebook'),
+                              child: Text(
+                                UiStrings.of(
+                                  context,
+                                ).text('Save draft as new notebook'),
+                              ),
                             ),
                         ],
                       ),
@@ -181,7 +195,10 @@ final class _NotesPanelState extends State<NotesPanel>
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '${controller.unsavedCount} other notebook draft(s) need saving.',
+                    UiStrings.of(context).text(
+                      '{unsavedCount} other notebook draft(s) need saving.',
+                      {'unsavedCount': controller.unsavedCount},
+                    ),
                   ),
                 ),
               if (controller.isLoading)
@@ -192,14 +209,26 @@ final class _NotesPanelState extends State<NotesPanel>
               if (controller.notebooks.isNotEmpty)
                 ExpansionTile(
                   key: const PageStorageKey<String>('personal-notebook-list'),
-                  title: Text(notebook?.displayTitle ?? 'Choose a notebook'),
-                  subtitle: Text('${controller.notebooks.length} notebook(s)'),
+                  title: Text(
+                    notebook?.displayTitle ??
+                        UiStrings.of(context).text('Choose a notebook'),
+                  ),
+                  subtitle: Text(
+                    UiStrings.of(context).text('{length} notebook(s)', {
+                      'length': controller.notebooks.length,
+                    }),
+                  ),
                   children: controller.notebooks
                       .map(
                         (NotebookSummary item) => ListTile(
                           selected: item.id == controller.selectedId,
                           title: Text(item.displayTitle),
-                          subtitle: Text('${item.blockCount} block(s)'),
+                          subtitle: Text(
+                            UiStrings.of(context).text(
+                              '{blockCount} block(s)',
+                              {'blockCount': item.blockCount},
+                            ),
+                          ),
                           onTap: () => controller.selectNotebook(item.id),
                         ),
                       )
@@ -207,7 +236,11 @@ final class _NotesPanelState extends State<NotesPanel>
                 ),
               if (controller.additionalRecoveredDrafts.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 12),
-                const Text('Additional recovered drafts from another editor:'),
+                Text(
+                  UiStrings.of(
+                    context,
+                  ).text('Additional recovered drafts from another editor:'),
+                ),
                 for (final NotebookDraft draft
                     in controller.additionalRecoveredDrafts)
                   Card(
@@ -217,14 +250,20 @@ final class _NotesPanelState extends State<NotesPanel>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(draft.notebook.displayTitle),
-                          const Text(
-                            'Retained locally; the saved notebook is unchanged.',
+                          Text(
+                            UiStrings.of(context).text(
+                              'Retained locally; the saved notebook is unchanged.',
+                            ),
                           ),
                           TextButton.icon(
                             onPressed: () =>
                                 controller.recoverSavedDraft(draft),
                             icon: const Icon(Icons.restore),
-                            label: const Text('Save as new notebook'),
+                            label: Text(
+                              UiStrings.of(
+                                context,
+                              ).text('Save as new notebook'),
+                            ),
                           ),
                         ],
                       ),
@@ -232,10 +271,12 @@ final class _NotesPanelState extends State<NotesPanel>
                   ),
               ],
               if (notebook == null && !controller.isLoading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    'Create a notebook for your study notes or sermon outline.',
+                    UiStrings.of(context).text(
+                      'Create a notebook for your study notes or sermon outline.',
+                    ),
                   ),
                 ),
               if (notebook != null) ...<Widget>[
@@ -249,7 +290,9 @@ final class _NotesPanelState extends State<NotesPanel>
                         notebook.titleTextCapacity,
                     maxRunes: maxNotebookTitleRunes,
                     onLimit: () => _reportInputLimit(
-                      'This edit exceeds the title or notebook size limit. Shorten the text before continuing.',
+                      UiStrings.of(context).text(
+                        'This edit exceeds the title or notebook size limit. Shorten the text before continuing.',
+                      ),
                     ),
                   ),
                   onChanged: (String title) =>
@@ -269,7 +312,9 @@ final class _NotesPanelState extends State<NotesPanel>
                           ) ??
                           notebook.blockTextCapacity(notebook.blocks[index].id),
                       onLimit: () => _reportInputLimit(
-                        'This edit exceeds the note block or notebook size limit. Shorten this block or another block before continuing.',
+                        UiStrings.of(context).text(
+                          'This edit exceeds the note block or notebook size limit. Shorten this block or another block before continuing.',
+                        ),
                       ),
                     ),
                     position: index + 1,
@@ -299,7 +344,7 @@ final class _NotesPanelState extends State<NotesPanel>
                           ? null
                           : () => _edit(controller.addTextBlock),
                       icon: const Icon(Icons.add),
-                      label: const Text('Add note block'),
+                      label: Text(UiStrings.of(context).text('Add note block')),
                     ),
                     OutlinedButton.icon(
                       onPressed:
@@ -309,18 +354,24 @@ final class _NotesPanelState extends State<NotesPanel>
                           ? null
                           : _insertScripture,
                       icon: const Icon(Icons.format_quote),
-                      label: const Text('Insert current Scripture'),
+                      label: Text(
+                        UiStrings.of(context).text('Insert current Scripture'),
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: () => _deleteNotebook(notebook),
                       icon: const Icon(Icons.delete_outline),
-                      label: const Text('Delete notebook'),
+                      label: Text(
+                        UiStrings.of(context).text('Delete notebook'),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Autosaves locally. Ctrl/⌘ + Enter saves immediately.',
+                Text(
+                  UiStrings.of(context).text(
+                    'Autosaves locally. Ctrl/⌘ + Enter saves immediately.',
+                  ),
                   style: TextStyle(fontSize: 12),
                 ),
               ],
@@ -356,9 +407,11 @@ final class _NotesPanelState extends State<NotesPanel>
       }
       if (controller.hasUndurableDrafts) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Save or retry your notebook draft before exporting.',
+              UiStrings.of(
+                context,
+              ).text('Save or retry your notebook draft before exporting.'),
             ),
           ),
         );
@@ -371,7 +424,11 @@ final class _NotesPanelState extends State<NotesPanel>
       final String preview = shortened
           ? String.fromCharCodes(markdown.runes.take(32000))
           : markdown;
-      final TextFileService files = widget.files ?? PlatformTextFileService();
+      final TextFileService files =
+          widget.files ??
+          PlatformTextFileService(
+            textFilesLabel: UiStrings.of(context).text('Text and JSON files'),
+          );
       bool busy = false;
       await showDialog<void>(
         context: context,
@@ -386,8 +443,10 @@ final class _NotesPanelState extends State<NotesPanel>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const Text(
-                      'Readable Markdown for saving or sharing. Use Complete private backup for a restorable copy.',
+                    Text(
+                      UiStrings.of(context).text(
+                        'Readable Markdown for saving or sharing. Use Complete private backup for a restorable copy.',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Flexible(
@@ -396,8 +455,10 @@ final class _NotesPanelState extends State<NotesPanel>
                       ),
                     ),
                     if (shortened)
-                      const Text(
-                        'Preview shortened. The saved file includes the complete notebook.',
+                      Text(
+                        UiStrings.of(context).text(
+                          'Preview shortened. The saved file includes the complete notebook.',
+                        ),
                       ),
                     const SizedBox(height: 12),
                     TextExportActions(
@@ -417,7 +478,7 @@ final class _NotesPanelState extends State<NotesPanel>
                   onPressed: busy
                       ? null
                       : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Close'),
+                  child: Text(UiStrings.of(context).text('Close')),
                 ),
               ],
             ),
@@ -427,9 +488,11 @@ final class _NotesPanelState extends State<NotesPanel>
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'The notebook could not be exported. Your private draft remains available.',
+              UiStrings.of(context).text(
+                'The notebook could not be exported. Your private draft remains available.',
+              ),
             ),
           ),
         );
@@ -452,7 +515,14 @@ final class _NotesPanelState extends State<NotesPanel>
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('The reference could not be opened. $error')),
+          SnackBar(
+            content: Text(
+              UiStrings.of(context).text(
+                'The reference could not be opened. {error}',
+                {'error': error},
+              ),
+            ),
+          ),
         );
       }
     }
@@ -475,7 +545,10 @@ final class _NotesPanelState extends State<NotesPanel>
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           SnackBar(
             content: Text(
-              'The passage could not be opened. Your notebook draft is retained. $error',
+              UiStrings.of(context).text(
+                'The passage could not be opened. Your notebook draft is retained. {error}',
+                {'error': error},
+              ),
             ),
           ),
         );
@@ -500,7 +573,7 @@ final class _NotesPanelState extends State<NotesPanel>
       context: context,
       builder: (BuildContext dialogContext) => StatefulBuilder(
         builder: (BuildContext dialogContext, StateSetter setState) => AlertDialog(
-          title: const Text('Insert Scripture'),
+          title: Text(UiStrings.of(context).text('Insert Scripture')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -518,7 +591,9 @@ final class _NotesPanelState extends State<NotesPanel>
                 ),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Include this quotation'),
+                  title: Text(
+                    UiStrings.of(context).text('Include this quotation'),
+                  ),
                   value: quote,
                   onChanged: (bool? value) => setState(() {
                     quote = value ?? true;
@@ -527,7 +602,9 @@ final class _NotesPanelState extends State<NotesPanel>
                 TextButton.icon(
                   onPressed: () => _previewReference(reference.previewRequest),
                   icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('Open reference preview'),
+                  label: Text(
+                    UiStrings.of(context).text('Open reference preview'),
+                  ),
                 ),
               ],
             ),
@@ -535,11 +612,11 @@ final class _NotesPanelState extends State<NotesPanel>
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(UiStrings.of(context).text('Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Insert'),
+              child: Text(UiStrings.of(context).text('Insert')),
             ),
           ],
         ),
@@ -565,8 +642,10 @@ final class _NotesPanelState extends State<NotesPanel>
   Future<void> _deleteBlock(NotebookBlock block) async {
     final String? selected = widget.controller.selectedId;
     final bool? confirmed = await _confirm(
-      'Delete note block?',
-      'This permanently deletes this block from the notebook.',
+      UiStrings.of(context).text('Delete note block?'),
+      UiStrings.of(
+        context,
+      ).text('This permanently deletes this block from the notebook.'),
     );
     if (mounted &&
         confirmed == true &&
@@ -577,8 +656,11 @@ final class _NotesPanelState extends State<NotesPanel>
 
   Future<void> _deleteNotebook(Notebook notebook) async {
     final bool? confirmed = await _confirm(
-      'Delete notebook?',
-      '“${notebook.displayTitle}” and its blocks will be permanently deleted from this device.',
+      UiStrings.of(context).text('Delete notebook?'),
+      UiStrings.of(context).text(
+        '“{displayTitle}” and its blocks will be permanently deleted from this device.',
+        {'displayTitle': notebook.displayTitle},
+      ),
     );
     if (mounted && confirmed == true) {
       await widget.controller.deleteNotebook(notebook.id);
@@ -593,11 +675,11 @@ final class _NotesPanelState extends State<NotesPanel>
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(UiStrings.of(context).text('Cancel')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Delete'),
+          child: Text(UiStrings.of(context).text('Delete')),
         ),
       ],
     ),
@@ -623,7 +705,7 @@ final class _NotebookTitle extends StatelessWidget {
     initialValue: notebook.title,
     inputFormatters: <TextInputFormatter>[inputFormatter],
     decoration: InputDecoration(
-      labelText: 'Notebook title',
+      labelText: UiStrings.of(context).text('Notebook title'),
       border: const OutlineInputBorder(),
       counterText: '${notebook.title.runes.length} / $maxNotebookTitleRunes',
     ),
@@ -670,21 +752,23 @@ final class _NotebookBlockEditor extends StatelessWidget {
             spacing: 4,
             children: <Widget>[
               Text(
-                'Block $position',
+                UiStrings.of(
+                  context,
+                ).text('Block {position}', {'position': position}),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               IconButton(
-                tooltip: 'Move block up',
+                tooltip: UiStrings.of(context).text('Move block up'),
                 onPressed: canMoveUp ? onMoveUp : null,
                 icon: const Icon(Icons.arrow_upward),
               ),
               IconButton(
-                tooltip: 'Move block down',
+                tooltip: UiStrings.of(context).text('Move block down'),
                 onPressed: canMoveDown ? onMoveDown : null,
                 icon: const Icon(Icons.arrow_downward),
               ),
               IconButton(
-                tooltip: 'Delete note block',
+                tooltip: UiStrings.of(context).text('Delete note block'),
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline),
               ),
@@ -711,11 +795,11 @@ final class _NotebookBlockEditor extends StatelessWidget {
               children: <Widget>[
                 TextButton(
                   onPressed: () => onPreview(reference.previewRequest),
-                  child: const Text('Reference preview'),
+                  child: Text(UiStrings.of(context).text('Reference preview')),
                 ),
                 TextButton(
                   onPressed: () => onOpen(reference.passage),
-                  child: const Text('Open in reader'),
+                  child: Text(UiStrings.of(context).text('Open in reader')),
                 ),
               ],
             ),
@@ -728,8 +812,8 @@ final class _NotebookBlockEditor extends StatelessWidget {
             keyboardType: TextInputType.multiline,
             decoration: InputDecoration(
               labelText: block.reference == null
-                  ? 'Study or sermon notes'
-                  : 'Notes about this Scripture',
+                  ? UiStrings.of(context).text('Study or sermon notes')
+                  : UiStrings.of(context).text('Notes about this Scripture'),
               alignLabelWithHint: true,
               border: const OutlineInputBorder(),
               counterText: '${block.text.length} / $maxNotebookBlockCodeUnits',

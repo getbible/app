@@ -23,6 +23,7 @@ void studyWorkspaceJourney({
   bool useDeviceViewport = false,
   Size viewport = const Size(1250, 900),
   TargetPlatformVariant? platform,
+  double initialKeyboardInset = 0,
 }) {
   testWidgets(
     'Study dictionaries, commentary, topics and local notebooks compose without changing Scripture',
@@ -32,6 +33,10 @@ void studyWorkspaceJourney({
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
+      }
+      if (initialKeyboardInset > 0) {
+        tester.view.viewInsets = FakeViewPadding(bottom: initialKeyboardInset);
+        addTearDown(tester.view.resetViewInsets);
       }
       final StudyApiFixture fixture = StudyApiFixture();
       const Passage origin = Passage(
@@ -112,19 +117,31 @@ void studyWorkspaceJourney({
       }
 
       await openWord();
-      expect(find.text('Source language: en'), findsOneWidget);
+      expect(state.study.dictionary.metadata?.language, 'en');
+      final dictionaryScroll = find
+          .descendant(
+            of: find.byType(DictionaryPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      // A native IME transition can still constrain the panel after Study
+      // opens. Loaded metadata may be outside the lazy list's visible range.
+      final sourceLanguage = find.text('Source language: en');
+      await tester.scrollUntilVisible(
+        sourceLanguage,
+        100,
+        scrollable: dictionaryScroll,
+      );
+      await tester.pumpAndSettle();
+      expect(sourceLanguage, findsOneWidget);
+      expect(sourceLanguage.hitTestable(), findsOneWidget);
       // Use the exact published ID to distinguish repeated definitions. On
       // short native viewports the list tile is not built until scrolled to.
       final Finder definition = find.widgetWithText(ListTile, 'kadesh');
       await tester.scrollUntilVisible(
         definition,
         150,
-        scrollable: find
-            .descendant(
-              of: find.byType(DictionaryPanel),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+        scrollable: dictionaryScroll,
       );
       await tester.pumpAndSettle();
       expect(definition.hitTestable(), findsOneWidget);
@@ -132,6 +149,12 @@ void studyWorkspaceJourney({
       await settle();
       expect(find.textContaining('Preserved paragraphs.'), findsOneWidget);
       expect(state.current!.verses.first.text, originalText);
+      if (initialKeyboardInset > 0) {
+        // The regression holds the pending IME inset through the first lookup,
+        // then delivers its hide notification before continuing the journey.
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+      }
 
       await choose(StudyTab.commentary);
       await tester.tap(find.text('Whole chapter'));

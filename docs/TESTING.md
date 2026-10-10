@@ -396,6 +396,11 @@ offline-portability journeys at a 390 × 844 logical-pixel phone viewport.
 scrolling lazily rendered dictionary entries into view. Compact Study tests
 retain the panel's captured context through its closing animation and cover
 notifications while that route is being removed.
+`test/study_tablet_layout_test.dart` holds a pending keyboard inset through the
+first dictionary lookup at 1280 × 900 logical pixels. The shared journey verifies
+loaded source metadata, scrolls its lazy list, and checks the visible,
+hit-testable source-language label before opening the definition; native IME
+transitions must not be mistaken for missing resource data.
 
 ```bash
 python scripts/testing/embed_fixtures.py --check

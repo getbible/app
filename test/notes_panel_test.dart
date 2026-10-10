@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/notebook_controller.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/repositories/sql_notebook_repository.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/notebook.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/reference.dart';
-import 'package:getbible_live/domain/models/study_context.dart';
-import 'package:getbible_live/presentation/widgets/notes_panel.dart';
+import 'package:getbible/application/notebook_controller.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/repositories/sql_notebook_repository.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/notebook.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/reference.dart';
+import 'package:getbible/domain/models/study_context.dart';
+import 'package:getbible/presentation/widgets/notes_panel.dart';
 
 void main() {
   testWidgets(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/presentation/widgets/scripture_editorial.dart';
-import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/presentation/widgets/scripture_editorial.dart';
+import 'package:getbible/presentation/widgets/scripture_verse_text.dart';
 
 void main() {
   testWidgets('rich verse preserves exact native selectable and copied text', (

@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/preferences.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/preferences.dart';
 import 'support/reader_api_fixture.dart';
 
 void main() {

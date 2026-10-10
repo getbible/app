@@ -33,7 +33,7 @@ ALIASES = {'enm': 'en', 'hbo': 'he', 'grc': 'el', 'cu': 'ru', 'cop': 'ar',
            'nn': 'nb', 'sr': 'sr-Cyrl', 'syr': 'ar', 'tl': 'fil', 'tsg': 'fil',
            'tlh': 'tlh-Latn', 'ppk': 'id', 'zh': 'zh-Hans'}
 FALLBACKS = {'ch', 'chr', 'br', 'eo', 'gd', 'gv', 'la', 'pon', 'pot', 'tpi'}
-TERMS = ['getBible.Life', 'GetBible', 'getBible', 'CrossWire', 'SWORD',
+TERMS = ['getBible', 'GetBible', 'getBible', 'CrossWire', 'SWORD',
          'Markdown', 'SHA-256', 'SHA-1', 'SHA', 'UTF-8', 'JSON', 'MiB', 'KiB',
          'Ctrl', 'Strong’s', 'Strong\'s', '.md']
 PLACEHOLDERS = re.compile(r'\{([a-zA-Z][a-zA-Z0-9]*)\}')

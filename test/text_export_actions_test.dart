@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/ui_strings.dart';
-import 'package:getbible_live/presentation/widgets/text_export_actions.dart';
-import 'package:getbible_live/services/text_file_service.dart';
+import 'package:getbible/core/ui_strings.dart';
+import 'package:getbible/presentation/widgets/text_export_actions.dart';
+import 'package:getbible/services/text_file_service.dart';
 
 void main() {
   testWidgets(

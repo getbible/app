@@ -1,9 +1,9 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=getBible.live
+Name=getBible
 Comment=Read and study Scripture
-Exec=/opt/getbible-live/getbible_life %u
+Exec=/opt/getbible/getbible %u
 Icon=life.getbible.mobile
 Terminal=false
 Categories=Education;

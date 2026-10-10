@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/annotations.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/preferences.dart';
-import 'package:getbible_live/main.dart';
-import 'package:getbible_live/presentation/widgets/reader_translation_field.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/annotations.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/preferences.dart';
+import 'package:getbible/main.dart';
+import 'package:getbible/presentation/widgets/reader_translation_field.dart';
 import 'package:provider/provider.dart';
 
 import 'support/reader_api_fixture.dart';
@@ -34,7 +34,7 @@ void main() {
     await _editNote(tester);
     final List<String> requests = List<String>.of(fixture.paths);
 
-    await tester.tap(find.text('getBible.Life'));
+    await tester.tap(find.text('getBible'));
     await tester.pumpAndSettle();
     expect(state.passage, _origin);
     expect(fixture.paths, requests);

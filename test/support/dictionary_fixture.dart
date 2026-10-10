@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:getbible_live/core/json.dart';
-import 'package:getbible_live/data/api/api_transport.dart';
-import 'package:getbible_live/data/repositories/api_dictionary_repository.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/study_context.dart';
-import 'package:getbible_live/domain/repositories/study_preferences_repository.dart';
+import 'package:getbible/core/json.dart';
+import 'package:getbible/data/api/api_transport.dart';
+import 'package:getbible/data/repositories/api_dictionary_repository.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/study_context.dart';
+import 'package:getbible/domain/repositories/study_preferences_repository.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

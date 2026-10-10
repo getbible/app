@@ -1,6 +1,7 @@
 import 'package:unorm_dart/unorm_dart.dart' as unicode;
 
 import '../../core/json.dart';
+import '../../core/product_identity.dart';
 
 final class Passage {
   const Passage({
@@ -154,8 +155,7 @@ Uri? readerLinkLocation(Uri uri) {
     return Uri(path: path, query: uri.hasQuery ? uri.query : null);
   }
   if (uri.hasScheme &&
-      (uri.scheme != 'https' ||
-          !const {'app.getbible.life', 'getbible.life'}.contains(uri.host))) {
+      (uri.scheme != 'https' || uri.host != ProductIdentity.websiteUri.host)) {
     return null;
   }
   if (!uri.hasScheme && uri.hasAuthority) return null;
@@ -167,6 +167,5 @@ Uri? readerLinkLocation(Uri uri) {
   return Uri(path: uri.path, query: uri.hasQuery ? uri.query : null);
 }
 
-Uri shareablePassageUri(Passage passage, String bookName) => Uri.parse(
-  'https://app.getbible.life${canonicalPassagePath(passage, bookName)}',
-);
+Uri shareablePassageUri(Passage passage, String bookName) =>
+    ProductIdentity.websiteUri.resolve(canonicalPassagePath(passage, bookName));

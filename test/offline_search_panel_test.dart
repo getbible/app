@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/online_search_controller.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/domain/models/online_search.dart';
-import 'package:getbible_live/domain/models/service_envelopes.dart';
-import 'package:getbible_live/domain/repositories/search_repository.dart';
-import 'package:getbible_live/presentation/widgets/search_panel.dart';
+import 'package:getbible/application/online_search_controller.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/domain/models/online_search.dart';
+import 'package:getbible/domain/models/service_envelopes.dart';
+import 'package:getbible/domain/repositories/search_repository.dart';
+import 'package:getbible/presentation/widgets/search_panel.dart';
 
 void main() {
   testWidgets(

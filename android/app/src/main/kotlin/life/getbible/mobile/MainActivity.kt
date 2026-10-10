@@ -39,7 +39,7 @@ class MainActivity : FlutterActivity() {
                                 text.toByteArray(Charsets.UTF_8).size <= maxShareBytes) {
                                 "This text is too large for a share sheet. Save it as a file instead."
                             }
-                            val subject = call.argument<String>("subject") ?: "getBible.Life"
+                            val subject = call.argument<String>("subject") ?: "getBible"
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, text)
@@ -56,7 +56,7 @@ class MainActivity : FlutterActivity() {
                                 text.toByteArray(Charsets.UTF_8).size <= maxFileBytes) {
                                 "The text exceeds the size limit."
                             }
-                            val filename = call.argument<String>("filename") ?: "getBible-Life.txt"
+                            val filename = call.argument<String>("filename") ?: "getBible.txt"
                             require(validFilename(filename)) { "The export filename is invalid." }
                             pendingText = text
                             val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/presentation/app_bootstrap.dart';
+import 'package:getbible/presentation/app_bootstrap.dart';
 
 void main() {
   testWidgets(

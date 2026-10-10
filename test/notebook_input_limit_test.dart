@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/notebook.dart';
-import 'package:getbible_live/presentation/widgets/notebook_input_limit_formatter.dart';
+import 'package:getbible/domain/models/notebook.dart';
+import 'package:getbible/presentation/widgets/notebook_input_limit_formatter.dart';
 
 void main() {
   test(

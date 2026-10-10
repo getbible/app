@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/services/source_annotations.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/services/source_annotations.dart';
 
 void main() {
   test(

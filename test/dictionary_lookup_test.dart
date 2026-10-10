@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/dictionary_lookup.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/dictionary.dart';
-import 'package:getbible_live/domain/models/dictionary_folding.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/reference.dart';
-import 'package:getbible_live/domain/models/study_citation.dart';
-import 'package:getbible_live/domain/models/study_context.dart';
+import 'package:getbible/application/dictionary_lookup.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/dictionary.dart';
+import 'package:getbible/domain/models/dictionary_folding.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/reference.dart';
+import 'package:getbible/domain/models/study_citation.dart';
+import 'package:getbible/domain/models/study_context.dart';
 
 void main() {
   test(

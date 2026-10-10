@@ -177,7 +177,7 @@ def verified_assets(directory: Path, metadata: dict, required_signed=()):
         else:
             targets.add(target)
         suffix = "-signed" if signed and not target.endswith("-signed") else ""
-        prefix = f'getbible-live-{metadata["artifact_version"]}-{target}-{arch}{suffix}'
+        prefix = f'getbible-{metadata["artifact_version"]}-{target}-{arch}{suffix}'
         if path.name != prefix + "-manifest.json":
             raise ReleaseError(f"Manifest filename disagrees with its identity: {path.name}")
         expected_names = {prefix + suffix for suffix in SUFFIXES[target]}
@@ -275,22 +275,31 @@ def release_notes(repository: str, metadata: dict, manifests: list[Path], source
     source = f'Build `{metadata["version"]}` from [`{metadata["git_sha"][:12]}`](https://github.com/{repository}/commit/{metadata["git_sha"]}).'
     if source_run_id is not None:
         source += f' These are the original packages from [successful Flutter CI run {source_run_id}](https://github.com/{repository}/actions/runs/{source_run_id}); they were not rebuilt for this release.'
+    installation_notice = (
+        '**Alpha 5 requires a clean installation.** Remove any earlier alpha and '
+        'its local test data before installing getBible. For Web, clear the deployment\'s '
+        'site data. This intentional development reset does not migrate old package '
+        'names or databases. '
+        if metadata["release_version"] == "1.0.0-alpha.5" else
+        'Export a complete private backup before testing an upgrade or uninstalling. '
+    )
     return (
         source + f'\n\n<!-- getbible-build-number: {metadata["build_number"]} -->\n\n'
+        + installation_notice + '\n\n' +
         '## Downloads\n\n| Platform | Packages | Signing |\n|---|---|---|\n' + "\n".join(downloads) +
         '\n\nDownload the installer for your architecture. The adjacent `-SHA256SUMS` files cover '
         'every package and its manifest; compare your download before opening it. Manifests record '
         'the exact version, commit, architecture and signing state. No store submission occurs.\n\n'
         '## Install for testing\n\n'
         f'- **Linux (Debian/Ubuntu):** run `sudo apt install ./{linux}` from the download directory, '
-        'then open **getBible.live** from Applications or run `getbible-live`. The `.tar.gz` is a portable '
+        'then open **getBible** from Applications or run `getbible`. The `.tar.gz` is a portable '
         'Flutter bundle for compatible Linux hosts; keep its `lib/` and `data/` beside the executable. '
         'This release does not contain an AppImage.\n'
         '- **Windows:** run the `-setup.exe`. It installs for the current user and includes the required '
         'Microsoft runtime. An unsigned build may show SmartScreen; after checking this source and its '
         'checksum, use **More info → Run anyway** if your device policy allows. The portable ZIP also '
         'works when extracted as a complete folder.\n'
-        '- **macOS:** open the `.dmg`, drag **getBible.live** into Applications, and launch it. For an '
+        '- **macOS:** open the `.dmg`, drag **getBible** into Applications, and launch it. For an '
         'unsigned test build blocked by Gatekeeper, use **System Settings → Privacy & Security → Open Anyway** '
         'after checking the download. Managed device policy may prevent an override. Prefer the signed, '
         'notarized download when available.\n'
@@ -307,8 +316,7 @@ def release_notes(repository: str, metadata: dict, manifests: list[Path], source
         f'- **Web/Chrome:** create `{web_directory}`, extract `{web}` into it, then run '
         f'`python3 -m http.server 8000 --directory preview` and open `http://localhost:8000{base}`. '
         'Keep the packaged base path; opening `index.html` as a local file is unsupported.\n\n'
-        'Existing private data is retained by desktop updates. Export a complete private backup before '
-        'testing an upgrade or uninstalling. Store acceptance and physical-device approval are separate '
+        'Store acceptance and physical-device approval are separate '
         f'from these automated build checks; see the [release checklist](https://github.com/{repository}/blob/{metadata["git_sha"]}/docs/RELEASE_CHECKLIST.md).\n'
     )
 
@@ -354,7 +362,7 @@ def publish(client, directory: Path, metadata: dict, required_signed=(), *, sour
         release = existing
     else:
         release = client.call("/releases", method="POST", data={
-            "tag_name": tag, "target_commitish": metadata["git_sha"], "name": f"getBible.live {version}",
+            "tag_name": tag, "target_commitish": metadata["git_sha"], "name": f"getBible {version}",
             "body": body, "draft": True, "prerelease": metadata["channel"] != "stable",
         })
     if tag_commit(client, tag) is None:

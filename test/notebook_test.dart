@@ -5,12 +5,12 @@ import 'package:drift/drift.dart'
     show QueryExecutor, QueryExecutorUser, OpeningDetails;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/notebook_controller.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/repositories/sql_notebook_repository.dart';
-import 'package:getbible_live/domain/models/notebook.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/repositories/notebook_repository.dart';
+import 'package:getbible/application/notebook_controller.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/repositories/sql_notebook_repository.dart';
+import 'package:getbible/domain/models/notebook.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/repositories/notebook_repository.dart';
 
 void main() {
   for (final int version in <int>[1, 2]) {
@@ -21,7 +21,7 @@ void main() {
           'getbible-notebook-migration-',
         );
         addTearDown(() => directory.delete(recursive: true));
-        final File file = File('${directory.path}/getbible_life.sqlite');
+        final File file = File('${directory.path}/getbible.sqlite');
         final NativeDatabase old = NativeDatabase(file);
         await old.ensureOpen(_FixtureUser(version));
         await _seedPrivateData(old, version);
@@ -69,7 +69,7 @@ void main() {
         'getbible-notebook-rollback-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      final File file = File('${directory.path}/getbible_life.sqlite');
+      final File file = File('${directory.path}/getbible.sqlite');
       final NativeDatabase old = NativeDatabase(file);
       await old.ensureOpen(_FixtureUser(2));
       await _seedPrivateData(old, 2);
@@ -469,7 +469,7 @@ void main() {
         'getbible-notebook-restart-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      final File file = File('${directory.path}/getbible_life.sqlite');
+      final File file = File('${directory.path}/getbible.sqlite');
       final LocalDatabase firstDatabase = await LocalDatabase.fromExecutor(
         NativeDatabase(file),
       );

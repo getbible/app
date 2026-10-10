@@ -3,13 +3,13 @@
 ; network download is required. Uninstall never touches private reader data.
 [Setup]
 AppId={{C4D87722-B27D-4A50-920F-A364762B19C8}
-AppName=getBible.live
+AppName=getBible
 AppVersion={#AppVersion}
 AppPublisher=Vast Development Method
 AppPublisherURL=https://getbible.net/
 AppSupportURL=https://github.com/getbible/app/issues
-DefaultDirName={localappdata}\Programs\getBible.live
-DefaultGroupName=getBible.live
+DefaultDirName={localappdata}\Programs\getBible
+DefaultGroupName=getBible
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -19,7 +19,7 @@ OutputDir={#OutputDir}
 OutputBaseFilename={#OutputName}
 VersionInfoVersion={#FileVersion}
 SetupIconFile={#SourceRoot}\windows\runner\resources\app_icon.ico
-UninstallDisplayIcon={app}\getbible_life.exe
+UninstallDisplayIcon={app}\getbible.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -31,15 +31,15 @@ ChangesAssociations=yes
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\getBible.live"; Filename: "{app}\getbible_life.exe"
+Name: "{group}\getBible"; Filename: "{app}\getbible.exe"
 
 [Registry]
 ; Per-user protocol registration. Quote both executable and URI argument;
 ; the app validates the URI and never executes it through a command shell.
 Root: HKCU; Subkey: "Software\Classes\getbible"; ValueType: string; ValueName: ""; ValueData: "URL:getBible passage"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\getbible"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
-Root: HKCU; Subkey: "Software\Classes\getbible\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\getbible_life.exe,0"
-Root: HKCU; Subkey: "Software\Classes\getbible\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\getbible_life.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\getbible\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\getbible.exe,0"
+Root: HKCU; Subkey: "Software\Classes\getbible\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\getbible.exe"" ""%1"""
 
 [Run]
-Filename: "{app}\getbible_life.exe"; Description: "Open getBible.live"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\getbible.exe"; Description: "Open getBible"; Flags: nowait postinstall skipifsilent

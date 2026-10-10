@@ -3,13 +3,13 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/offline_controller.dart';
-import 'package:getbible_live/core/json.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/data/api/api_transport.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/offline/study_resource_installer.dart';
-import 'package:getbible_live/domain/models/offline_resource.dart';
+import 'package:getbible/application/offline_controller.dart';
+import 'package:getbible/core/json.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/data/api/api_transport.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/offline/study_resource_installer.dart';
+import 'package:getbible/domain/models/offline_resource.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

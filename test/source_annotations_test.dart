@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
-import 'package:getbible_live/presentation/widgets/source_annotations.dart';
-import 'package:getbible_live/services/source_annotations.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/presentation/widgets/scripture_verse_text.dart';
+import 'package:getbible/presentation/widgets/source_annotations.dart';
+import 'package:getbible/services/source_annotations.dart';
 
 Verse _sourceVerse() => Verse(
   chapter: 1,

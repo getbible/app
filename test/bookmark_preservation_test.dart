@@ -4,16 +4,16 @@ import 'package:drift/drift.dart'
     show OpeningDetails, QueryExecutor, QueryExecutorUser;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/annotations.dart';
-import 'package:getbible_live/domain/models/backup.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/preferences.dart';
-import 'package:getbible_live/main.dart';
-import 'package:getbible_live/services/backup_service.dart';
-import 'package:getbible_live/services/scripture_text.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/annotations.dart';
+import 'package:getbible/domain/models/backup.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/preferences.dart';
+import 'package:getbible/main.dart';
+import 'package:getbible/services/backup_service.dart';
+import 'package:getbible/services/scripture_text.dart';
 import 'package:provider/provider.dart';
 
 import 'support/reader_api_fixture.dart';

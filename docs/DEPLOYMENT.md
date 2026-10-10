@@ -9,6 +9,12 @@ packages already produced by CI. PR packages remain available in their workflow
 run's **Artifacts** section for 90 days (subject to repository retention limits).
 No store upload is performed by these workflows.
 
+Alpha 5 corrects the application identity to **getBible** and starts from a clean
+development installation. It ships suffix-free `getbible` artifact/package names
+and no compatibility aliases or rename migration. Its generated release notes
+instruct testers to remove earlier alpha installations and their local data.
+Published earlier assets remain unchanged. See [installation](INSTALLING.md).
+
 ## One version source
 
 `pubspec.yaml` is the only application version source. Use the following sequence,

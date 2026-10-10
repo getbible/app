@@ -5,8 +5,8 @@ import 'package:drift/drift.dart'
     show QueryExecutor, QueryExecutorUser, OpeningDetails;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/cache.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/cache.dart';
 
 void main() {
   for (final cleanupFails in [false, true]) {
@@ -104,7 +104,7 @@ void main() {
         'getbible-failed-migration-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      final file = File('${directory.path}/getbible_life.sqlite');
+      final file = File('${directory.path}/getbible.sqlite');
       final old = NativeDatabase(file);
       await old.ensureOpen(_SchemaOneUser());
       for (final key in ['chapter:fx:1:1', 'bible:v2:s1:chapter:fx:1:1']) {
@@ -154,7 +154,7 @@ void main() {
         'getbible-v1-migration-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      final file = File('${directory.path}/getbible_life.sqlite');
+      final file = File('${directory.path}/getbible.sqlite');
       final old = NativeDatabase(file);
       await old.ensureOpen(_SchemaOneUser());
       final now = DateTime.utc(2026, 1, 1).millisecondsSinceEpoch;

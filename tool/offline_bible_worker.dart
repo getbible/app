@@ -1,6 +1,6 @@
 import 'dart:js_interop';
 
-import 'package:getbible_live/data/offline/offline_index_processor.dart';
+import 'package:getbible/data/offline/offline_index_processor.dart';
 
 @JS('self.onmessage')
 external set onMessage(JSFunction callback);

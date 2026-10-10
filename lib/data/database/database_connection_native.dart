@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 Future<QueryExecutor> openDatabaseExecutor() async {
   final Directory directory = await getApplicationSupportDirectory();
   final File file = File(
-    '${directory.path}${Platform.pathSeparator}getbible_life.sqlite',
+    '${directory.path}${Platform.pathSeparator}getbible.sqlite',
   );
   return NativeDatabase.createInBackground(file);
 }

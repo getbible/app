@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/repositories/sql_settings_repository.dart';
-import 'package:getbible_live/data/repositories/sql_study_preferences_repository.dart';
-import 'package:getbible_live/domain/models/preferences.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/repositories/sql_settings_repository.dart';
+import 'package:getbible/data/repositories/sql_study_preferences_repository.dart';
+import 'package:getbible/domain/models/preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

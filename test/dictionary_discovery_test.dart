@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/dictionary_discovery.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/domain/models/dictionary.dart';
-import 'package:getbible_live/domain/models/service_envelopes.dart';
-import 'package:getbible_live/domain/repositories/dictionary_repository.dart';
+import 'package:getbible/application/dictionary_discovery.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/domain/models/dictionary.dart';
+import 'package:getbible/domain/models/service_envelopes.dart';
+import 'package:getbible/domain/repositories/dictionary_repository.dart';
 
 void main() {
   test(

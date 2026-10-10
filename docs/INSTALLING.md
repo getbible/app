@@ -1,5 +1,17 @@
 # Installing test releases
 
+## Alpha 5 requires a clean installation
+
+`1.0.0-alpha.5+6` establishes the corrected **getBible** product and package
+names. Remove any earlier alpha installation and its local test data first;
+for a Web installation, clear that deployment's site data. This is an intentional
+development reset. Old installation directories, database names and package
+names have no aliases, automatic migration or upgrade bridge in this release.
+Earlier published assets remain immutable historical builds. Fresh packages use
+the naming and commands below; do not apply them to older downloads.
+
+## Downloads
+
 Download from [getbible/app Releases](https://github.com/getbible/app/releases).
 Alpha, beta and release-candidate builds have the **Pre-release** label. Their
 notes contain direct links to the actual installers, source commit and successful
@@ -16,14 +28,14 @@ versioned; no Flutter SDK or compilation is needed to install them.
 | Device | Download | Installation |
 |---|---|---|
 | Debian/Ubuntu x64 | `linux-x64.deb` | Open with a package manager or use `sudo apt install ./<downloaded-file>.deb`. |
-| Other compatible Linux x64 | `linux-x64.tar.gz` | Extract the entire folder and run `getbible_life` inside it; install its GTK/runtime dependencies from the host distribution. |
+| Other compatible Linux x64 | `linux-x64.tar.gz` | Extract the entire folder and run `getbible` inside it; install its GTK/runtime dependencies from the host distribution. |
 | Windows x64 | `windows-x64-setup.exe` | Run the installer; it installs for the current user without administrator access. |
-| macOS | `macos-<architecture>.dmg` | Open, drag getBible.live into Applications, then launch it. `universal` supports both Intel and Apple Silicon. |
+| macOS | `macos-<architecture>.dmg` | Open, drag getBible into Applications, then launch it. `universal` supports both Intel and Apple Silicon. |
 | Android phone/tablet or emulator | `android-multiarch-debug.apk` | Install the APK, allowing installation from the chosen source, or use `adb install -r <downloaded-file>.apk`. |
 | iPhone/iPad Simulator on macOS | `ios-simulator-<architecture>.app.zip` | Extract with `ditto`, install with `xcrun simctl`, then launch in Xcode Simulator. |
 | Chrome or another supported browser | `web-browser.zip` | Extract and serve over HTTP on localhost or HTTPS on a server, at its recorded base path. |
 
-Filenames also include `getbible-live-<version>-build.<number>-`. The complete
+Filenames also include `getbible-<version>-build.<number>-`. The complete
 commands in each release's notes use that release's actual filenames. Optional
 `-signed` desktop installers and signed Android release APKs should be preferred
 when provided. A portable Windows ZIP or macOS APP ZIP is also available; extract
@@ -110,8 +122,9 @@ force-reload an open private editor.
 ## Updates, links and removal
 
 Export **Backup and restore → Complete private backup** before testing a new
-version. The application identifier remains `life.getbible.mobile`; normal
-desktop updates preserve its private data. Replacing Linux files through DEB,
+version. Follow the clean-install requirement above when moving from an earlier
+alpha. The application identifier is `life.getbible.mobile`; subsequent ordinary
+desktop updates preserve current-identity private data. Replacing Linux files through DEB,
 running the Windows installer again, or replacing the macOS APP updates the app
 without intentionally deleting its database. A backup remains necessary before
 downgrades or operating-system/device cleanup.
@@ -124,8 +137,8 @@ Public HTTPS association depends on the website's domain-association
 configuration and platform signing; a desktop installer does not take over all
 web links.
 
-Remove Linux DEB installs with `sudo apt remove getbible-live`, Windows installs
-through **Installed apps**, and macOS installs by removing getBible.live from
+Remove Linux DEB installs with `sudo apt remove getbible`, Windows installs
+through **Installed apps**, and macOS installs by removing getBible from
 Applications. The desktop installers do not deliberately erase private user
 files during removal. OS cleanup tools and mobile uninstallation can remove
 private data, so keep exported backups outside the app's own data directory.

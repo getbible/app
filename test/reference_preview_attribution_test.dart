@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/application/reference_preview_controller.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/notebook.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/presentation/widgets/reference_preview.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/application/reference_preview_controller.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/notebook.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/presentation/widgets/reference_preview.dart';
 import 'support/reader_api_fixture.dart';
 
 void main() {

@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/data/api/api_configuration.dart';
-import 'package:getbible_live/data/api/api_transport.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/data/api/api_configuration.dart';
+import 'package:getbible/data/api/api_transport.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

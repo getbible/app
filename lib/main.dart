@@ -7,6 +7,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 
 import 'application/app_state.dart';
+import 'core/product_identity.dart';
 import 'core/ui_strings.dart';
 import 'data/platform/native_reader_links.dart';
 import 'domain/models/passage.dart';
@@ -211,7 +212,7 @@ class _GetBibleAppState extends State<GetBibleApp> with WidgetsBindingObserver {
     return MaterialApp.router(
       routerConfig: _navigation.router,
       scaffoldMessengerKey: _messenger,
-      title: 'getBible.live',
+      title: ProductIdentity.name,
       locale: state.ui.flutterLocale,
       supportedLocales: UiStrings.supportedLocales
           .map((code) => UiStrings(code, const <String>[]).flutterLocale)

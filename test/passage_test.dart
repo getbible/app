@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/passage.dart';
+import 'package:getbible/domain/models/passage.dart';
 
 void main() {
   test('parses canonical passage links', () {

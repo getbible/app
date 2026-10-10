@@ -1,12 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/core/json.dart';
-import 'package:getbible_live/data/api/api_transport.dart';
-import 'package:getbible_live/data/api/dictionary_adapters.dart';
-import 'package:getbible_live/data/repositories/api_dictionary_repository.dart';
-import 'package:getbible_live/domain/models/dictionary.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/core/json.dart';
+import 'package:getbible/data/api/api_transport.dart';
+import 'package:getbible/data/api/dictionary_adapters.dart';
+import 'package:getbible/data/repositories/api_dictionary_repository.dart';
+import 'package:getbible/domain/models/dictionary.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

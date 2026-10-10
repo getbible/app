@@ -5,7 +5,7 @@ import 'package:drift/drift.dart'
     show OpeningDetails, QueryExecutor, QueryExecutorUser;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/data/database/local_database.dart';
+import 'package:getbible/data/database/local_database.dart';
 
 import 'fixture_documents.dart';
 

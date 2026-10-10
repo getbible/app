@@ -1,6 +1,6 @@
 # Privacy policy draft
 
-getBible.live is a local-first Bible reader implemented with Flutter. Canonical
+getBible is a local-first Bible reader implemented with Flutter. Canonical
 verse notes, study/sermon notebooks, draft journals, markings, preferences,
 reading position and cached Scripture are stored on the user's device. The
 application does not require an account and does not include advertising,

@@ -6,6 +6,8 @@ import 'package:getbible/core/native_ui_catalog.dart';
 import 'package:getbible/core/ui_strings.dart';
 import 'package:getbible/core/web_ui_catalog.dart';
 
+import '../tool/sync_web_locales.dart' as reference_locales;
+
 Map<String, Object?> _object(String path) =>
     (jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>);
 
@@ -24,6 +26,7 @@ void main() {
       );
       expect(contract['revision'], matches(RegExp(r'^[0-9a-f]{40}$')));
       expect(contract['messageKeys'], orderedEquals(webUiMessages.keys));
+      expect(contract['nativeProductCopyKeys'], ['clearAllConfirm']);
       expect(contract['locales'], orderedEquals(webUiLocales));
       final supported =
           (jsonDecode(File('assets/locales/index.json').readAsStringSync())
@@ -65,6 +68,27 @@ void main() {
     },
   );
 
+  test('reference synchronization keeps native branding and external keys', () {
+    for (final suffix in ['Life', 'live']) {
+      expect(
+        reference_locales.adaptReferenceMessage(
+          'clearAllConfirm',
+          'Clear all local getBible.$suffix data?',
+        ),
+        'Clear all local getBible data?',
+      );
+    }
+    expect(
+      reference_locales.adaptReferenceMessage(
+        'clearAllConfirm',
+        'Clear all local Get Bible data?',
+      ),
+      'Clear all local getBible data?',
+    );
+    const source = 'https://app.getbible.life';
+    expect(reference_locales.adaptReferenceMessage('source', source), source);
+  });
+
   test(
     'every native pack covers all explicit UI templates with intact variables',
     () {
@@ -78,6 +102,8 @@ void main() {
       expect(provenance['sourceMessages'], english);
       final protectedTerms = (provenance['protectedTerms']! as List)
           .cast<String>();
+      final invariantMessages = (provenance['invariantMessages']! as List)
+          .cast<String>();
       final locales = provenance['locales']! as Map<String, Object?>;
       expect(locales.keys.toSet(), UiStrings.supportedLocales.toSet());
       for (final locale in UiStrings.supportedLocales) {
@@ -86,6 +112,21 @@ void main() {
         ).cast<String, String>();
         expect(translated.keys.toSet(), english.keys.toSet(), reason: locale);
         for (final entry in translated.entries) {
+          if (invariantMessages.contains(english[entry.key])) {
+            expect(
+              entry.value,
+              english[entry.key],
+              reason: '$locale/${entry.key}',
+            );
+          }
+          expect(
+            RegExp(
+              r'get\s*bible',
+              caseSensitive: false,
+            ).allMatches(entry.value).every((match) => match[0] == 'getBible'),
+            isTrue,
+            reason: '$locale/${entry.key} preserves exact product spelling',
+          );
           expect(
             entry.value.trim(),
             isNotEmpty,

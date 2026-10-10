@@ -13,6 +13,15 @@ English catalog provides the fallback for the positional translations. The
 pinned source revision and key order are recorded in
 `test/fixtures/ui_locale_contract.json`.
 
+The native app is always named `getBible`, including translated messages.
+The importer adapts the literal product name in the reference's
+`clearAllConfirm` message while retaining its upstream key and positional index.
+This deliberate copy adaptation is recorded in the contract fixture; resource
+names, public URLs and externally defined keys are unchanged. Regenerating packs
+therefore cannot restore a domain suffix in the application name. A translated
+template that changes the protected name falls back to its English template;
+interpolated Scripture, resource titles and private text remain untouched.
+
 The current reference bundles 69 locale codes and 282 messages. Of those packs,
 52 contain translations. English is defined by the keyed catalog; 16 other
 language codes currently use the reference's explicit English fallback:
@@ -49,19 +58,29 @@ UiStrings.of(context).text(
 The inventory command scans only explicit UI calls. A reviewed list in
 `tool/native_ui_defaults.json` registers UI-owned labels returned by framework-
 independent file/status services and backup validation boundaries. Those services stay independent of Flutter.
-The current native catalog has 442 templates. CI also rejects new plain static
+The current native catalog has 438 templates. CI also rejects new plain static
 text, tooltip and input labels that would bypass this explicit catalog.
 A malformed/missing pack or translated placeholder falls back per message;
 private content is never transformed to fill a translation gap. Unknown parser
 diagnostics retain their original detail under a localized failure explanation. Substitution is
 one pass, so braces inside a source name cannot become another placeholder.
 
-Native extensions are machine translated using the reference project's public
-UI translation policy. `assets/native_locales/provenance.json` records original
-English templates, effective locale targets and review status. It explicitly
+Native extensions use committed machine translations following the reference
+project's public UI translation policy, with locally generated AI-assisted
+additions recorded separately. `assets/native_locales/provenance.json` records
+original English templates, effective locale targets, generation history and review status. It explicitly
 marks human review as pending. Historical aliases and intentionally empty
 reference packs retain the same fallback policy; failed new translations are
 reported as failures, not silently declared translated.
+
+The reader-alignment update adds twelve AI-assisted messages to all 52 existing
+translated packs without using an external translation service. Their placeholders
+and catalog coverage are tested; human linguistic review remains pending. The
+16 deliberate fallback locales continue to use English.
+
+The compact `G` global-bookmark origin marker remains invariant. Its full
+accessibility label is independently localized so assistive technology announces
+the meaning rather than only the letter.
 
 ## Updating packs
 

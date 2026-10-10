@@ -102,6 +102,33 @@ void main() {
     },
   );
 
+  test(
+    'product name is fixed while source and private values stay literal',
+    () {
+      const original = 'The selected file is not a valid getBible backup.';
+      final key = nativeUiKeys[original]!;
+      for (final spelling in [
+        'GetBible',
+        'Get Bible',
+        'getBible.${'life'}',
+        'getBible.${'live'}',
+      ]) {
+        final strings = UiStrings('af', const [], {
+          key: 'Ongeldige $spelling rugsteun.',
+        });
+        expect(strings.text(original), original);
+      }
+      final strings = UiStrings('af', const [], {
+        key: 'Ongeldige getBible rugsteun.',
+      });
+      expect(strings.text(original), 'Ongeldige getBible rugsteun.');
+      expect(
+        UiStrings.english('openBookmarkTopic', {'topic': 'Get Bible notes'}),
+        'Open Get Bible notes in Study',
+      );
+    },
+  );
+
   test('missing/malformed packs fall back independently', () async {
     final key = nativeUiKeys['Complete private backup']!;
     final bundle = _Bundle({

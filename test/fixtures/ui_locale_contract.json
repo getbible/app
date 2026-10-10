@@ -355,5 +355,8 @@
     "zh",
     "zh-Hans",
     "zh-Hant"
+  ],
+  "nativeProductCopyKeys": [
+    "clearAllConfirm"
   ]
 }

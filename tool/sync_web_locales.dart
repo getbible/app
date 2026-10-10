@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:getbible/core/product_identity.dart';
+
 /// Synchronizes keyed English messages AND positional packs as one contract.
 ///
 /// dart run tool/sync_web_locales.dart ../app.getbible.life [--check]
@@ -46,7 +48,10 @@ void synchronize(Directory source, {required bool check}) {
   for (final RegExpMatch match in entry.allMatches(body)) {
     final String key = match.group(1)!;
     if (english.containsKey(key)) throw FormatException('Duplicate key $key');
-    english[key] = jsonDecode(match.group(2)!) as String;
+    english[key] = adaptReferenceMessage(
+      key,
+      jsonDecode(match.group(2)!) as String,
+    );
   }
   if (english.isEmpty || body.replaceAll(entry, '').trim().isNotEmpty) {
     throw const FormatException('Unrecognized English catalog syntax.');
@@ -78,11 +83,15 @@ void synchronize(Directory source, {required bool check}) {
         decoded.any((message) => message is! String)) {
       throw FormatException('Unaligned locale $locale');
     }
+    final List<String> messages = <String>[
+      for (final (index, key) in english.keys.indexed)
+        adaptReferenceMessage(key, decoded[index] as String),
+    ];
     if (decoded.every((message) => (message as String).isEmpty)) {
       fallbacks.add(locale);
     }
     for (final (int index, String original) in english.values.indexed) {
-      final String translated = decoded[index] as String;
+      final String translated = messages[index];
       if (translated.isNotEmpty &&
           signature(translated) != signature(original)) {
         throw FormatException('Invalid placeholders: $locale message $index');
@@ -91,7 +100,8 @@ void synchronize(Directory source, {required bool check}) {
         throw FormatException('English pack drift at message $index');
       }
     }
-    outputs['assets/locales/$locale.json'] = content;
+    // Preserve the reference's compact positional-pack format.
+    outputs['assets/locales/$locale.json'] = jsonEncode(messages);
   }
   outputs['assets/locales/index.json'] = File(
     '${packs.path}/index.json',
@@ -141,7 +151,13 @@ void synchronize(Directory source, {required bool check}) {
     throw StateError('Cannot determine reference revision.');
   }
   outputs['test/fixtures/ui_locale_contract.json'] =
-      '${const JsonEncoder.withIndent('  ').convert(<String, Object>{'source': 'https://github.com/getbible/app.getbible.life', 'revision': '${git.stdout}'.trim(), 'messageKeys': english.keys.toList(), 'locales': locales})}\n';
+      '${const JsonEncoder.withIndent('  ').convert(<String, Object>{
+        'source': 'https://github.com/getbible/app.getbible.life',
+        'revision': '${git.stdout}'.trim(),
+        'messageKeys': english.keys.toList(),
+        'locales': locales,
+        'nativeProductCopyKeys': <String>['clearAllConfirm'],
+      })}\n';
   // Validate the entire source before touching any destination.
   final List<String> changed = <String>[];
   for (final entry in outputs.entries) {
@@ -158,5 +174,18 @@ void synchronize(Directory source, {required bool check}) {
   }
   stdout.writeln(
     '${locales.length} locale packs, ${english.length} messages; ${changed.length} files ${check ? 'different' : 'updated'}.',
+  );
+}
+
+/// Retains the upstream key/position contract while applying native branding.
+///
+/// This one application-owned message includes the web product name literally.
+/// Restrict normalization to that key: source attribution, external identifiers
+/// and public website addresses must never be rewritten by locale generation.
+String adaptReferenceMessage(String key, String message) {
+  if (key != 'clearAllConfirm') return message;
+  return message.replaceAll(
+    RegExp(r'\bget\s*bible(?:\.(?:life|live))?\b', caseSensitive: false),
+    ProductIdentity.name,
   );
 }

@@ -24,6 +24,7 @@ void studyWorkspaceJourney({
   Size viewport = const Size(1250, 900),
   TargetPlatformVariant? platform,
   double initialKeyboardInset = 0,
+  double notebookKeyboardInset = 0,
 }) {
   testWidgets(
     'Study dictionaries, commentary, topics and local notebooks compose without changing Scripture',
@@ -34,9 +35,11 @@ void studyWorkspaceJourney({
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
       }
+      if (initialKeyboardInset > 0 || notebookKeyboardInset > 0) {
+        addTearDown(tester.view.resetViewInsets);
+      }
       if (initialKeyboardInset > 0) {
         tester.view.viewInsets = FakeViewPadding(bottom: initialKeyboardInset);
-        addTearDown(tester.view.resetViewInsets);
       }
       final StudyApiFixture fixture = StudyApiFixture();
       const Passage origin = Passage(
@@ -281,14 +284,44 @@ void studyWorkspaceJourney({
       await settle();
       final Finder title = find.widgetWithText(TextField, 'Notebook title');
       await tester.scrollUntilVisible(title, 150, scrollable: notebookScroll);
+      await tester.showKeyboard(title);
       await tester.pumpAndSettle();
+      expect(title.hitTestable(), findsOneWidget);
       await tester.enterText(title, 'Sunday sermon');
       final Finder block = find.widgetWithText(
         TextFormField,
         'Study or sermon notes',
       );
       await tester.scrollUntilVisible(block, 250, scrollable: notebookScroll);
+      final bodyState = tester.state<EditableTextState>(
+        find.descendant(of: block, matching: find.byType(EditableText)),
+      );
+      if (notebookKeyboardInset > 0) {
+        // Android can deliver the title field's pending IME metrics after the
+        // body has been scrolled into view. Reproduce that event ordering.
+        tester.view.viewInsets = FakeViewPadding(bottom: notebookKeyboardInset);
+      }
+      // Choose the new editor before yielding to IME layout. Waiting while the
+      // title still owns focus can reveal its caret and dispose the unfocused
+      // body in this lazy list. Native focus keeps the intended field alive.
+      await tester.showKeyboard(block);
       await tester.pumpAndSettle();
+      expect(bodyState.mounted, isTrue);
+      expect(bodyState.widget.focusNode.hasFocus, isTrue);
+      // A title caret-reveal already queued by the IME can still move the
+      // viewport. Reveal this same retained editor using the settled geometry.
+      await Scrollable.ensureVisible(bodyState.context);
+      await tester.pumpAndSettle();
+      expect(block.hitTestable(), findsOneWidget);
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(of: block, matching: find.byType(EditableText)),
+            )
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
       await tester.enterText(block, 'Private draft survives closing Study.');
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -307,6 +340,10 @@ void studyWorkspaceJourney({
       await settle();
       expect(state.passage, origin);
       expect(find.byType(StudyWorkspace), findsNothing);
+      if (notebookKeyboardInset > 0) {
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+      }
       fixture.offline = true;
       await openWord();
       await choose(StudyTab.notes);

@@ -25,12 +25,21 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
+ChangesAssociations=yes
 
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\getBible.live"; Filename: "{app}\getbible_life.exe"
+
+[Registry]
+; Per-user protocol registration. Quote both executable and URI argument;
+; the app validates the URI and never executes it through a command shell.
+Root: HKCU; Subkey: "Software\Classes\getbible"; ValueType: string; ValueName: ""; ValueData: "URL:getBible passage"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\getbible"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\getbible\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\getbible_life.exe,0"
+Root: HKCU; Subkey: "Software\Classes\getbible\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\getbible_life.exe"" ""%1"""
 
 [Run]
 Filename: "{app}\getbible_life.exe"; Description: "Open getBible.live"; Flags: nowait postinstall skipifsilent

@@ -60,9 +60,18 @@ class PackagingTests(unittest.TestCase):
             "flutter_bootstrap.js": "start();", "main.dart.js": "main();",
             "drift_worker.dart.js": "worker();", "sqlite3.wasm": "wasm fixture",
             "offline_bible_worker.dart.js": "offlineWorker();",
+            "offline_shell.js": "registerWorker();",
+            "offline_service_worker.js": "serviceWorker();",
         }.items():
             (path / name).write_text(content, encoding="utf-8")
+        self.shell_manifest(path)
         return path
+
+    def shell_manifest(self, path):
+        entries = [{"path": file.relative_to(path).as_posix(), "bytes": file.stat().st_size, "sha256": release.sha256(file)}
+                   for file in sorted(path.rglob("*")) if file.is_file() and file.name not in {"offline-shell-manifest.json", "offline_service_worker.js"}]
+        revision = hashlib.sha256(json.dumps(entries, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+        (path / "offline-shell-manifest.json").write_text(json.dumps({"schema_version": 1, "revision": revision, "worker_revision": "a" * 64, "files": entries}))
 
     def verify_checksums(self, output):
         checksums = list(output.glob("*-SHA256SUMS"))
@@ -130,6 +139,8 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("sqlite3.wasm", package.namelist())
             self.assertIn("drift_worker.dart.js", package.namelist())
             self.assertIn("offline_bible_worker.dart.js", package.namelist())
+            self.assertIn("offline_service_worker.js", package.namelist())
+            self.assertIn("offline-shell-manifest.json", package.namelist())
             self.assertEqual(json.loads(package.read("release-metadata.json"))["version"], "1.2.3+42")
         self.verify_checksums(output)
         self.assertFalse((source / "release-metadata.json").exists())
@@ -146,6 +157,23 @@ class PackagingTests(unittest.TestCase):
         with self.assertRaisesRegex(release.PackagingError, "drift_worker"):
             release.package(self.args(source=source))
         self.assertEqual(list((self.root / "dist").iterdir()), [])
+
+    def test_web_stale_or_incomplete_offline_shell_is_not_packaged(self):
+        source = self.web()
+        (source / "main.dart.js").write_text("changedAfterShellGeneration();")
+        with self.assertRaisesRegex(release.PackagingError, "asset is missing or changed"):
+            release.package(self.args(source=source))
+        self.shell_manifest(source)
+        (source / "unexpected.js").write_text("untracked();")
+        with self.assertRaisesRegex(release.PackagingError, "complete compiled application"):
+            release.package(self.args(source=source))
+        self.assertEqual(list((self.root / "dist").iterdir()), [])
+
+    def test_web_missing_offline_worker_cannot_be_packaged(self):
+        source = self.web()
+        (source / "offline_service_worker.js").unlink()
+        with self.assertRaisesRegex(release.PackagingError, "offline_service_worker"):
+            release.package(self.args(source=source))
 
     def test_repeat_packaging_cannot_replace_an_existing_release(self):
         source = self.web()
@@ -221,7 +249,9 @@ class PackagingTests(unittest.TestCase):
         extracted = self.root / "extracted"
         release.run(["dpkg-deb", "--extract", package, extracted])
         self.assertTrue((extracted / "opt/getbible-live/lib/libapp.so").exists())
-        self.assertTrue((extracted / "usr/share/applications/life.getbible.mobile.desktop").exists())
+        desktop = (extracted / "usr/share/applications/life.getbible.mobile.desktop").read_text()
+        self.assertIn("Exec=/opt/getbible-live/getbible_life %u", desktop)
+        self.assertIn("MimeType=x-scheme-handler/getbible;", desktop)
         with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
             self.assertTrue(any(name.endswith("/data/icudtl.dat") for name in archive.getnames()))
         self.verify_checksums(output)

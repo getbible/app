@@ -1,0 +1,51 @@
+name: Publish tested packages
+
+on:
+  workflow_run:
+    workflows: [Flutter CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Successful Flutter CI run on main whose existing packages should be published'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One publisher owns the release inventory at a time, including manual retries.
+# Never cancel an upload halfway through when a later version finishes building.
+concurrency:
+  group: getbible-release-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      # Execute only the trusted publisher from main. Downloaded artifacts are
+      # data: no script, native binary or source checkout from them is executed.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify and publish the original CI packages without rebuilding
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id }}
+        run: python scripts/release/promote.py --run-id "$SOURCE_RUN_ID"

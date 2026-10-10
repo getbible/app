@@ -29,6 +29,7 @@ class FakeGitHub:
     """Small stateful API: callers cannot replace tags or published assets."""
 
     def __init__(self):
+        self.repository = "getbible/app"
         self.records = {}
         self.refs = {}
         self.tag_objects = {}
@@ -73,6 +74,8 @@ class FakeGitHub:
             self.records[release_id] = copy.deepcopy(record)
             return copy.deepcopy(record)
         if path.startswith("https://uploads.github.com/"):
+            if isinstance(raw, Path):
+                raw = raw.read_bytes()
             if self.fail_upload_after is not None and self.uploads >= self.fail_upload_after:
                 raise publish.ReleaseError("Simulated interrupted upload")
             parsed = urlparse(path)
@@ -137,7 +140,7 @@ class PublicationTests(unittest.TestCase):
                 files.append(path)
                 entries.append({"file": path.name, "bytes": path.stat().st_size, "sha256": publish.digest(path), "role": "test fixture"})
             manifest = self.dist / (prefix + "-manifest.json")
-            manifest.write_text(json.dumps({**self.metadata, "target": target, "architecture": arch, "distribution_signed": False, "signing": "unsigned", "installability": "test fixture", "artifacts": entries}), encoding="utf-8")
+            manifest.write_text(json.dumps({**self.metadata, "target": target, "architecture": arch, "distribution_signed": False, "signing": "unsigned", "installability": "test fixture", "artifacts": entries, **({"base_href": "/flutter/"} if target == "web" else {})}), encoding="utf-8")
             files.append(manifest)
             (self.dist / (prefix + "-SHA256SUMS")).write_text("".join(f"{publish.digest(path)}  {path.name}\n" for path in files), encoding="utf-8")
 
@@ -172,6 +175,27 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(record["make_latest"], "false")
         self.assertEqual(len(record["assets"]), len(list(self.dist.iterdir())))
         self.assertEqual(self.client.refs[record["tag_name"]]["sha"], SHA)
+
+    def test_release_notes_link_actual_installers_source_run_and_platform_limits(self):
+        publish.publish(self.client, self.dist, self.metadata, source_run_id=123)
+        body = self.client.records[1]["body"]
+        for artifact in self.dist.iterdir():
+            if artifact.name.endswith((".deb", "-setup.exe", ".dmg", "-debug.apk", ".app.zip")):
+                self.assertIn(f"https://github.com/getbible/app/releases/download/v1.0.0-beta.1/{artifact.name}", body)
+        self.assertIn("/actions/runs/123", body)
+        self.assertIn("sudo apt install ./getbible-live-", body)
+        self.assertIn("http://localhost:8000/flutter/", body)
+        self.assertIn("cannot run on a physical device", body)
+        self.assertIn("not rebuilt", body)
+
+    def test_invalid_web_path_cannot_enter_release_notes_or_publish(self):
+        manifest_path = next(self.dist.glob("*-web-*-manifest.json"))
+        manifest = json.loads(manifest_path.read_text())
+        manifest["base_href"] = "/../malicious/"
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(publish.ReleaseError, "Invalid web hosting path"):
+            publish.publish(self.client, self.dist, self.metadata)
+        self.assertEqual(self.client.writes, [])
 
     def test_existing_published_release_is_never_edited_even_at_a_new_commit(self):
         publish.publish(self.client, self.dist, self.metadata)

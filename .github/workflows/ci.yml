@@ -6,10 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      publish_release:
-        description: 'Publish the version in pubspec.yaml to GitHub Releases (main only)'
-        default: false
-        type: boolean
       web_base_href:
         description: 'Web hosting path (leading and trailing slash)'
         default: /flutter/
@@ -62,6 +58,7 @@ jobs:
           name: release-metadata
           path: build/release-metadata.json
           if-no-files-found: error
+          retention-days: 90
 
   test:
     needs: metadata
@@ -81,6 +78,7 @@ jobs:
       - run: sha256sum -c assets/branding/BRAND_ASSETS.sha256
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze --no-pub
+      - run: python scripts/testing/embed_fixtures.py --check
       - run: flutter test --no-pub
       - name: Test developer and release tooling
         run: |
@@ -107,35 +105,44 @@ jobs:
       - name: Install native build and packaging prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb dpkg-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb dbus-x11 dpkg-dev desktop-file-utils xdg-utils
       - uses: actions/download-artifact@v4
         with:
           name: release-metadata
           path: build
       - run: python scripts/develop.py check linux
       - run: flutter pub get --enforce-lockfile
-      - name: Exercise reader and native clipboard
-        run: xvfb-run -a flutter test --no-pub integration_test/reader_upgrade_test.dart -d linux
-      - name: Exercise Study and private notebook reopening
-        run: xvfb-run -a flutter test --no-pub integration_test/study_workspace_test.dart -d linux
-      - name: Exercise private portability and installed resources after restart
-        run: xvfb-run -a flutter test --no-pub integration_test/offline_portability_test.dart -d linux
+      - name: Exercise native reader, migration, clipboard, Study and offline restart
+        run: |
+          set -o pipefail
+          mkdir -p build/runtime-evidence
+          xvfb-run -a dbus-run-session -- flutter drive --driver=test_driver/platform_acceptance.dart --target=integration_test/platform_acceptance_test.dart -d linux 2>&1 | tee build/runtime-evidence/driver.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-linux
+          path: build/runtime-evidence
+          if-no-files-found: warn
+          retention-days: 30
       - run: flutter build linux --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - run: python scripts/release/package.py package --target linux --metadata build/release-metadata.json --output dist --arch x64
       - name: Validate Debian installation and installed application startup
         run: |
           sudo apt-get install -y ./dist/*.deb
+          desktop-file-validate /usr/share/applications/life.getbible.mobile.desktop
+          test "$(xdg-mime query default x-scheme-handler/getbible)" = life.getbible.mobile.desktop
           xvfb-run -a python scripts/release/smoke_desktop.py /opt/getbible-live/getbible_life
       - uses: actions/upload-artifact@v4
         with:
           name: packages-linux-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   web:
     needs: metadata
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
       BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
@@ -163,10 +170,16 @@ jobs:
       - run: dart compile js -O4 tool/drift_worker.dart -o web/drift_worker.dart.js
       - run: dart compile js -O2 tool/offline_bible_worker.dart -o web/offline_bible_worker.dart.js
       - run: flutter build web --release --no-web-resources-cdn --base-href "$WEB_BASE_HREF" --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+      - run: python scripts/build_web_shell.py --build-dir build/web
+      - run: node --test tool/offline_shell/test.mjs
       - run: npm ci --prefix tool/browser_smoke
-      - run: npx --prefix tool/browser_smoke playwright install --with-deps chromium
+      - run: npx --prefix tool/browser_smoke playwright install --with-deps chromium firefox webkit
+      - run: node --test tool/offline_shell/browser.test.mjs
       - name: Launch compiled app and verify persistence and offline installation in a real browser
-        run: node tool/browser_smoke/run.mjs --build-dir build/web --base-path "$WEB_BASE_HREF"
+        run: node tool/browser_smoke/run.mjs --build-dir build/web --base-path "$WEB_BASE_HREF" --browsers chromium,firefox,webkit
+      - name: Record bounded live-service browser CORS evidence
+        if: always()
+        run: node tool/browser_smoke/probe-services.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -179,6 +192,7 @@ jobs:
           name: packages-web-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   android:
     needs: metadata
@@ -217,6 +231,7 @@ jobs:
           name: packages-android-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   windows:
     needs: metadata
@@ -259,6 +274,9 @@ jobs:
           $destination = Join-Path $env:RUNNER_TEMP 'GetBible-Smoke'
           $process = Start-Process -FilePath $installer[0].FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$destination") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          $registered = (Get-Item 'HKCU:\Software\Classes\getbible\shell\open\command').GetValue('')
+          $expected = '"' + (Join-Path $destination 'getbible_life.exe') + '" "%1"'
+          if ($registered -ne $expected) { throw "Incorrect getbible URI registration: $registered" }
           python scripts/release/smoke_desktop.py (Join-Path $destination 'getbible_life.exe')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
@@ -266,6 +284,7 @@ jobs:
           name: packages-windows-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   apple:
     needs: metadata
@@ -306,16 +325,24 @@ jobs:
         run: flutter build ios --simulator --debug --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
       - run: python scripts/release/package.py package --target '${{ matrix.target }}' --metadata build/release-metadata.json --output dist
       - if: matrix.target == 'macos'
-        name: Unpack and launch the macOS package
+        name: Inspect ZIP and install and launch the macOS DMG
         run: |
-          mkdir "$RUNNER_TEMP/getbible-smoke"
-          ditto -x -k dist/*.app.zip "$RUNNER_TEMP/getbible-smoke"
+          mkdir "$RUNNER_TEMP/getbible-zip" "$RUNNER_TEMP/getbible-smoke" "$RUNNER_TEMP/getbible-dmg"
+          ditto -x -k dist/*.app.zip "$RUNNER_TEMP/getbible-zip"
+          test -x "$RUNNER_TEMP/getbible-zip/getBible.live.app/Contents/MacOS/getBible.live"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/getbible-dmg" dist/*.dmg
+          trap 'hdiutil detach "$RUNNER_TEMP/getbible-dmg"' EXIT
+          ditto "$RUNNER_TEMP/getbible-dmg/getBible.live.app" "$RUNNER_TEMP/getbible-smoke/getBible.live.app"
+          hdiutil detach "$RUNNER_TEMP/getbible-dmg"
+          trap - EXIT
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$RUNNER_TEMP/getbible-smoke/getBible.live.app/Contents/Info.plist")" = getbible
           python scripts/release/smoke_desktop.py "$RUNNER_TEMP/getbible-smoke/getBible.live.app/Contents/MacOS/getBible.live"
       - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.target }}-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   signing:
     # No secret is exposed to pull-request code, including same-repository PRs.
@@ -405,6 +432,7 @@ jobs:
           name: packages-android-signed-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   windows-signed:
     needs: [metadata, signing, test]
@@ -451,6 +479,7 @@ jobs:
           name: packages-windows-signed-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   macos-signed:
     needs: [metadata, signing, test]
@@ -499,6 +528,7 @@ jobs:
           name: packages-macos-signed-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
   ios-signed:
     needs: [metadata, signing, test]
@@ -541,44 +571,11 @@ jobs:
           name: packages-ios-signed-${{ needs.metadata.outputs.artifact_version }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 90
 
-  release:
-    if: >-
-      always() && github.ref == 'refs/heads/main' &&
-      github.event_name == 'workflow_dispatch' && inputs.publish_release &&
-      needs.test.result == 'success' && needs.linux.result == 'success' &&
-      needs.web.result == 'success' && needs.android.result == 'success' &&
-      needs.windows.result == 'success' && needs.apple.result == 'success' &&
-      needs.signing.result == 'success' &&
-      (needs.android-signed.result == 'success' || needs.android-signed.result == 'skipped') &&
-      (needs.windows-signed.result == 'success' || needs.windows-signed.result == 'skipped') &&
-      (needs.macos-signed.result == 'success' || needs.macos-signed.result == 'skipped') &&
-      (needs.ios-signed.result == 'success' || needs.ios-signed.result == 'skipped')
-    needs: [metadata, test, linux, web, android, windows, apple, signing, android-signed, windows-signed, macos-signed, ios-signed]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-metadata
-          path: build
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: packages-*
-          path: dist
-          merge-multiple: true
-      - name: Publish the new recorded version, or skip an existing release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANDROID_SIGNING: ${{ needs.signing.outputs.android }}
-          WINDOWS_SIGNING: ${{ needs.signing.outputs.windows }}
-          MACOS_SIGNING: ${{ needs.signing.outputs.macos }}
-          IOS_SIGNING: ${{ needs.signing.outputs.ios }}
-        run: |
-          REQUIRED_SIGNED=$(python -c "import os; print(','.join(p for p in ('android','windows','macos','ios') if os.environ.get(p.upper() + '_SIGNING') == 'true'))")
-          python scripts/release/publish.py --directory dist --metadata build/release-metadata.json --required-signed-targets "$REQUIRED_SIGNED"
+
+  runtime-validation:
+    needs: [metadata, test]
+    uses: ./.github/workflows/runtime-validation.yml
+    with:
+      flutter-version: ${{ needs.metadata.outputs.flutter }}

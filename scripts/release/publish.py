@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish complete packages only after an explicit manual main run.
+"""Publish verified CI packages as an immutable GitHub release.
 
 Published versions are never edited. An interrupted draft may resume at the same
 commit/build, retaining verified uploads. Tags are resolved to their commit,
@@ -8,6 +8,7 @@ created without force, and checked again immediately before publication.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -65,6 +66,8 @@ def validate_metadata(metadata: dict) -> None:
             raise ReleaseError(f"Invalid release metadata field: {name}")
     if not re.fullmatch(r"[0-9a-f]{40}", metadata.get("git_sha", "")):
         raise ReleaseError("Invalid source commit SHA")
+    if type(metadata.get("source_date_epoch")) is not int or metadata["source_date_epoch"] < 0:
+        raise ReleaseError("Invalid source commit timestamp")
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -78,6 +81,7 @@ class GitHub:
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
             raise ReleaseError("Invalid repository")
         self.base = "https://api.github.com/repos/" + repository
+        self.repository = repository
         self.token = token
         self.opener = urllib.request.build_opener(NoRedirect())
 
@@ -91,10 +95,18 @@ class GitHub:
             "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "getbible-release",
             "Content-Type": "application/octet-stream" if raw is not None else "application/json",
         }
-        body = raw if raw is not None else (json.dumps(data).encode() if data is not None else None)
-        request = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
-            with self.opener.open(request, timeout=300) as response:
+            with contextlib.ExitStack() as stack:
+                if isinstance(raw, Path):
+                    # Stream large platform packages instead of holding a full
+                    # archive in memory. GitHub requires the exact byte length.
+                    headers["Content-Length"] = str(raw.stat().st_size)
+                    source = stack.enter_context(raw.open("rb"))
+                    body = iter(lambda: source.read(1024 * 1024), b"")
+                else:
+                    body = raw if raw is not None else (json.dumps(data).encode() if data is not None else None)
+                request = urllib.request.Request(url, data=body, headers=headers, method=method)
+                response = stack.enter_context(self.opener.open(request, timeout=300))
                 content = response.read()
                 return json.loads(content) if content else None
         except urllib.error.HTTPError as error:
@@ -156,6 +168,10 @@ def verified_assets(directory: Path, metadata: dict, required_signed=()):
         if identity in identities:
             raise ReleaseError(f"Duplicate target manifest: {identity}")
         identities.add(identity)
+        if target == "web":
+            base = manifest.get("base_href", "")
+            if not re.fullmatch(r"/(?:[A-Za-z0-9._~-]+/)*", base) or any(part in (".", "..") for part in base.split("/")):
+                raise ReleaseError(f"Invalid web hosting path: {path.name}")
         if signed:
             signed_targets.add(target.removesuffix("-signed"))
         else:
@@ -233,7 +249,71 @@ def verify_remote_asset(asset: dict, path: Path):
         raise ReleaseError(f"GitHub asset failed size/state/SHA-256 verification: {path.name}")
 
 
-def publish(client, directory: Path, metadata: dict, required_signed=()):
+def release_notes(repository: str, metadata: dict, manifests: list[Path], source_run_id: int | None) -> str:
+    """Put actual installer links and platform limitations above the asset list."""
+    tag = "v" + metadata["release_version"]
+    root = f"https://github.com/{repository}/releases/download/{tag}/"
+    downloads, files = [], {}
+    def label(value):
+        return str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+    for path in manifests:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        target = manifest["target"]
+        entries = manifest["artifacts"]
+        links = [f'[{label(entry["role"])}]({root}{entry["file"]})' for entry in entries]
+        downloads.append(f'| {target} ({manifest["architecture"]}) | {" · ".join(links)} | {label(manifest["signing"])} |')
+        if not manifest["distribution_signed"]:
+            files[target] = {"manifest": manifest, "names": [entry["file"] for entry in entries]}
+    def filename(target, suffix):
+        return next(name for name in files[target]["names"] if name.endswith(suffix))
+    linux = filename("linux", ".deb")
+    android = filename("android", "-debug.apk")
+    simulator = filename("ios-simulator", ".app.zip")
+    web = filename("web", ".zip")
+    base = files["web"]["manifest"]["base_href"]
+    web_directory = "preview" + base.rstrip("/")
+    source = f'Build `{metadata["version"]}` from [`{metadata["git_sha"][:12]}`](https://github.com/{repository}/commit/{metadata["git_sha"]}).'
+    if source_run_id is not None:
+        source += f' These are the original packages from [successful Flutter CI run {source_run_id}](https://github.com/{repository}/actions/runs/{source_run_id}); they were not rebuilt for this release.'
+    return (
+        source + f'\n\n<!-- getbible-build-number: {metadata["build_number"]} -->\n\n'
+        '## Downloads\n\n| Platform | Packages | Signing |\n|---|---|---|\n' + "\n".join(downloads) +
+        '\n\nDownload the installer for your architecture. The adjacent `-SHA256SUMS` files cover '
+        'every package and its manifest; compare your download before opening it. Manifests record '
+        'the exact version, commit, architecture and signing state. No store submission occurs.\n\n'
+        '## Install for testing\n\n'
+        f'- **Linux (Debian/Ubuntu):** run `sudo apt install ./{linux}` from the download directory, '
+        'then open **getBible.live** from Applications or run `getbible-live`. The `.tar.gz` is a portable '
+        'Flutter bundle for compatible Linux hosts; keep its `lib/` and `data/` beside the executable. '
+        'This release does not contain an AppImage.\n'
+        '- **Windows:** run the `-setup.exe`. It installs for the current user and includes the required '
+        'Microsoft runtime. An unsigned build may show SmartScreen; after checking this source and its '
+        'checksum, use **More info → Run anyway** if your device policy allows. The portable ZIP also '
+        'works when extracted as a complete folder.\n'
+        '- **macOS:** open the `.dmg`, drag **getBible.live** into Applications, and launch it. For an '
+        'unsigned test build blocked by Gatekeeper, use **System Settings → Privacy & Security → Open Anyway** '
+        'after checking the download. Managed device policy may prevent an override. Prefer the signed, '
+        'notarized download when available.\n'
+        f'- **Android phone/tablet or emulator:** use the `-debug.apk`, for example `adb install -r {android}`. '
+        'An AAB is a store-upload bundle, and an unsigned release APK cannot be installed directly. '
+        'CI debug signing identities can change between runs; back up private data before replacing an '
+        'installation whose signing key differs. A configured release key provides upgrade continuity.\n'
+        f'- **iOS/iPadOS Simulator on macOS:** unzip the `ios-simulator` archive with '
+        f'`ditto -x -k {simulator} ios-simulator`, boot a compatible Xcode Simulator, then run '
+        '`xcrun simctl install booted ios-simulator/Runner.app` and '
+        '`xcrun simctl launch booted life.getbible.mobile`. Match the simulator architecture. '
+        'The unsigned `ios-device` bundle only validates compilation and cannot run on a physical device. '
+        'An optional App Store IPA still requires TestFlight/App Store Connect distribution.\n'
+        f'- **Web/Chrome:** create `{web_directory}`, extract `{web}` into it, then run '
+        f'`python3 -m http.server 8000 --directory preview` and open `http://localhost:8000{base}`. '
+        'Keep the packaged base path; opening `index.html` as a local file is unsupported.\n\n'
+        'Existing private data is retained by desktop updates. Export a complete private backup before '
+        'testing an upgrade or uninstalling. Store acceptance and physical-device approval are separate '
+        f'from these automated build checks; see the [release checklist](https://github.com/{repository}/blob/{metadata["git_sha"]}/docs/RELEASE_CHECKLIST.md).\n'
+    )
+
+
+def publish(client, directory: Path, metadata: dict, required_signed=(), *, source_run_id=None):
     validate_metadata(metadata)
     version, tag = metadata["release_version"], "v" + metadata["release_version"]
     existing = client.call("/releases/tags/" + urllib.parse.quote(tag, safe=""))
@@ -266,18 +346,7 @@ def publish(client, directory: Path, metadata: dict, required_signed=()):
     if source_tag is not None and (not existing or source_tag != metadata["git_sha"]):
         raise ReleaseError(f"Tag {tag} already exists with different or unowned release state; never moved automatically")
     assets, manifests = verified_assets(directory, metadata, required_signed)
-    summaries = []
-    for path in manifests:
-        manifest = json.loads(path.read_text(encoding="utf-8"))
-        summaries.append(f'| {manifest["target"]} | {manifest["architecture"]} | {manifest["signing"]} | {manifest["installability"]} |')
-    body = (
-        f'Build `{metadata["version"]}` from `{metadata["git_sha"]}`.\n\n'
-        f'<!-- getbible-build-number: {metadata["build_number"]} -->\n\n'
-        '| Target | Architecture | Signing | Use |\n|---|---|---|---|\n' + "\n".join(summaries) +
-        "\n\nVerify packages against their SHA256SUMS. Unsigned Apple device bundles validate compilation; "
-        "they cannot be installed on physical devices. Debug Android packages are development builds. "
-        "Signed IPA distribution follows its embedded provisioning profile. No store upload is performed.\n"
-    )
+    body = release_notes(client.repository, metadata, manifests, source_run_id)
     if existing:
         markers = re.findall(r"<!-- getbible-build-number: (\d+) -->", existing.get("body") or "")
         if existing["target_commitish"] != metadata["git_sha"] or markers != [str(metadata["build_number"])]:
@@ -301,7 +370,7 @@ def publish(client, directory: Path, metadata: dict, required_signed=()):
     upload_url = release["upload_url"].split("{", 1)[0]
     for name, path in sorted(assets.items()):
         if name not in uploaded:
-            asset = client.call(upload_url + "?name=" + urllib.parse.quote(name, safe=""), method="POST", raw=path.read_bytes())
+            asset = client.call(upload_url + "?name=" + urllib.parse.quote(name, safe=""), method="POST", raw=path)
             verify_remote_asset(asset, path)
     final_assets = list(client.assets(release["id"]))
     if len(final_assets) != len(assets) or {asset["name"] for asset in final_assets} != set(assets):

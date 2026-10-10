@@ -3,7 +3,8 @@ import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, stat } from 'node:fs/promises';
 import { resolve, sep, extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
+import { measureWorker } from './worker-performance.mjs';
 import { apiFixtures, firstVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
 import { studyInstallationFixtures } from './study-fixtures.mjs';
 
@@ -12,13 +13,19 @@ const { values } = parseArgs({ options: {
   'base-path': { type: 'string', default: '/flutter/' },
   'output-dir': { type: 'string', default: 'build/browser-smoke' },
   'browser-channel': { type: 'string' },
+  browsers: { type: 'string', default: 'chromium' },
 } });
+const selectedBrowsers = values.browsers.split(',');
+const browserTypes = { chromium, firefox, webkit };
+assert.ok(selectedBrowsers.length && selectedBrowsers.every((name) => Object.hasOwn(browserTypes, name)), 'Unsupported browser');
+assert.equal(new Set(selectedBrowsers).size, selectedBrowsers.length, 'Duplicate browser');
+assert.ok(!values['browser-channel'] || selectedBrowsers.every((name) => name === 'chromium'), 'Browser channel applies only to Chromium');
 const buildDirectory = resolve(values['build-dir']);
 const outputDirectory = resolve(values['output-dir']);
 const basePath = values['base-path'];
 assert.match(basePath, /^\/(?:[a-zA-Z0-9._~-]+\/)*$/, 'Base path must start and end in /');
 assert.ok(!basePath.split('/').some((segment) => segment === '.' || segment === '..'), 'Base path cannot contain dot segments');
-for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js', 'offline_bible_worker.dart.js']) {
+for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js', 'offline_bible_worker.dart.js', 'offline_service_worker.js', 'offline-shell-manifest.json']) {
   assert.ok((await stat(join(buildDirectory, asset))).isFile(), `Missing built asset: ${asset}`);
 }
 const index = await readFile(join(buildDirectory, 'index.html'), 'utf8');
@@ -32,18 +39,26 @@ const contentTypes = new Map([
   ['.otf', 'font/otf'], ['.woff2', 'font/woff2'],
 ]);
 
-/** Serves only the built directory; unknown paths are 404, never HTML fallbacks. */
+/** Uses the documented SPA rewrite for HTML navigation; missing assets stay 404. */
 async function serveBuild({ isolated }) {
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
       const relativePath = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : null;
-      const filePath = relativePath === null ? '' : resolve(buildDirectory, relativePath || 'index.html');
+      let filePath = relativePath === null ? '' : resolve(buildDirectory, relativePath || 'index.html');
       if (!filePath.startsWith(buildDirectory + sep)) {
         response.writeHead(404).end();
         return;
       }
-      const body = await readFile(filePath);
+      let body;
+      try {
+        body = await readFile(filePath);
+      } catch (error) {
+        if (error.code !== 'ENOENT' || extname(filePath) || !request.headers.accept?.includes('text/html') ||
+            (request.headers['sec-fetch-dest'] && request.headers['sec-fetch-dest'] !== 'document')) throw error;
+        filePath = join(buildDirectory, 'index.html');
+        body = await readFile(filePath);
+      }
       const headers = { 'content-type': contentTypes.get(extname(filePath)) ?? 'application/octet-stream' };
       if (isolated) {
         headers['cross-origin-opener-policy'] = 'same-origin';
@@ -73,10 +88,11 @@ async function readerVisible(page) {
   await page.getByRole('group', { name: `Genesis 1:1. ${firstVerse}`, exact: true }).waitFor();
 }
 
-async function runJourney(browser, { isolated }) {
-  const mode = isolated ? 'cross-origin-isolated' : 'standard-hosting';
+async function runJourney(browser, { isolated, browserName }) {
+  const hosting = isolated ? 'cross-origin-isolated' : 'standard-hosting';
+  const mode = `${browserName}-${hosting}`;
   const { server, origin } = await serveBuild({ isolated });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'allow' });
   const errors = [];
   const requests = [];
   const missingAssets = [];
@@ -92,7 +108,7 @@ async function runJourney(browser, { isolated }) {
       if (message.type() !== 'error') return;
       // A deliberately disconnected API logs a network error in Chromium.
       // All uncaught exceptions and local asset errors remain failures.
-      if (apiOffline && message.text().includes('net::ERR_INTERNET_DISCONNECTED')) return;
+      if (apiOffline && /net::ERR_INTERNET_DISCONNECTED|Failed to load resource:.*(?:network connection was lost|Internet connection appears to be offline)|NetworkError when attempting to fetch resource/.test(message.text())) return;
       errors.push({ type: 'console', message: message.text() });
     });
     opened.on('response', (response) => {
@@ -127,13 +143,23 @@ async function runJourney(browser, { isolated }) {
   try {
     page = await context.newPage();
     page.setDefaultTimeout(45000);
-    await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
+    await page.goto(origin + basePath + 'KJV/Genesis/1?verse=1', { waitUntil: 'domcontentloaded' });
     await enableSemantics(page);
     await readerVisible(page);
     assert.equal(await page.evaluate(() => crossOriginIsolated), isolated);
     assert.deepEqual(errors, [], 'Startup produced browser errors');
     assert.deepEqual(missingAssets, [], 'Startup missed built assets');
     console.log(`${mode}: release reader opened`);
+    const workerMetrics = await measureWorker(page);
+    await writeFile(join(outputDirectory, `${mode}-worker-performance.json`), JSON.stringify(workerMetrics, null, 2));
+    assert.equal(workerMetrics.verses, 20000);
+    assert.ok(workerMetrics.maximumVerseBatch <= 100);
+    assert.ok(workerMetrics.uiHeartbeatTicks > 0, 'UI event loop must remain live while the worker parses');
+    const dictionaryMetrics = await measureWorker(page, 'dictionary-index');
+    await writeFile(join(outputDirectory, `${mode}-dictionary-performance.json`), JSON.stringify(dictionaryMetrics, null, 2));
+    assert.equal(dictionaryMetrics.entries, 20000);
+    assert.ok(dictionaryMetrics.maximumEntryBatch <= 128);
+    assert.ok(dictionaryMetrics.uiHeartbeatTicks > 0, 'Dictionary index parsing must leave the UI event loop live');
 
     // Verse-number context actions exercise the actual rendered release UI.
     await page.getByText('1', { exact: true }).click();
@@ -271,9 +297,36 @@ async function runJourney(browser, { isolated }) {
     await page.screenshot({ path: join(outputDirectory, `${mode}-offline.png`) });
     assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
       'Installed restart, reading and search must stay within the local database');
+    // The generated application shell must cache its own exact release assets.
+    // A fresh page with all networking disabled demonstrates a real cold start,
+    // in addition to the earlier independent public-API offline checks.
+    // Activation never claims an existing page: a deploy must not switch the
+    // asset generation underneath an open note editor. The next navigation is
+    // controlled after the complete worker has activated.
+    await page.waitForFunction(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return registration?.active?.state === 'activated';
+    }, undefined, { timeout: 90000 });
+    await context.setOffline(true);
+    await page.close();
+    page = await context.newPage();
+    page.setDefaultTimeout(45000);
+    // The inbound route differs from the saved Genesis 2 position, proving
+    // actual browser deep-link delivery wins over last-reading restoration.
+    await page.goto(origin + basePath + 'KJV/Genesis/1?verse=1', { waitUntil: 'domcontentloaded' });
+    assert.equal(await page.evaluate(() => navigator.serviceWorker.controller !== null), true,
+      'A new offline navigation must use the activated application shell');
+    await enableSemantics(page);
+    await readerVisible(page);
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await page.getByRole('button', { name: 'Next chapter', exact: true }).first().click();
+    await page.getByRole('group', { name: `Genesis 2:1. ${unvisitedVerse}`, exact: true }).waitFor();
+    await page.screenshot({ path: join(outputDirectory, `${mode}-application-offline.png`) });
+    assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
+      'Network-disconnected application startup must not fetch public services');
     assert.deepEqual(errors, [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
-    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'no browser errors'] };
+    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: join(outputDirectory, `${mode}-failure.png`) }).catch(() => {});
@@ -288,19 +341,31 @@ async function runJourney(browser, { isolated }) {
   }
 }
 
-const browser = await chromium.launch({ channel: values['browser-channel'] });
 const results = [];
-try {
-  for (const isolated of [false, true]) {
-    try {
-      results.push(await runJourney(browser, { isolated }));
-      console.log(`PASS ${results.at(-1).mode}`);
-    } catch (error) {
-      results.push({ mode: isolated ? 'cross-origin-isolated' : 'standard-hosting', status: 'failed', error: error.message });
-      throw error;
+let failed = false;
+for (const browserName of selectedBrowsers) {
+  let browser;
+  try {
+    browser = await browserTypes[browserName].launch(
+      browserName === 'chromium' ? { channel: values['browser-channel'] } : {},
+    );
+    for (const isolated of [false, true]) {
+      try {
+        results.push(await runJourney(browser, { isolated, browserName }));
+        console.log(`PASS ${results.at(-1).mode}`);
+      } catch (error) {
+        failed = true;
+        results.push({ browser: browserName, mode: isolated ? 'cross-origin-isolated' : 'standard-hosting', status: 'failed', error: error.stack ?? error.message });
+        console.error(error);
+      }
     }
+  } catch (error) {
+    failed = true;
+    results.push({ browser: browserName, status: 'failed', error: error.stack ?? error.message });
+    console.error(error);
+  } finally {
+    await writeFile(join(outputDirectory, 'results.json'), JSON.stringify(results, null, 2));
+    await browser?.close();
   }
-} finally {
-  await writeFile(join(outputDirectory, 'results.json'), JSON.stringify(results, null, 2));
-  await browser.close();
 }
+if (failed) process.exitCode = 1;

@@ -8,6 +8,7 @@ import '../../core/ui_strings.dart';
 import '../../domain/models/annotations.dart';
 import '../../domain/models/passage.dart';
 import '../../domain/models/unified_bookmarks.dart';
+import 'topic_verse_list.dart';
 
 /// Existing canonical annotations remain independent of public Study resources.
 class MyAnnotationsPanel extends StatefulWidget {
@@ -17,11 +18,13 @@ class MyAnnotationsPanel extends StatefulWidget {
     required this.onOpenPassage,
     this.showNotes = false,
     this.initialGroupId,
+    this.onBackToVerse,
   });
   final AppState state;
   final ValueChanged<Passage> onOpenPassage;
   final bool showNotes;
   final String? initialGroupId;
+  final VoidCallback? onBackToVerse;
   @override
   State<MyAnnotationsPanel> createState() => _MyAnnotationsPanelState();
 }
@@ -40,6 +43,14 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
         if (!mounted) return;
         await widget.state.bookmarks.initialize(locale: widget.state.ui.locale);
       });
+    }
+  }
+
+  @override
+  void didUpdateWidget(MyAnnotationsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialGroupId != widget.initialGroupId) {
+      _selectedGroup = widget.initialGroupId;
     }
   }
 
@@ -87,12 +98,46 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Wrap(
+                    spacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => setState(() => _selectedGroup = null),
+                        icon: const Icon(Icons.arrow_back),
+                        label: Text(UiStrings.of(context).text('All topics')),
+                      ),
+                      if (widget.onBackToVerse != null)
+                        TextButton.icon(
+                          onPressed: widget.onBackToVerse,
+                          icon: const Icon(Icons.keyboard_return),
+                          label: Text(
+                            UiStrings.of(context).text('Back to verse'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 ListTile(
-                  leading: const Icon(Icons.arrow_back),
+                  leading: group == null
+                      ? null
+                      : CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Color(
+                            int.parse(group.color.substring(1), radix: 16) |
+                                0xff000000,
+                          ),
+                        ),
                   title: Text(
                     group?.name ?? UiStrings.of(context).text('Markings'),
                   ),
-                  onTap: () => setState(() => _selectedGroup = null),
+                  subtitle: Text(
+                    UiStrings.of(
+                      context,
+                    ).text('{count} bookmarks', {'count': items.length}),
+                  ),
                 ),
                 if (group?.source?.effectiveScope ==
                     state.bookmarks.publicTopics.sourceScope)
@@ -117,91 +162,59 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
               ),
             )
           else
-            SliverList.builder(
-              itemCount: items.length,
-              itemBuilder: (BuildContext context, int index) {
-                final BookmarkDisplayRow row = items[index];
-                final Marking marking = row.marking;
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  child: InkWell(
-                    onTap: () => _openMarking(state, marking),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          Text(
-                            _displayReference(state, row),
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          if (row.global)
-                            Text(
-                              row.personal
-                                  ? UiStrings.of(
-                                      context,
-                                    ).text('Global and personal bookmark')
-                                  : UiStrings.of(
-                                      context,
-                                    ).text('Global bookmark'),
-                            ),
-                          Text(
-                            marking.quote,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Wrap(
-                            spacing: 8,
-                            children: <Widget>[
-                              TextButton.icon(
-                                label: Text(UiStrings.of(context).text('Open')),
-                                icon: const Icon(Icons.open_in_new),
-                                onPressed: () => _openMarking(state, marking),
-                              ),
-                              if (row.personal)
-                                TextButton.icon(
-                                  label: Text(
-                                    UiStrings.of(
-                                      context,
-                                    ).text('Remove personal bookmark'),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.person_remove_outlined,
-                                  ),
-                                  onPressed: state.bookmarks.busy
-                                      ? null
-                                      : () => _deleteOrigin(
-                                          state,
-                                          marking,
-                                          BookmarkOrigin.personal,
-                                        ),
-                                ),
-                              if (row.global)
-                                TextButton.icon(
-                                  label: Text(
-                                    UiStrings.of(
-                                      context,
-                                    ).text('Remove global bookmark'),
-                                  ),
-                                  icon: const Icon(Icons.public_off),
-                                  onPressed: state.bookmarks.busy
-                                      ? null
-                                      : () => _deleteOrigin(
-                                          state,
-                                          marking,
-                                          BookmarkOrigin.global,
-                                        ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
+            TopicVerseList(
+              key: ValueKey('saved-topic:$_selectedGroup'),
+              lookup: state.referenceLookup,
+              items: [
+                for (final row in items)
+                  TopicVerseItem(
+                    passage: row.marking.passage.copyWith(
+                      translation: state.passage.translation,
+                      verse: row.marking.verse,
                     ),
+                    reference: _displayReference(state, row),
+                    global: row.global,
+                    personal: row.personal,
+                    selectedQuote: row.marking.isWholeVerse
+                        ? null
+                        : row.marking.quote,
+                    quoteTranslation: row.marking.passage.translation,
                   ),
-                );
+              ],
+              preferences: state.preferences,
+              onOpen: (item) => widget.onOpenPassage(item.passage),
+              actionsBuilder: (item, index) {
+                final row = items[index];
+                return [
+                  if (row.personal)
+                    IconButton(
+                      tooltip: UiStrings.of(
+                        context,
+                      ).text('Remove personal bookmark'),
+                      icon: const Icon(Icons.person_remove_outlined),
+                      onPressed: state.bookmarks.busy
+                          ? null
+                          : () => _deleteOrigin(
+                              state,
+                              row.marking,
+                              BookmarkOrigin.personal,
+                            ),
+                    ),
+                  if (row.global)
+                    IconButton(
+                      tooltip: UiStrings.of(
+                        context,
+                      ).text('Remove global bookmark'),
+                      icon: const Icon(Icons.public_off),
+                      onPressed: state.bookmarks.busy
+                          ? null
+                          : () => _deleteOrigin(
+                              state,
+                              row.marking,
+                              BookmarkOrigin.global,
+                            ),
+                    ),
+                ];
               },
             ),
         ],
@@ -378,18 +391,8 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
     );
   }
 
-  void _openMarking(AppState state, Marking marking) => widget.onOpenPassage(
-    Passage(
-      translation: state.passage.translation,
-      book: marking.passage.book,
-      chapter: marking.passage.chapter,
-      verse: marking.verse,
-    ),
-  );
-
   String _displayReference(AppState state, BookmarkDisplayRow row) {
     final marking = row.marking;
-    if (row.personal) return marking.reference;
     final book = state.books
         .where((book) => book.number == marking.passage.book)
         .firstOrNull;

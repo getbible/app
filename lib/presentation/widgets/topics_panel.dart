@@ -2,17 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../application/grouped_reference_lookup.dart';
 import '../../application/topics_controller.dart';
 import '../../application/unified_bookmarks_controller.dart';
 import '../../core/ui_strings.dart';
+import '../../domain/models/passage.dart';
+import '../../domain/models/preferences.dart';
 import '../../domain/models/public_topic.dart';
 import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
 import '../../domain/models/study_context.dart';
 import 'study_offline_status.dart';
+import 'topic_verse_list.dart';
 
-/// Native public-topic browsing. Scripture text is requested only through the
-/// shared selected-Bible preview; following/hiding never creates annotations.
+/// Native public-topic browsing with bounded inline selected-Bible Scripture.
+/// Following/hiding and reading text never create private annotations.
 final class TopicsPanel extends StatefulWidget {
   const TopicsPanel({
     super.key,
@@ -23,9 +27,13 @@ final class TopicsPanel extends StatefulWidget {
     this.onPrivateCopyCommitted,
     this.bookmarks,
     this.onOpenBookmarks,
+    this.referenceLookup,
+    this.preferences,
   });
 
   final TopicsController controller;
+  final GroupedReferenceLookup? referenceLookup;
+  final ReaderPreferences? preferences;
   final UnifiedBookmarksController? bookmarks;
   final ValueChanged<String?>? onOpenBookmarks;
   final StudyContext context;
@@ -111,6 +119,7 @@ final class _TopicsPanelState extends State<TopicsPanel> {
         })
         .toList(growable: false);
     return CustomScrollView(
+      key: const PageStorageKey<String>('public-topic-catalogue'),
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Padding(
@@ -343,6 +352,7 @@ final class _TopicsPanelState extends State<TopicsPanel> {
     final PublicTopic? topic = controller.selectedTopic;
     final List<ReferenceSelection> selections = topic?.selections ?? [];
     return CustomScrollView(
+      key: PageStorageKey<String>('public-topic:${controller.selectedTopicId}'),
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Padding(
@@ -435,13 +445,13 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                   ),
                   Text(
                     UiStrings.of(context).text(
-                      '{length} canonical verse associations · Public GetBible Bookmarks v1',
+                      '{length} canonical verse associations · Public getBible Bookmarks v1',
                       {'length': topic.coordinates.length},
                     ),
                   ),
                   Text(
                     UiStrings.of(context).text(
-                      'Preview uses your selected Bible. Missing books or verses are reported by the reference preview.',
+                      'Verses use your selected Bible. Missing verses are shown as unavailable.',
                     ),
                   ),
                   if (controller.copyResult != null)
@@ -471,6 +481,37 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                   UiStrings.of(
                     context,
                   ).text('This topic has no verse associations.'),
+                ),
+              ),
+            )
+          else if (widget.referenceLookup != null)
+            TopicVerseList(
+              key: ValueKey('public-topic:${topic.id}'),
+              lookup: widget.referenceLookup!,
+              preferences: widget.preferences,
+              items: [
+                for (final coordinate in topic.coordinates)
+                  TopicVerseItem(
+                    passage: Passage(
+                      translation: widget.context.translation,
+                      book: coordinate.book,
+                      chapter: coordinate.chapter,
+                      verse: coordinate.verse,
+                    ),
+                    reference:
+                        '${UiStrings.of(context).text('Book {book}', {'book': coordinate.book})} ${coordinate.chapter}:${coordinate.verse}',
+                    global: true,
+                  ),
+              ],
+              onOpen: (item) => unawaited(
+                widget.onPreviewReference(
+                  StructuredReferenceRequest(
+                    translation: widget.context.translation,
+                    translationName: widget.context.translationName,
+                    translationDirection: widget.context.direction,
+                    sourceLabel: topic.localizedName(controller.locale),
+                    selections: [ReferenceSelection.verse(item.passage)],
+                  ),
                 ),
               ),
             )

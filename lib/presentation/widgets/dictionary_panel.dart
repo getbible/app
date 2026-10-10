@@ -110,7 +110,19 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
                       key: const ValueKey('dictionary-resource-choice'),
                       initialValue: state.selectedModule?.id,
                       isExpanded: true,
+                      // A dense button reserves one line even when a resource
+                      // name wraps. Keep menu padding out of the selected value
+                      // and let the field grow with its text and accessibility
+                      // scale instead of clipping the dictionary name.
+                      isDense: false,
                       itemHeight: null,
+                      selectedItemBuilder: (context) => [
+                        for (final module in state.choices)
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text('${module.name} (${module.language})'),
+                          ),
+                      ],
                       decoration: InputDecoration(
                         labelText: state.isBrowsing
                             ? UiStrings.of(context).text('Dictionary')

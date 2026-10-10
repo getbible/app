@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getbible/application/dictionary_controller.dart';
 import 'package:getbible/domain/models/reference.dart';
@@ -7,6 +8,94 @@ import 'package:getbible/presentation/widgets/dictionary_panel.dart';
 import 'support/dictionary_fixture.dart';
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'selected dictionary name is fully visible at ${scale * 100}% text',
+      (tester) async {
+        tester.view.physicalSize = Size(scale == 1 ? 840 : 320, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final fixture = DictionaryFixture();
+        final controller = DictionaryController(
+          repository: fixture.repository,
+          preferences: MemoryStudyPreferences(),
+        );
+        addTearDown(() {
+          controller.dispose();
+          fixture.close();
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: Directionality(
+                textDirection: scale == 1
+                    ? TextDirection.ltr
+                    : TextDirection.rtl,
+                child: child!,
+              ),
+            ),
+            home: Scaffold(
+              body: DictionaryPanel(
+                controller: controller,
+                context: dictionaryContext(word: 'Kádésh,'),
+                onPreviewReference: (_) async {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final field = find.byKey(const ValueKey('dictionary-resource-choice'));
+        final module = controller.selectedModule!;
+        final name = '${module.name} (${module.language})';
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: field, matching: find.text(name)),
+        );
+        // Widget existence alone misses a dense dropdown's internal text clip.
+        // Compare its allocated height to the complete, naturally wrapped text.
+        final text = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout(maxWidth: paragraph.size.width);
+        addTearDown(text.dispose);
+        expect(paragraph.size.height, greaterThanOrEqualTo(text.height - 0.01));
+        if (scale == 2) {
+          expect(text.computeLineMetrics().length, greaterThan(1));
+        }
+        final fieldBounds = tester.getRect(field);
+        final origin = paragraph.localToGlobal(Offset.zero);
+        // Selection boxes for trailing wrap spaces may extend beyond a line;
+        // check the actual visible glyphs rather than those invisible spaces.
+        final boxes = [
+          for (var offset = 0; offset < name.length; offset++)
+            if (name[offset].trim().isNotEmpty)
+              ...paragraph.getBoxesForSelection(
+                TextSelection(baseOffset: offset, extentOffset: offset + 1),
+              ),
+        ];
+        expect(boxes, isNotEmpty);
+        for (final box in boxes) {
+          final bounds = box.toRect().shift(origin);
+          expect(
+            fieldBounds.contains(bounds.topLeft),
+            isTrue,
+            reason: '$bounds should be within $fieldBounds',
+          );
+          expect(
+            fieldBounds.contains(bounds.bottomRight),
+            isTrue,
+            reason: '$bounds should be within $fieldBounds',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'word lookup shows every definition and actionable lexical chips',
     (tester) async {

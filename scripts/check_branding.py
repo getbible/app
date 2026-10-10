@@ -38,6 +38,10 @@ def text_violations(path: str, value: str) -> list[str]:
             line = line.replace(f"applinks:{OLD_READER_HOST}", "applinks:reader.example")
         if RETIRED_NAME.search(line):
             errors.append(f"{path}:{line_number}: retired product name")
+        if path.endswith(".md") and re.search(
+            r"\b(?:GetBible|Get Bible|get Bible|GETBIBLE)\b", line
+        ):
+            errors.append(f"{path}:{line_number}: product name must be getBible")
     return errors
 
 

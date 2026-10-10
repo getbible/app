@@ -29,6 +29,16 @@ class BrandingTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(branding.text_violations("example", value), [])
 
+    def test_documentation_keeps_exact_product_spelling(self):
+        for value in ("GetBible", "Get Bible", "get Bible", "GETBIBLE"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    len(branding.text_violations("docs/BRANDING.md", value)), 1
+                )
+        self.assertEqual(branding.text_violations(
+            "README.md", "getBible uses getbible packages and GETBIBLE_ENV."
+        ), [])
+
 
 if __name__ == "__main__":
     unittest.main()

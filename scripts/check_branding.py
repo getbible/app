@@ -23,6 +23,7 @@ RETIRED_NAME = re.compile(
     r"getBible\.(?:[Ll]ife|live)|getbible[_.-](?:live|life)(?![a-z])"
     r"|getbible[L]ife|GETBIBLE\.(?:LIVE|LIFE)"
 )
+DISPLAY_NAME_VARIANT = re.compile(r"\b(?:GetBible|Get Bible|get Bible|GETBIBLE)\b")
 
 
 def text_violations(path: str, value: str) -> list[str]:
@@ -38,10 +39,17 @@ def text_violations(path: str, value: str) -> list[str]:
             line = line.replace(f"applinks:{OLD_READER_HOST}", "applinks:reader.example")
         if RETIRED_NAME.search(line):
             errors.append(f"{path}:{line_number}: retired product name")
-        if path.endswith(".md") and re.search(
-            r"\b(?:GetBible|Get Bible|get Bible|GETBIBLE)\b", line
-        ):
+        if path.endswith(".md") and DISPLAY_NAME_VARIANT.search(line):
             errors.append(f"{path}:{line_number}: product name must be getBible")
+        # Public error/status strings are visible branding too. Class names
+        # remain ordinary Dart identifiers; translated catalogues have their
+        # own generation and runtime brand-normalization contract.
+        if path.startswith("lib/") and path.endswith(".dart") and not path.endswith(
+            ("web_ui_catalog.dart", "native_ui_catalog.dart")
+        ):
+            literals = re.finditer(r'''(['"])((?:\\.|(?!\1).)*)\1''', line)
+            if any(DISPLAY_NAME_VARIANT.search(item.group(2)) for item in literals):
+                errors.append(f"{path}:{line_number}: display text must use getBible")
     return errors
 
 

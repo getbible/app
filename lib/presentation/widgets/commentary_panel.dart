@@ -18,14 +18,12 @@ final class CommentaryPanel extends StatefulWidget {
     required this.controller,
     required this.context,
     required this.onPreviewReference,
-    this.onSetUpOffline,
     super.key,
   });
 
   final CommentaryController controller;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
-  final VoidCallback? onSetUpOffline;
 
   @override
   State<CommentaryPanel> createState() => _CommentaryPanelState();
@@ -81,7 +79,6 @@ final class _CommentaryPanelState extends State<CommentaryPanel> {
               installed: controller.selectedModule == null
                   ? null
                   : controller.isInstalled,
-              onSetUpOffline: widget.onSetUpOffline,
             ),
             Text(
               widget.context.label,

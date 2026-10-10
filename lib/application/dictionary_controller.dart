@@ -20,6 +20,7 @@ final class DictionaryController extends ChangeNotifier {
     required this.repository,
     required this.preferences,
     this.historyLimit = 8,
+    this.captureResourceUse,
   }) {
     if (historyLimit < 1 || historyLimit > 32) {
       throw ArgumentError.value(historyLimit, 'historyLimit');
@@ -28,6 +29,12 @@ final class DictionaryController extends ChangeNotifier {
   final DictionaryRepository repository;
   final StudyPreferencesRepository preferences;
   final int historyLimit;
+
+  /// Captures a success callback when a reader action begins. Composition can
+  /// invalidate earlier actions when downloads are cleared, without coupling
+  /// dictionary navigation to the download coordinator.
+  final ValueChanged<String> Function()? captureResourceUse;
+  ValueChanged<String>? _resourceOpened;
   final RequestOwner _owner = RequestOwner();
   final RequestOwner _discoveryOwner = RequestOwner();
   late final DictionaryDiscovery _discovery = DictionaryDiscovery(repository);
@@ -130,6 +137,7 @@ final class DictionaryController extends ChangeNotifier {
 
   Future<void> open(StudyContext context) async {
     if (_disposed) return;
+    _resourceOpened = captureResourceUse?.call();
     _active = true;
     _lookupHistory.clear();
     _definitions = const [];
@@ -382,6 +390,7 @@ final class DictionaryController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    _resourceOpened = captureResourceUse?.call();
     final previousChoice =
         preferredModule ??
         (preserveChoice ? (_manualModule ?? _selected?.id) : null);
@@ -421,7 +430,7 @@ final class DictionaryController extends ChangeNotifier {
         final selected = await _preferredForBrowsing(request);
         if (!_owner.owns(request)) return;
         if (selected != null) {
-          await selectModule(selected.id);
+          await _selectModule(selected.id, captureUse: false);
         } else {
           notifyListeners();
         }
@@ -487,12 +496,17 @@ final class DictionaryController extends ChangeNotifier {
               strongs.any((String id) => id.startsWith(module.strongPrefix!));
   }
 
-  Future<void> selectModule(String id) async {
+  Future<void> selectModule(String id) => _selectModule(id);
+
+  Future<void> _selectModule(String id, {bool captureUse = true}) async {
     final DictionaryModule? module = modules
         .where((DictionaryModule item) => item.id == id)
         .firstOrNull;
     if (module == null || _context == null || !_active || _disposed) return;
     if (!_browsing && _confirmed(id) == null) return;
+    // An internal continuation keeps the initiating action's callback, so a
+    // delayed preference read cannot undo a later Clear downloads operation.
+    if (captureUse) _resourceOpened = captureResourceUse?.call();
     _manualModule = id;
     final RequestCancellation request = _owner.begin();
     _loading = true;
@@ -537,6 +551,18 @@ final class DictionaryController extends ChangeNotifier {
   }
 
   Future<void> _loadModule(
+    DictionaryModule module,
+    RequestCancellation request,
+  ) async {
+    try {
+      await _loadModuleGeneration(module, request);
+    } on InstalledStudyGenerationChanged {
+      request.throwIfCancelled();
+      await _loadModuleGeneration(module, request);
+    }
+  }
+
+  Future<void> _loadModuleGeneration(
     DictionaryModule module,
     RequestCancellation request,
   ) async {
@@ -613,6 +639,7 @@ final class DictionaryController extends ChangeNotifier {
       if (_owner.owns(request)) _requestedEntry = null;
       rethrow;
     }
+    if (_owner.owns(request)) _resourceOpened?.call(module.id);
   }
 
   /// Index filtering is local and never a server definition-text search.
@@ -647,6 +674,7 @@ final class DictionaryController extends ChangeNotifier {
     final DictionaryIndex? index = _index;
     final DictionaryModule? module = _selected;
     if (index == null || module == null) return;
+    final resourceOpened = captureResourceUse?.call();
     if (index.entryById(id) == null) {
       _owner.cancel();
       _loading = false;
@@ -678,11 +706,12 @@ final class DictionaryController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final DictionaryEntry result = await repository.entry(
-        module.id,
-        id,
-        cancellation: request,
-      );
+      DictionaryEntry result;
+      try {
+        result = await repository.entry(module.id, id, cancellation: request);
+      } on InstalledStudyGenerationChanged {
+        result = await _reloadEntryGeneration(module, id, request);
+      }
       if (!_owner.owns(request)) return;
       if (current != null && current.id != id) {
         _history.add(current);
@@ -690,6 +719,7 @@ final class DictionaryController extends ChangeNotifier {
       }
       _entry = result;
       _definitions = [result];
+      resourceOpened?.call(module.id);
     } catch (error) {
       if (_owner.owns(request)) _error = error;
     } finally {
@@ -698,6 +728,47 @@ final class DictionaryController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  /// Keep the current definition visible until one complete replacement read
+  /// succeeds. A second concurrent activation propagates an honest retry state;
+  /// it never loops or substitutes another entry for a removed identifier.
+  Future<DictionaryEntry> _reloadEntryGeneration(
+    DictionaryModule module,
+    String id,
+    RequestCancellation request,
+  ) async {
+    final metadata = await repository.metadata(
+      module.id,
+      cancellation: request,
+    );
+    request.throwIfCancelled();
+    final index = await repository.index(module.id, cancellation: request);
+    request.throwIfCancelled();
+    if (metadata.language != index.language ||
+        metadata.entryCount != index.entries.length ||
+        metadata.uniqueKeyCount != index.uniqueKeyCount) {
+      throw const ApiFormatException(
+        'The dictionary index and metadata are inconsistent. Please retry.',
+      );
+    }
+    if (index.entryById(id) == null) {
+      throw const ReferenceLookupException(
+        'This linked word is not in the dictionary index.',
+      );
+    }
+    final entry = await repository.entry(module.id, id, cancellation: request);
+    request.throwIfCancelled();
+    if (_owner.owns(request)) {
+      _metadata = metadata;
+      _index = index;
+      _matches = _matches
+          .map((match) => index.entryById(match.id))
+          .nonNulls
+          .toList();
+      _discovery.clearIndexes();
+    }
+    return entry;
   }
 
   void goBack() {

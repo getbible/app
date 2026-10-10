@@ -321,7 +321,7 @@ T _parse<T>(T Function() parser) {
     return parser();
   } on FormatException catch (error) {
     throw ApiFormatException(
-      'The GetBible service returned an invalid resource.',
+      'The getBible service returned an invalid resource.',
       error,
     );
   }

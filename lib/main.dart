@@ -159,6 +159,9 @@ class _GetBibleAppState extends State<GetBibleApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+    if (lifecycle == AppLifecycleState.resumed) {
+      unawaited(_navigation.state.offline.checkForUpdates());
+    }
     if (lifecycle == AppLifecycleState.inactive ||
         lifecycle == AppLifecycleState.paused) {
       unawaited(_flushOnSuspend());

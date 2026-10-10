@@ -11,6 +11,7 @@ final class ReaderApiFixture {
     this.lastVerse = 3,
     this.firstVerseText = ' First verse. ',
     this.resourceResponse,
+    this.beforeResponse,
   }) {
     api = GetBibleApiClient(client: MockClient(_respond));
   }
@@ -19,6 +20,7 @@ final class ReaderApiFixture {
   final int lastVerse;
   final String firstVerseText;
   final Future<http.Response?> Function(http.Request)? resourceResponse;
+  final Future<http.Response?> Function(http.Request)? beforeResponse;
   Completer<void>? delayedIndex;
   final Completer<void> indexStarted = Completer<void>();
   final List<String> paths = <String>[];
@@ -27,6 +29,8 @@ final class ReaderApiFixture {
   Future<http.Response> _respond(http.Request request) async {
     final String path = request.url.path;
     paths.add(path);
+    final override = await beforeResponse?.call(request);
+    if (override != null) return override;
     if (request.url.host != 'api.getbible.net' &&
         request.url.host != 'query.getbible.net') {
       final http.Response? resource = await resourceResponse?.call(request);

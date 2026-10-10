@@ -9,6 +9,83 @@ import 'package:getbible/presentation/widgets/search_panel.dart';
 
 void main() {
   testWidgets(
+    'a complete installed Bible is the default while explicit online remains selected',
+    (tester) async {
+      final online = _SearchRecorder();
+      final installed = _SearchRecorder();
+      final controller = OnlineSearchController(
+        repository: online,
+        installedRepository: installed,
+        isTranslationInstalled: (translation) => translation == 'fx',
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchPanel(
+              controller: controller,
+              translation: 'fx',
+              books: const [],
+              onOpen: (_) async {},
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Installed Bible (offline)'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('online-search-query')),
+        'faith',
+      );
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(online.requests, isEmpty);
+      expect(
+        installed.requests.single.criteria.diacritics,
+        SearchDiacritics.exact,
+      );
+      await tester.tap(find.text('Installed Bible (offline)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Online search').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('online-search-query')),
+        'hope',
+      );
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(online.requests.last.text, 'hope');
+      expect(installed.requests, hasLength(1));
+      expect(controller.mode, SearchExecutionMode.online);
+    },
+  );
+
+  test(
+    'controller chooses the installed source only for an available Bible',
+    () async {
+      final online = _SearchRecorder();
+      final installed = _SearchRecorder();
+      final controller = OnlineSearchController(
+        repository: online,
+        installedRepository: installed,
+        isTranslationInstalled: (translation) => translation == 'fx',
+      );
+      addTearDown(controller.dispose);
+      await controller.search('fx', 'faith');
+      expect(controller.mode, SearchExecutionMode.installed);
+      expect(
+        installed.requests.single.criteria.diacritics,
+        SearchDiacritics.exact,
+      );
+      await controller.search('other', 'hope');
+      expect(controller.mode, SearchExecutionMode.online);
+      expect(online.requests.single.translation, 'other');
+      await controller.search('fx', 'love', mode: SearchExecutionMode.online);
+      expect(online.requests.last.text, 'love');
+      expect(installed.requests, hasLength(1));
+    },
+  );
+
+  testWidgets(
     'installed source is explicit and submits supported local criteria without online search',
     (tester) async {
       final online = _SearchRecorder();

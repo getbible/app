@@ -6,8 +6,8 @@ import '../../application/offline_controller.dart';
 import '../../core/ui_strings.dart';
 import '../../domain/models/offline_resource.dart';
 
-/// A native, scrollable resource manager. Opening it only reads durable local
-/// state; fetching a catalogue and installing a resource are separate actions.
+/// Central controls for automatic public downloads and optional bookmark data.
+/// Private notes and bookmarks are never removed by this manager.
 class OfflineSetupPanel extends StatefulWidget {
   const OfflineSetupPanel({super.key, required this.controller, this.onClose});
   final OfflineController controller;
@@ -29,7 +29,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
   @override
   void initState() {
     super.initState();
-    unawaited(widget.controller.initialize());
+    unawaited(widget.controller.refreshInstalled());
   }
 
   @override
@@ -59,7 +59,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ListTile(
-                title: Text(UiStrings.of(context).text('Offline resources')),
+                title: Text(UiStrings.of(context).text('Downloads & storage')),
                 trailing: widget.onClose == null
                     ? null
                     : IconButton(
@@ -76,9 +76,45 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                   children: [
                     Text(
                       UiStrings.of(context).text(
-                        'Install public Bibles and Study resources for use without a connection. Downloads start only when you choose Install. Notes and notebooks remain separate.',
+                        'Bibles download in full when you open them. Dictionaries and commentaries download automatically unless you turn off Keep offline. The complete bookmark dataset downloads only when you choose Install.',
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Text(
+                      UiStrings.of(context).text(
+                        'While the app is open, saved resources are checked for updates every 30 days. Changed content replaces the previous copy only after verification.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: controller.checking
+                              ? null
+                              : () => controller.checkForUpdates(force: true),
+                          icon: const Icon(Icons.refresh),
+                          label: Text(
+                            UiStrings.of(context).text('Check for updates'),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _clearDownloads,
+                          icon: const Icon(Icons.delete_outline),
+                          label: Text(
+                            UiStrings.of(context).text('Clear downloads'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (controller.queuedCount > 0)
+                      Text(
+                        UiStrings.of(context).text(
+                          '{count} downloads waiting',
+                          {'count': '${controller.queuedCount}'},
+                        ),
+                      ),
                     const SizedBox(height: 12),
                     Text(
                       UiStrings.of(context).text(
@@ -94,7 +130,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                       Semantics(
                         liveRegion: true,
                         child: Text(
-                          controller.error!,
+                          UiStrings.of(context).text(controller.error!),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.error,
                           ),
@@ -137,7 +173,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text(
                           UiStrings.of(context).text(
-                            'No complete resources installed yet. Previously opened online chapters may still be cached.',
+                            'No complete resources saved yet. Automatic downloads will continue when a connection is available.',
                           ),
                         ),
                       ),
@@ -203,11 +239,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                               : controller.discover,
                           icon: const Icon(Icons.refresh),
                           label: Text(
-                            controller.catalog.isEmpty
-                                ? UiStrings.of(context).text('Browse catalogue')
-                                : UiStrings.of(
-                                    context,
-                                  ).text('Check for updates'),
+                            UiStrings.of(context).text('Browse catalogue'),
                           ),
                         ),
                       ],
@@ -312,7 +344,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
             style: Theme.of(context).textTheme.titleSmall,
           ),
           Text(
-            '${_kindLabel(context, installed.resource.kind)} · ${_size(installed.byteCount)} · ${_hasUpdate(installed.resource) ? UiStrings.of(context).text('Update available') : UiStrings.of(context).text('Installed')}',
+            '${_kindLabel(context, installed.resource.kind)} · ${_size(installed.byteCount)} · ${UiStrings.of(context).text('Available offline')}',
           ),
           Text(
             UiStrings.of(context).text('Verified source revision: {revision}', {
@@ -323,6 +355,8 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
           ),
           if (installed.resource.attribution.isNotEmpty)
             Text(installed.resource.attribution),
+          if (_automaticKind(installed.resource.kind))
+            _automaticChoice(installed.resource),
           Wrap(
             spacing: 8,
             children: [
@@ -334,9 +368,7 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
                 label: Text(UiStrings.of(context).text('Update / verify')),
               ),
               TextButton.icon(
-                onPressed: widget.controller.installing
-                    ? null
-                    : () => _remove(installed),
+                onPressed: () => _remove(installed),
                 icon: const Icon(Icons.delete_outline),
                 label: Text(UiStrings.of(context).text('Remove download')),
               ),
@@ -346,11 +378,6 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
       ),
     ),
   );
-
-  bool _hasUpdate(OfflineResourceDescriptor existing) {
-    final latest = _latest(existing);
-    return latest.revision.isNotEmpty && latest.revision != existing.revision;
-  }
 
   OfflineResourceDescriptor _latest(OfflineResourceDescriptor existing) {
     for (final item in widget.controller.catalog) {
@@ -378,21 +405,86 @@ class _OfflineSetupPanelState extends State<OfflineSetupPanel> {
               resource.sourceUri.toString(),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            TextButton.icon(
-              onPressed: widget.controller.installing
-                  ? null
-                  : () => _install(resource),
-              icon: Icon(installed ? Icons.system_update_alt : Icons.download),
-              label: Text(
-                installed
-                    ? UiStrings.of(context).text('Update / verify')
-                    : UiStrings.of(context).text('Install'),
+            if (_automaticKind(resource.kind))
+              _automaticChoice(resource)
+            else
+              TextButton.icon(
+                onPressed: widget.controller.installing
+                    ? null
+                    : () => _install(resource),
+                icon: Icon(
+                  installed ? Icons.system_update_alt : Icons.download,
+                ),
+                label: Text(
+                  installed
+                      ? UiStrings.of(context).text('Update / verify')
+                      : UiStrings.of(context).text('Install'),
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  bool _automaticKind(OfflineResourceKind kind) =>
+      kind == OfflineResourceKind.dictionary ||
+      kind == OfflineResourceKind.commentary;
+
+  Widget _automaticChoice(OfflineResourceDescriptor resource) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        controlAffinity: ListTileControlAffinity.leading,
+        title: Text(UiStrings.of(context).text('Keep offline')),
+        subtitle: Text(
+          UiStrings.of(context).text(
+            'Turning this off removes the downloaded copy and stops automatic downloads for this resource.',
+          ),
+        ),
+        value: !widget.controller.excludedKeys.contains(resource.key),
+        onChanged: (enabled) {
+          if (enabled != null) {
+            unawaited(
+              widget.controller.setAutomaticDownload(resource, enabled),
+            );
+          }
+        },
+      ),
+      if (widget.controller.failures[resource.key] case final failure?)
+        Text(
+          UiStrings.of(context).text(failure),
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+    ],
+  );
+
+  Future<void> _clearDownloads() async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(UiStrings.of(context).text('Clear downloads?')),
+        content: SingleChildScrollView(
+          child: Text(
+            UiStrings.of(context).text(
+              'This removes public downloads and cached content. Your notes, notebooks, bookmarks and download choices remain. Bibles download again when opened; enabled dictionaries and commentaries return on next use or startup. The complete bookmark dataset stays removed until you choose to install it again.',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(UiStrings.of(context).text('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(UiStrings.of(context).text('Clear downloads')),
+          ),
+        ],
+      ),
+    );
+    if (accepted == true && mounted) await widget.controller.clearDownloads();
   }
 
   Future<void> _install(OfflineResourceDescriptor resource) async {

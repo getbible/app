@@ -14,7 +14,7 @@ base class NetworkException extends AppException {
 
 final class RequestTimeoutException extends NetworkException {
   const RequestTimeoutException([Object? cause])
-    : super('The GetBible request timed out.', cause);
+    : super('The getBible request timed out.', cause);
 }
 
 /// The bounded public fields of an RFC 9457 problem response. HTML/static-host
@@ -49,7 +49,7 @@ final class ResourceUnavailableException extends HttpStatusException {
         message:
             problem?.detail ??
             problem?.title ??
-            'The requested GetBible resource is unavailable.',
+            'The requested getBible resource is unavailable.',
       );
 }
 
@@ -61,7 +61,7 @@ final class RateLimitException extends HttpStatusException {
         message:
             problem?.detail ??
             problem?.title ??
-            'GetBible is receiving too many requests. Please retry later.',
+            'getBible is receiving too many requests. Please retry later.',
       );
 }
 
@@ -74,7 +74,7 @@ final class InvalidApiRequestException extends HttpStatusException {
          message:
              problem?.detail ??
              problem?.title ??
-             'GetBible could not accept the requested input.',
+             'getBible could not accept the requested input.',
        );
 }
 
@@ -88,7 +88,7 @@ base class ApiFormatException extends AppException {
 
 final class ResponseTooLargeException extends ApiFormatException {
   const ResponseTooLargeException(this.limitBytes)
-    : super('The GetBible response exceeds the permitted size.');
+    : super('The getBible response exceeds the permitted size.');
 
   final int limitBytes;
 }

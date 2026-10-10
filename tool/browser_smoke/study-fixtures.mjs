@@ -5,16 +5,18 @@ const fixtureBytes = (path) => readFileSync(new URL(`../../test/fixtures/${path}
 const fixture = (path) => JSON.parse(fixtureBytes(path).toString('utf8'));
 
 /**
- * A complete small dictionary installation, sharing the native test corpus.
+ * Complete small dictionary and commentary installations from the native corpus.
  * Metadata sizes and SHA256 hashes describe the exact UTF-8 response bodies,
  * including the complete module's original whitespace. Merge these records
- * after apiFixtures() so its discovery-only dictionary catalogue is replaced.
+ * after apiFixtures() so discovery advertises only fully served resources.
  */
 export function studyInstallationFixtures() {
   const module = 'strongsgreek';
   const base = 'https://dictionaries.getbible.net/v1/';
   const bulk = fixtureBytes('offline_study_v1/dictionary.json');
   const catalogue = fixture('dictionaries_v1/dictionaries.json');
+  catalogue.dictionaries = catalogue.dictionaries.filter((item) => item.id === module);
+  catalogue.module_count = catalogue.dictionaries.length;
   const metadata = fixture(`dictionaries_v1/${module}/metadata.json`);
   metadata.bytes = bulk.length;
   const descriptor = catalogue.dictionaries.find((item) => item.id === module);
@@ -33,7 +35,30 @@ export function studyInstallationFixtures() {
       path, createHash('sha256').update(body, 'utf8').digest('hex'),
     ])),
   }));
-  return new Map([...documents].map(([path, body]) => [
+  const records = new Map([...documents].map(([path, body]) => [
     base + path, { body, contentType: 'application/json' },
   ]));
+  const commentary = fixture('commentary_v1.json');
+  const commentaryBulk = fixtureBytes('offline_study_v1/commentary.json');
+  commentary.metadata.bytes = commentaryBulk.length;
+  commentary.catalogue.commentaries[0].bytes = commentaryBulk.length;
+  const commentaryDocuments = new Map([
+    ['commentaries.json', JSON.stringify(commentary.catalogue)],
+    ['fixture/metadata.json', JSON.stringify(commentary.metadata)],
+    ['fixture/books.json', JSON.stringify(commentary.coverage)],
+    ['fixture.json', commentaryBulk.toString('utf8')],
+  ]);
+  commentaryDocuments.set('hashes.json', JSON.stringify({
+    schema: 'getbible-hashes-v1',
+    algorithm: 'sha256',
+    files: Object.fromEntries([...commentaryDocuments].map(([path, body]) => [
+      path, createHash('sha256').update(body, 'utf8').digest('hex'),
+    ])),
+  }));
+  for (const [path, body] of commentaryDocuments) {
+    records.set(`https://commentaries.getbible.net/v1/${path}`, {
+      body, contentType: 'application/json',
+    });
+  }
+  return records;
 }

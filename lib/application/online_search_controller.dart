@@ -15,18 +15,28 @@ final class SearchRevisionChangedException extends NetworkException {
       );
 }
 
-/// Owns one interactive search independently from reader navigation. Online is
-/// the default; installed execution requires an explicit source choice. Results
+/// Owns one interactive search independently from reader navigation. A complete
+/// installed Bible is preferred unless the reader chooses a source. Results
 /// preserve repository ordering; only duplicate verse identities are skipped.
 final class OnlineSearchController extends ChangeNotifier {
   OnlineSearchController({
     required this.repository,
     this.installedRepository,
+    this.isTranslationInstalled,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
   final SearchRepository repository;
   final SearchRepository? installedRepository;
+
+  /// A source-scoped local snapshot supplied by composition; no HTTP is needed
+  /// to choose a search source or to start editing the query.
+  final bool Function(String translation)? isTranslationInstalled;
+  SearchExecutionMode defaultModeFor(String translation) =>
+      installedRepository != null &&
+          (isTranslationInstalled?.call(translation) ?? false)
+      ? SearchExecutionMode.installed
+      : SearchExecutionMode.online;
   SearchExecutionMode _mode = SearchExecutionMode.online;
   SearchExecutionMode get mode => _mode;
   bool get supportsInstalledSearch => installedRepository != null;
@@ -78,12 +88,12 @@ final class OnlineSearchController extends ChangeNotifier {
     OnlineSearchCriteria? criteria,
     int pageSize = 25,
     String direction = 'LTR',
-    SearchExecutionMode mode = SearchExecutionMode.online,
+    SearchExecutionMode? mode,
   }) async {
     if (_disposed) return;
     // Even repeated effective inputs replace the previous interaction's token.
     clear();
-    _mode = mode;
+    _mode = mode ?? defaultModeFor(translation);
     try {
       _request = OnlineSearchRequest(
         translation: translation,
@@ -91,7 +101,7 @@ final class OnlineSearchController extends ChangeNotifier {
         criteria:
             criteria ??
             OnlineSearchCriteria(
-              diacritics: mode == SearchExecutionMode.installed
+              diacritics: _mode == SearchExecutionMode.installed
                   ? SearchDiacritics.exact
                   : SearchDiacritics.fold,
             ),

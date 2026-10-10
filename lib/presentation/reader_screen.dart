@@ -1181,13 +1181,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
           controller: state.study.dictionary,
           context: captured,
           onPreviewReference: _showReferencePreview,
-          onSetUpOffline: () => unawaited(_showOffline()),
         ),
         StudyTab.commentary => CommentaryPanel(
           controller: state.study.commentary,
           context: captured,
           onPreviewReference: _showReferencePreview,
-          onSetUpOffline: () => unawaited(_showOffline()),
         ),
         StudyTab.topics => TopicsPanel(
           controller: state.study.topics,
@@ -1212,7 +1210,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           context: captured,
           onPreviewReference: _showReferencePreview,
           onPrivateCopyCommitted: state.refreshAnnotations,
-          onSetUpOffline: () => unawaited(_showOffline()),
+          onManageDownloads: () => unawaited(_showOffline()),
         ),
         StudyTab.notes => NotesPanel(
           controller: state.study.notebooks,
@@ -2606,7 +2604,7 @@ class _ReaderDrawer extends StatelessWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.download_for_offline_outlined),
-            title: Text(UiStrings.of(context).text('Set up offline use')),
+            title: Text(UiStrings.of(context).text('Downloads & storage')),
             onTap: () {
               Navigator.of(context).pop();
               unawaited(onOffline());

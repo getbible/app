@@ -17,13 +17,11 @@ final class DictionaryPanel extends StatefulWidget {
     required this.controller,
     required this.context,
     required this.onPreviewReference,
-    this.onSetUpOffline,
     super.key,
   });
   final DictionaryController controller;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
-  final VoidCallback? onSetUpOffline;
 
   @override
   State<DictionaryPanel> createState() => _DictionaryPanelState();
@@ -442,10 +440,7 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
                           ],
                         ),
 
-                        StudyOfflineStatus(
-                          installed: state.isInstalled,
-                          onSetUpOffline: widget.onSetUpOffline,
-                        ),
+                        StudyOfflineStatus(installed: state.isInstalled),
                       ],
                     ),
                   ),

@@ -2,6 +2,19 @@ import '../../core/json.dart';
 
 enum OfflineResourceKind { bible, dictionary, commentary, bookmarks }
 
+/// A successful check applies only to the generation that was checked. This
+/// prevents stale work from making a replacement installation appear current.
+final class OfflineFreshness {
+  const OfflineFreshness({
+    this.checkedGeneration,
+    this.checkedAt,
+    this.lastAttemptAt,
+    this.retryAfter,
+  });
+  final String? checkedGeneration;
+  final DateTime? checkedAt, lastAttemptAt, retryAfter;
+}
+
 /// A public resource is scoped to its exact configured service root. Installed
 /// data from one host can never silently answer requests against another host.
 final class OfflineResourceDescriptor {

@@ -45,6 +45,19 @@ Iterable<Map<String, Object?>> indexStudySource(
       }
       selected[path] = hash;
     }
+    // Cache only module-level fingerprints needed by this discovery batch.
+    // An unrelated absent/malformed module cannot fail the requested resource.
+    final optional = (input['optionalPaths'] as List? ?? const [])
+        .cast<String>();
+    if (optional.length > 4001) {
+      throw const FormatException('Too many optional manifest paths.');
+    }
+    for (final path in optional) {
+      final hash = files[path];
+      if (hash is String && RegExp(r'^[a-f0-9]{64}$').hasMatch(hash)) {
+        selected[path] = hash;
+      }
+    }
     yield {'manifest': selected, 'digest': digest};
     return;
   }

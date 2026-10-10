@@ -70,6 +70,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Backup and restore": "native.backupAndRestore",
   "Baskerville": "native.baskerville",
   "Bible": "native.bible",
+  "Bibles download in full when you open them. Dictionaries and commentaries download automatically unless you turn off Keep offline. The complete bookmark dataset downloads only when you choose Install.":
+      "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
   "Block {position}": "native.blockPosition",
   "{blockCount} block(s)": "native.blockcountBlockS",
   "Book {book}": "native.bookBook",
@@ -107,6 +109,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.citationProvenanceApiVersification",
   "Citations were resolved by {api} ({versification}). Preview requests use {bible}; availability and versification may differ.":
       "native.citationsWereResolvedByApiVersificationPreviewRequestsUse",
+  "Clear downloads": "native.clearDownloads",
+  "Clear downloads?": "native.clearDownloadse81a1da9",
   "Close": "native.close",
   "Close marking groups": "native.closeMarkingGroups",
   "Close offline resources": "native.closeOfflineResources",
@@ -135,6 +139,7 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "{count} bookmarks": "native.countBookmarks",
   "{count} dictionaries could not be checked. Showing confirmed definitions.":
       "native.countDictionariesCouldNotBeCheckedShowingConfirmedDefinitions",
+  "{count} downloads waiting": "native.countDownloadsWaiting",
   "{count} indexed definition": "native.countIndexedDefinition",
   "{count} indexed definitions": "native.countIndexedDefinitions",
   "{count} of 83 available selections": "native.countOf83AvailableSelections",
@@ -220,8 +225,6 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Insert current Scripture": "native.insertCurrentScripture",
   "Insert Scripture": "native.insertScripture",
   "Install": "native.install",
-  "Install public Bibles and Study resources for use without a connection. Downloads start only when you choose Install. Notes and notebooks remain separate.":
-      "native.installPublicBiblesAndStudyResourcesForUseWithout",
   "Install {title}?": "native.installTitle",
   "Installed": "native.installed",
   "Installed Bible (offline)": "native.installedBibleOffline",
@@ -234,6 +237,7 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Invalid bookmark source scope.": "native.invalidBookmarkSourceScope",
   "Invalid recent bookmark topics.": "native.invalidRecentBookmarkTopics",
   "Invalid topic copy provenance.": "native.invalidTopicCopyProvenance",
+  "Keep offline": "native.keepOffline",
   "Keep your own backup of saved Scripture, verse notes, notebooks, drafts and preferences. Backups contain private text. Choose where you save them and who can access them.":
       "native.keepYourOwnBackupOfSavedScriptureVerseNotes",
   "{label} · {bytes} saved": "native.labelBytesSaved",
@@ -267,8 +271,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "New notebook": "native.newNotebook",
   "No commentary in this Bible’s language is selected. Choose an available resource explicitly; its source language will be shown.":
       "native.noCommentaryInThisBibleSLanguageIsSelected",
-  "No complete resources installed yet. Previously opened online chapters may still be cached.":
-      "native.noCompleteResourcesInstalledYetPreviouslyOpenedOnlineChapters",
+  "No complete resources saved yet. Automatic downloads will continue when a connection is available.":
+      "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
   "No dictionary resources are currently published.":
       "native.noDictionaryResourcesAreCurrentlyPublished",
   "No exact definition could be confirmed for this selection.":
@@ -280,17 +284,15 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "No matching resources.": "native.noMatchingResources",
   "No topics match these choices. A verse with no public associations is valid.":
       "native.noTopicsMatchTheseChoicesAVerseWithNo",
+  "Not yet available offline": "native.notYetAvailableOffline",
   "NOTE": "native.note",
   "Notebook title": "native.notebookTitle",
   "Notebooks": "native.notebooks",
   "Notes about this Scripture": "native.notesAboutThisScripture",
   "Offline cached Scripture — verification unavailable":
       "native.offlineCachedScriptureVerificationUnavailable",
-  "Offline resources": "native.offlineResources",
   "Offline search uses exact diacritics and Bible order. Folding, relevance, proximity and Deuterocanon scope require Online search. Choose individual books to include other offline scopes. Install the selected Bible in Offline resources first.":
       "native.offlineSearchUsesExactDiacriticsAndBibleOrderFolding",
-  "Online resource · not installed on this device":
-      "native.onlineResourceNotInstalledOnThisDevice",
   "Online search": "native.onlineSearch",
   "Open in reader": "native.openInReader",
   "Open {reference}": "native.openReference",
@@ -392,7 +394,6 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Searching installed dictionaries.": "native.searchingInstalledDictionaries",
   "Searching Scripture": "native.searchingScripture",
   "See also": "native.seeAlso",
-  "Set up offline use": "native.setUpOfflineUse",
   "Share": "native.share",
   "Share cancelled.": "native.shareCancelled",
   "Share completed.": "native.shareCompleted",
@@ -482,6 +483,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.theNotebookCouldNotBeSavedOrLoadedYour",
   "The notebook exceeds its document limits or contains duplicate block identities.":
       "native.theNotebookExceedsItsDocumentLimitsOrContainsDuplicate",
+  "The offline preparation queue is full. Retry after current downloads finish.":
+      "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
   "The operation could not be completed. Please try another option.":
       "native.theOperationCouldNotBeCompletedPleaseTryAnother",
   "The passage could not be opened. Your notebook draft is retained. {error}":
@@ -545,6 +548,10 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.thisReferenceOrTranslationIsUnavailable",
   "This removes only the installed public resource and its search index. Your notes, notebooks, copied markings and preferences are preserved.":
       "native.thisRemovesOnlyTheInstalledPublicResourceAndIts",
+  "This removes public downloads and cached content. Your notes, notebooks, bookmarks and download choices remain. Bibles download again when opened; enabled dictionaries and commentaries return on next use or startup. The complete bookmark dataset stays removed until you choose to install it again.":
+      "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+  "This resource belongs to another source.":
+      "native.thisResourceBelongsToAnotherSource",
   "This resource has no published commentary for {reference}.":
       "native.thisResourceHasNoPublishedCommentaryForReference",
   "This resource is in {sourceLanguage}; your Bible is in {bibleLanguage}.":
@@ -566,6 +573,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Topics": "native.topics",
   "Translation source": "native.translationSource",
   "Transliteration": "native.transliteration",
+  "Turning this off removes the downloaded copy and stops automatic downloads for this resource.":
+      "native.turningThisOffRemovesTheDownloadedCopyAndStops",
   "Unable to load this reference. Check your connection and try again.":
       "native.unableToLoadThisReferenceCheckYourConnectionAnd",
   "Unfollow": "native.unfollow",
@@ -573,7 +582,6 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "{unsavedCount} other notebook draft(s) need saving.":
       "native.unsavedcountOtherNotebookDraftSNeedSaving",
   "Unsupported reader preferences.": "native.unsupportedReaderPreferences",
-  "Update available": "native.updateAvailable",
   "Update / verify": "native.updateVerify",
   "Use Complete private backup to save notebooks and retained drafts. Website-compatible backups contain verse notes and markings only.":
       "native.useCompletePrivateBackupToSaveNotebooksAndRetained",
@@ -602,6 +610,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Website backups include saved groups, markings, verse notes and reader preferences. They do not include notebooks, drafts or additional private settings. Downloaded study and Bible resources are not included in either format.":
       "native.websiteBackupsIncludeSavedGroupsMarkingsVerseNotesAnd",
   "Website-compatible backup": "native.websiteCompatibleBackup",
+  "While the app is open, saved resources are checked for updates every 30 days. Changed content replaces the previous copy only after verification.":
+      "native.whileTheAppIsOpenSavedResourcesAreChecked",
   "Whole chapter": "native.wholeChapter",
   "Word mode": "native.wordMode",
   "Words, a phrase or a Scripture reference":

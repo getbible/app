@@ -66,6 +66,7 @@
     "native.backupAndRestore": "Backup and restore",
     "native.baskerville": "Baskerville",
     "native.bible": "Bible",
+    "native.biblesDownloadInFullWhenYouOpenThemDictionaries": "Bibles download in full when you open them. Dictionaries and commentaries download automatically unless you turn off Keep offline. The complete bookmark dataset downloads only when you choose Install.",
     "native.blockPosition": "Block {position}",
     "native.blockcountBlockS": "{blockCount} block(s)",
     "native.bookBook": "Book {book}",
@@ -98,6 +99,8 @@
     "native.chooseMarkingForReference": "Choose marking for {reference}",
     "native.citationProvenanceApiVersification": "Citation provenance: {api} · {versification}",
     "native.citationsWereResolvedByApiVersificationPreviewRequestsUse": "Citations were resolved by {api} ({versification}). Preview requests use {bible}; availability and versification may differ.",
+    "native.clearDownloads": "Clear downloads",
+    "native.clearDownloadse81a1da9": "Clear downloads?",
     "native.close": "Close",
     "native.closeMarkingGroups": "Close marking groups",
     "native.closeOfflineResources": "Close offline resources",
@@ -121,6 +124,7 @@
     "native.couldNotUpdateBookmarksError": "Could not update bookmarks. {error}",
     "native.countBookmarks": "{count} bookmarks",
     "native.countDictionariesCouldNotBeCheckedShowingConfirmedDefinitions": "{count} dictionaries could not be checked. Showing confirmed definitions.",
+    "native.countDownloadsWaiting": "{count} downloads waiting",
     "native.countIndexedDefinition": "{count} indexed definition",
     "native.countIndexedDefinitions": "{count} indexed definitions",
     "native.countOf83AvailableSelections": "{count} of 83 available selections",
@@ -189,7 +193,6 @@
     "native.insertCurrentScripture": "Insert current Scripture",
     "native.insertScripture": "Insert Scripture",
     "native.install": "Install",
-    "native.installPublicBiblesAndStudyResourcesForUseWithout": "Install public Bibles and Study resources for use without a connection. Downloads start only when you choose Install. Notes and notebooks remain separate.",
     "native.installTitle": "Install {title}?",
     "native.installed": "Installed",
     "native.installedBibleOffline": "Installed Bible (offline)",
@@ -200,6 +203,7 @@
     "native.invalidBookmarkSourceScope": "Invalid bookmark source scope.",
     "native.invalidRecentBookmarkTopics": "Invalid recent bookmark topics.",
     "native.invalidTopicCopyProvenance": "Invalid topic copy provenance.",
+    "native.keepOffline": "Keep offline",
     "native.keepYourOwnBackupOfSavedScriptureVerseNotes": "Keep your own backup of saved Scripture, verse notes, notebooks, drafts and preferences. Backups contain private text. Choose where you save them and who can access them.",
     "native.labelBytesSaved": "{label} · {bytes} saved",
     "native.lemma": "Lemma",
@@ -228,21 +232,20 @@
     "native.myMarkings": "My markings",
     "native.newNotebook": "New notebook",
     "native.noCommentaryInThisBibleSLanguageIsSelected": "No commentary in this Bible’s language is selected. Choose an available resource explicitly; its source language will be shown.",
-    "native.noCompleteResourcesInstalledYetPreviouslyOpenedOnlineChapters": "No complete resources installed yet. Previously opened online chapters may still be cached.",
+    "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue": "No complete resources saved yet. Automatic downloads will continue when a connection is available.",
     "native.noDictionaryResourcesAreCurrentlyPublished": "No dictionary resources are currently published.",
     "native.noExactDefinitionCouldBeConfirmedForThisSelection": "No exact definition could be confirmed for this selection.",
     "native.noExactDefinitionCouldBeConfirmedInTheInstalled": "No exact definition could be confirmed in the installed dictionaries.",
     "native.noMarkingGroupsMatchThisSearch": "No marking groups match this search.",
     "native.noMatchingResources": "No matching resources.",
     "native.noTopicsMatchTheseChoicesAVerseWithNo": "No topics match these choices. A verse with no public associations is valid.",
+    "native.notYetAvailableOffline": "Not yet available offline",
     "native.note": "NOTE",
     "native.notebookTitle": "Notebook title",
     "native.notebooks": "Notebooks",
     "native.notesAboutThisScripture": "Notes about this Scripture",
     "native.offlineCachedScriptureVerificationUnavailable": "Offline cached Scripture — verification unavailable",
-    "native.offlineResources": "Offline resources",
     "native.offlineSearchUsesExactDiacriticsAndBibleOrderFolding": "Offline search uses exact diacritics and Bible order. Folding, relevance, proximity and Deuterocanon scope require Online search. Choose individual books to include other offline scopes. Install the selected Bible in Offline resources first.",
-    "native.onlineResourceNotInstalledOnThisDevice": "Online resource · not installed on this device",
     "native.onlineSearch": "Online search",
     "native.openInReader": "Open in reader",
     "native.openReference": "Open {reference}",
@@ -326,7 +329,6 @@
     "native.searchingInstalledDictionaries": "Searching installed dictionaries.",
     "native.searchingScripture": "Searching Scripture",
     "native.seeAlso": "See also",
-    "native.setUpOfflineUse": "Set up offline use",
     "native.share": "Share",
     "native.shareCancelled": "Share cancelled.",
     "native.shareCompleted": "Share completed.",
@@ -382,6 +384,7 @@
     "native.theNotebookCouldNotBeExportedYourPrivateDraft": "The notebook could not be exported. Your private draft remains available.",
     "native.theNotebookCouldNotBeSavedOrLoadedYour": "The notebook could not be saved or loaded. Your open draft is retained. {error}",
     "native.theNotebookExceedsItsDocumentLimitsOrContainsDuplicate": "The notebook exceeds its document limits or contains duplicate block identities.",
+    "native.theOfflinePreparationQueueIsFullRetryAfterCurrent": "The offline preparation queue is full. Retry after current downloads finish.",
     "native.theOperationCouldNotBeCompletedPleaseTryAnother": "The operation could not be completed. Please try another option.",
     "native.thePassageCouldNotBeOpenedYourNotebookDraft": "The passage could not be opened. Your notebook draft is retained. {error}",
     "native.thePrivateDataOperationFailedYourSavedDataRemains": "The private data operation failed. Your saved data remains available. Please retry.",
@@ -414,6 +417,8 @@
     "native.thisPublishedChapterContainsNoCommentaryEntries": "This published chapter contains no commentary entries.",
     "native.thisReferenceOrTranslationIsUnavailable": "This reference or translation is unavailable.",
     "native.thisRemovesOnlyTheInstalledPublicResourceAndIts": "This removes only the installed public resource and its search index. Your notes, notebooks, copied markings and preferences are preserved.",
+    "native.thisRemovesPublicDownloadsAndCachedContentYourNotes": "This removes public downloads and cached content. Your notes, notebooks, bookmarks and download choices remain. Bibles download again when opened; enabled dictionaries and commentaries return on next use or startup. The complete bookmark dataset stays removed until you choose to install it again.",
+    "native.thisResourceBelongsToAnotherSource": "This resource belongs to another source.",
     "native.thisResourceHasNoPublishedCommentaryForReference": "This resource has no published commentary for {reference}.",
     "native.thisResourceIsInSourceLanguageYourBibleIsIn": "This resource is in {sourceLanguage}; your Bible is in {bibleLanguage}.",
     "native.thisSearchResultIsUnavailableInTheSelectedBible": "This search result is unavailable in the selected Bible.",
@@ -429,12 +434,12 @@
     "native.topics": "Topics",
     "native.translationSource": "Translation source",
     "native.transliteration": "Transliteration",
+    "native.turningThisOffRemovesTheDownloadedCopyAndStops": "Turning this off removes the downloaded copy and stops automatic downloads for this resource.",
     "native.unableToLoadThisReferenceCheckYourConnectionAnd": "Unable to load this reference. Check your connection and try again.",
     "native.unfollow": "Unfollow",
     "native.unlocatedSourceWord": "Unlocated source word",
     "native.unsavedcountOtherNotebookDraftSNeedSaving": "{unsavedCount} other notebook draft(s) need saving.",
     "native.unsupportedReaderPreferences": "Unsupported reader preferences.",
-    "native.updateAvailable": "Update available",
     "native.updateVerify": "Update / verify",
     "native.useCompletePrivateBackupToSaveNotebooksAndRetained": "Use Complete private backup to save notebooks and retained drafts. Website-compatible backups contain verse notes and markings only.",
     "native.usedbytesOfQuotaBytesOfflineContentBudgetUsedDeviceOr": "{usedBytes} of {quotaBytes} offline content budget used. Device or browser storage may have a lower limit.",
@@ -456,6 +461,7 @@
     "native.websiteBackupPreview": "Website backup preview",
     "native.websiteBackupsIncludeSavedGroupsMarkingsVerseNotesAnd": "Website backups include saved groups, markings, verse notes and reader preferences. They do not include notebooks, drafts or additional private settings. Downloaded study and Bible resources are not included in either format.",
     "native.websiteCompatibleBackup": "Website-compatible backup",
+    "native.whileTheAppIsOpenSavedResourcesAreChecked": "While the app is open, saved resources are checked for updates every 30 days. Changed content replaces the previous copy only after verification.",
     "native.wholeChapter": "Whole chapter",
     "native.wordMode": "Word mode",
     "native.wordsAPhraseOrAScriptureReference": "Words, a phrase or a Scripture reference",
@@ -465,15 +471,42 @@
   "locales": {
     "tsg": {
       "target": "fil",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "hbo": {
       "target": "he",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "da": {
       "target": "da",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "en": {
       "target": "en",
@@ -481,15 +514,42 @@
     },
     "de": {
       "target": "de",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "lt": {
       "target": "lt",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "af": {
       "target": "af",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "pon": {
       "target": "en",
@@ -497,11 +557,29 @@
     },
     "ru": {
       "target": "ru",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "nl": {
       "target": "nl",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "tpi": {
       "target": "en",
@@ -513,11 +591,29 @@
     },
     "pl": {
       "target": "pl",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "ppk": {
       "target": "id",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "pot": {
       "target": "en",
@@ -533,27 +629,81 @@
     },
     "ro": {
       "target": "ro",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "hy": {
       "target": "hy",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "pt": {
       "target": "pt",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "got": {
       "target": "de",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "es": {
       "target": "es",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "ar": {
       "target": "ar",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "chr": {
       "target": "en",
@@ -561,7 +711,16 @@
     },
     "tl": {
       "target": "fil",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "gv": {
       "target": "en",
@@ -569,55 +728,172 @@
     },
     "mlf": {
       "target": "ml",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "fi": {
       "target": "fi",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "hr": {
       "target": "hr",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "cs": {
       "target": "cs",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "rmq": {
       "target": "es",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "nn": {
       "target": "nb",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "my": {
       "target": "my",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "cop": {
       "target": "ar",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "prs": {
       "target": "prs",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "ja": {
       "target": "ja",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "lv": {
       "target": "lv",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "it": {
       "target": "it",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "syr": {
       "target": "ar",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "la": {
       "target": "en",
@@ -625,35 +901,107 @@
     },
     "el": {
       "target": "el",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "hu": {
       "target": "hu",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "grc": {
       "target": "el",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "mi": {
       "target": "mi",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "et": {
       "target": "et",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "ko": {
       "target": "ko",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "nb": {
       "target": "nb",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "he": {
       "target": "he",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "ch": {
       "target": "en",
@@ -665,11 +1013,29 @@
     },
     "cu": {
       "target": "ru",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "fr": {
       "target": "fr",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "eu": {
       "target": "en",
@@ -693,51 +1059,159 @@
     },
     "mg": {
       "target": "mg",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "sq": {
       "target": "sq",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "sv": {
       "target": "sv",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "sr": {
       "target": "sr-Cyrl",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "sw": {
       "target": "sw",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "th": {
       "target": "th",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "tr": {
       "target": "tr",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "uk": {
       "target": "uk",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "vi": {
       "target": "vi",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "zh": {
       "target": "zh-Hans",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "zh-Hans": {
       "target": "zh-Hans",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     },
     "zh-Hant": {
       "target": "zh-Hant",
-      "status": "machine translated; AI-assisted additions; human review pending"
+      "status": "machine translated; AI-assisted additions; new messages use English fallback; human review pending",
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ]
     }
   },
   "translationUpdates": [
@@ -806,6 +1280,80 @@
         "tl",
         "tr",
         "tsg",
+        "uk",
+        "vi",
+        "zh",
+        "zh-Hans",
+        "zh-Hant"
+      ]
+    },
+    {
+      "method": "AI-assisted short labels generated locally without an external service; longer new messages retain explicit English fallback",
+      "review": "Human linguistic review pending; English fallback messages await translation",
+      "messageKeys": [
+        "native.clearDownloads",
+        "native.clearDownloadse81a1da9",
+        "native.countDownloadsWaiting",
+        "native.keepOffline",
+        "native.notYetAvailableOffline"
+      ],
+      "englishFallbackKeys": [
+        "native.biblesDownloadInFullWhenYouOpenThemDictionaries",
+        "native.noCompleteResourcesSavedYetAutomaticDownloadsWillContinue",
+        "native.theOfflinePreparationQueueIsFullRetryAfterCurrent",
+        "native.thisRemovesPublicDownloadsAndCachedContentYourNotes",
+        "native.thisResourceBelongsToAnotherSource",
+        "native.turningThisOffRemovesTheDownloadedCopyAndStops",
+        "native.whileTheAppIsOpenSavedResourcesAreChecked"
+      ],
+      "locales": [
+        "tsg",
+        "hbo",
+        "da",
+        "de",
+        "lt",
+        "af",
+        "ru",
+        "nl",
+        "pl",
+        "ppk",
+        "ro",
+        "hy",
+        "pt",
+        "got",
+        "es",
+        "ar",
+        "tl",
+        "mlf",
+        "fi",
+        "hr",
+        "cs",
+        "rmq",
+        "nn",
+        "my",
+        "cop",
+        "prs",
+        "ja",
+        "lv",
+        "it",
+        "syr",
+        "el",
+        "hu",
+        "grc",
+        "mi",
+        "et",
+        "ko",
+        "nb",
+        "he",
+        "cu",
+        "fr",
+        "mg",
+        "sq",
+        "sv",
+        "sr",
+        "sw",
+        "th",
+        "tr",
         "uk",
         "vi",
         "zh",

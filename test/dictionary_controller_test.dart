@@ -13,9 +13,58 @@ import 'support/dictionary_fixture.dart';
 
 void main() {
   test(
+    'clearing downloads during a pending browse default cannot renew that old action',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository)
+        ..installedIds.add('strongsgreek');
+      var epoch = 0;
+      final captures = <int>[];
+      final prepared = <String>[];
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+        captureResourceUse: () {
+          final captured = epoch;
+          captures.add(captured);
+          return (id) {
+            if (captured == epoch) prepared.add(id);
+          };
+        },
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(_browserContext());
+      expect(prepared, ['strongsgreek']);
+      prepared.clear();
+      final pending = Completer<bool>();
+      repository.statusPending = pending;
+      repository.statusStarted = Completer<void>();
+      final browse = controller.searchWords('');
+      await repository.statusStarted!.future;
+      // Clear invalidates the captured preparation, while reading may finish.
+      epoch++;
+      repository.statusPending = null;
+      pending.complete(true);
+      await browse;
+      expect(controller.error, isNull);
+      expect(controller.selectedModule!.id, 'strongsgreek');
+      expect(prepared, isEmpty);
+      expect(captures, [0, 0]);
+      // A later explicit selection is a new action and may prepare resources.
+      await controller.selectModule('strongsgreek');
+      expect(captures, [0, 0, 1]);
+      expect(prepared, ['strongsgreek']);
+    },
+  );
+
+  test(
     'Retry completes every confirmed definition after a later entry read fails',
     () async {
       final fixture = DictionaryFixture();
+      final opened = <String>[];
       final repository = _ControlledDictionaryRepository(fixture.repository)
         ..before = (kind, module, id, count) async {
           if (kind == 'entry' && id == 'G3056--2' && count == 2) {
@@ -25,6 +74,7 @@ void main() {
       final controller = DictionaryController(
         repository: repository,
         preferences: MemoryStudyPreferences(),
+        captureResourceUse: () => opened.add,
       );
       addTearDown(() {
         controller.dispose();
@@ -32,6 +82,11 @@ void main() {
       });
       await controller.open(dictionaryContext(strongs: ['G3056']));
       expect(controller.error, isNotNull);
+      expect(
+        opened,
+        isEmpty,
+        reason: 'A partial load is not an opened module.',
+      );
       expect(controller.definitions.map((entry) => entry.id), ['G3056']);
       await controller.retry();
       expect(controller.error, isNull);
@@ -40,6 +95,7 @@ void main() {
         'G3056--2',
       ]);
       expect(controller.query, 'Word');
+      expect(opened, ['strongsgreek']);
     },
   );
 
@@ -770,10 +826,16 @@ final class DelayedDictionaryRepository
   bool installed = false;
   final Set<String> installedIds = {};
   Completer<bool>? statusPending;
+  Completer<void>? statusStarted;
   @override
-  Future<bool> isInstalled(String id) =>
-      statusPending?.future ??
-      Future.value(installed || installedIds.contains(id));
+  Future<bool> isInstalled(String id) {
+    if (statusPending != null && statusStarted?.isCompleted == false) {
+      statusStarted!.complete();
+    }
+    return statusPending?.future ??
+        Future.value(installed || installedIds.contains(id));
+  }
+
   final DictionaryRepository delegate;
   String? delayModule;
   String? delayEntry;

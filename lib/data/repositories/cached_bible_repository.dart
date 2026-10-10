@@ -34,6 +34,7 @@ final class CachedBibleRepository implements BibleRepository {
   final GetBibleApiClient _client;
   final DateTime Function() _clock;
   final ScriptureCacheIdentity _identity;
+  int _cacheEpoch = 0;
   // Navigation identifiers only, bounded to recently opened books. This keeps
   // a current no-store introduction selectable without retaining its body.
   final Map<String, Set<int>> _introductionIds = <String, Set<int>>{};
@@ -43,6 +44,7 @@ final class CachedBibleRepository implements BibleRepository {
   Future<RepositoryResult<List<Translation>>> getTranslations({
     bool forceRefresh = false,
   }) async {
+    final cacheEpoch = _cacheEpoch;
     // Installed discovery succeeds after a cold restart with zero HTTP.
     if (!forceRefresh && installed != null) {
       final local = await installed!.getTranslations();
@@ -69,7 +71,7 @@ final class CachedBibleRepository implements BibleRepository {
     try {
       final BibleApiDocument<List<Translation>> fresh = await _client
           .getTranslationsDocument();
-      if (cached != null) {
+      if (cacheEpoch == _cacheEpoch && cached != null) {
         final Map<String, Translation> previous = {
           for (final item in _decodeList(cached, Translation.fromJson))
             item.abbreviation: item,
@@ -88,6 +90,7 @@ final class CachedBibleRepository implements BibleRepository {
         'translations',
         fresh,
         (item) => item.toJson(),
+        cacheEpoch: cacheEpoch,
       );
     } catch (error, stack) {
       return _fallbackList(
@@ -105,6 +108,7 @@ final class CachedBibleRepository implements BibleRepository {
     String translation, {
     bool forceRefresh = false,
   }) async {
+    final cacheEpoch = _cacheEpoch;
     final String abbreviation = translation.toLowerCase();
     if (installed != null && await installed!.contains(abbreviation)) {
       return installed!.getBooks(abbreviation);
@@ -117,7 +121,7 @@ final class CachedBibleRepository implements BibleRepository {
     try {
       final BibleApiDocument<List<BibleBook>> fresh = await _client
           .getBooksDocument(abbreviation);
-      if (cached != null) {
+      if (cacheEpoch == _cacheEpoch && cached != null) {
         final Map<int, BibleBook> previous = {
           for (final item in _decodeList(cached, BibleBook.fromJson))
             item.number: item,
@@ -137,7 +141,13 @@ final class CachedBibleRepository implements BibleRepository {
           }
         }
       }
-      return _storeList(resource, 'books', fresh, (item) => item.toJson());
+      return _storeList(
+        resource,
+        'books',
+        fresh,
+        (item) => item.toJson(),
+        cacheEpoch: cacheEpoch,
+      );
     } catch (error, stack) {
       return _fallbackList(resource, cached, BibleBook.fromJson, error, stack);
     }
@@ -149,6 +159,7 @@ final class CachedBibleRepository implements BibleRepository {
     int book, {
     bool forceRefresh = false,
   }) async {
+    final cacheEpoch = _cacheEpoch;
     final String abbreviation = translation.toLowerCase();
     if (installed != null && await installed!.contains(abbreviation)) {
       return installed!.getChapters(abbreviation, book);
@@ -169,7 +180,7 @@ final class CachedBibleRepository implements BibleRepository {
       // The book representation is required to discover nested introduction
       // records that deliberately have no standalone chapter URL.
       final RepositoryResult<WholeTranslationBook> source =
-          await getBookContent(abbreviation, book);
+          await _getBookContent(abbreviation, book, cacheEpoch);
       final List<ChapterInfo> data = <ChapterInfo>[...?index?.value];
       for (final WholeTranslationChapter chapter in source.data.chapters) {
         if (chapter.isIntroduction &&
@@ -228,15 +239,17 @@ final class CachedBibleRepository implements BibleRepository {
             );
       }
       data.sort((left, right) => left.chapter.compareTo(right.chapter));
-      _introductionIds.remove(resource);
-      _introductionIds[resource] = data
-          .where((item) => item.isIntroduction)
-          .map((item) => item.chapter)
-          .toSet();
-      while (_introductionIds.length > 16) {
-        _introductionIds.remove(_introductionIds.keys.first);
+      if (cacheEpoch == _cacheEpoch) {
+        _introductionIds.remove(resource);
+        _introductionIds[resource] = data
+            .where((item) => item.isIntroduction)
+            .map((item) => item.chapter)
+            .toSet();
+        while (_introductionIds.length > 16) {
+          _introductionIds.remove(_introductionIds.keys.first);
+        }
       }
-      if (cached != null && index != null) {
+      if (cacheEpoch == _cacheEpoch && cached != null && index != null) {
         final Map<int, ChapterInfo> previous = {
           for (final item in _decodeList(cached, ChapterInfo.fromJson))
             item.chapter: item,
@@ -262,6 +275,7 @@ final class CachedBibleRepository implements BibleRepository {
           '',
           data.map((item) => item.toJson()).toList(),
           now,
+          cacheEpoch: cacheEpoch,
           response: data.any((item) => item.isIntroduction)
               ? null
               : index?.response,
@@ -280,7 +294,13 @@ final class CachedBibleRepository implements BibleRepository {
       // A valid chapter index is useful even if fetching optional book metadata
       // fails, particularly for a small, ordinary online Scripture read.
       if (index != null && index.value.isNotEmpty) {
-        return _storeList(resource, 'chapters', index, (item) => item.toJson());
+        return _storeList(
+          resource,
+          'chapters',
+          index,
+          (item) => item.toJson(),
+          cacheEpoch: cacheEpoch,
+        );
       }
       return _fallbackList(
         resource,
@@ -298,6 +318,7 @@ final class CachedBibleRepository implements BibleRepository {
     int book,
     int chapter,
   ) async {
+    final cacheEpoch = _cacheEpoch;
     final String abbreviation = translation.toLowerCase();
     if (installed != null && await installed!.contains(abbreviation)) {
       return installed!.getChapter(abbreviation, book, chapter);
@@ -327,7 +348,7 @@ final class CachedBibleRepository implements BibleRepository {
                 chapter,
               ) ??
               false)) {
-        final source = await getBookContent(abbreviation, book);
+        final source = await _getBookContent(abbreviation, book, cacheEpoch);
         final WholeTranslationChapter? nested = _introChapter(
           source.data,
           chapter,
@@ -375,6 +396,7 @@ final class CachedBibleRepository implements BibleRepository {
         fresh.digest,
         fresh.value.toJson(),
         now,
+        cacheEpoch: cacheEpoch,
         response: fresh.response,
         rawJson: fresh.rawJson,
       );
@@ -402,6 +424,12 @@ final class CachedBibleRepository implements BibleRepository {
   Future<RepositoryResult<WholeTranslationBook>> getBookContent(
     String translation,
     int book,
+  ) => _getBookContent(translation, book, _cacheEpoch);
+
+  Future<RepositoryResult<WholeTranslationBook>> _getBookContent(
+    String translation,
+    int book,
+    int cacheEpoch,
   ) async {
     final String abbreviation = translation.toLowerCase();
     final String resource = 'book:$abbreviation:$book';
@@ -436,6 +464,7 @@ final class CachedBibleRepository implements BibleRepository {
         fresh.digest,
         fresh.value.toJson(),
         now,
+        cacheEpoch: cacheEpoch,
         response: fresh.response,
         rawJson: fresh.rawJson,
       );
@@ -459,6 +488,7 @@ final class CachedBibleRepository implements BibleRepository {
   Future<RepositoryResult<WholeTranslation>> getWholeTranslation(
     Translation translation,
   ) async {
+    final cacheEpoch = _cacheEpoch;
     if (installed != null &&
         await installed!.contains(translation.abbreviation)) {
       return installed!.getWholeTranslation(translation);
@@ -496,6 +526,7 @@ final class CachedBibleRepository implements BibleRepository {
         fresh.digest,
         fresh.value.toJson(),
         now,
+        cacheEpoch: cacheEpoch,
         response: fresh.response,
         rawJson: fresh.rawJson,
       );
@@ -549,8 +580,18 @@ final class CachedBibleRepository implements BibleRepository {
 
   @override
   Future<void> clearScriptureCache() {
+    _cacheEpoch++;
     _introductionIds.clear();
     return _database.clearScriptureCache();
+  }
+
+  /// Clears public response caches without removing private annotations or
+  /// complete installed resources. Earlier reads may still finish on screen,
+  /// but their captured epoch prevents them from restoring removed cache rows.
+  Future<void> clearPublicCache() {
+    _cacheEpoch++;
+    _introductionIds.clear();
+    return _database.clearCache();
   }
 
   Future<JsonMap> getDailyScripture() => _client.getDailyScripture();
@@ -659,8 +700,9 @@ final class CachedBibleRepository implements BibleRepository {
     String resource,
     String kind,
     BibleApiDocument<List<T>> data,
-    JsonMap Function(T) serialize,
-  ) async {
+    JsonMap Function(T) serialize, {
+    required int cacheEpoch,
+  }) async {
     final DateTime now = _now();
     await _write(
       resource,
@@ -668,6 +710,7 @@ final class CachedBibleRepository implements BibleRepository {
       '',
       data.value.map(serialize).toList(),
       now,
+      cacheEpoch: cacheEpoch,
       response: data.response,
     );
     return RepositoryResult(
@@ -723,10 +766,13 @@ final class CachedBibleRepository implements BibleRepository {
     String hash,
     Object payload,
     DateTime now, {
+    required int cacheEpoch,
     ApiResponse? response,
     String? rawJson,
   }) async {
-    if (response?.cachePolicy.noStore == true) return;
+    if (cacheEpoch != _cacheEpoch || response?.cachePolicy.noStore == true) {
+      return;
+    }
     try {
       final Duration lifetime =
           response?.cachePolicy.remainingLifetime(now) ?? Duration.zero;

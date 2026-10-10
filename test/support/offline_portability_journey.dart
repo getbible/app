@@ -110,12 +110,38 @@ void offlinePortabilityJourney({
         addTearDown(beforeRestart.close);
         await restored.study.notebooks.createNotebook(title: 'Already here');
         final existingId = restored.study.notebooks.notebook!.id;
+        // Exercise the same default Study preparation and persisted catalogue
+        // checks as startup before taking the app offline. Merely installing a
+        // module manually does not certify the whole catalogue as checked.
+        await restored.offline.initialize();
+        await restored.offline.checkForUpdates();
+        await Future.wait([
+          restored.offline.ensureAvailable(
+            OfflineResourceKind.dictionary,
+            'strongsgreek',
+          ),
+          restored.offline.ensureAvailable(
+            OfflineResourceKind.commentary,
+            'fixture',
+          ),
+        ]);
+        expect(restored.offline.error, isNull);
+        expect(
+          restored.offline.installed.map((item) => item.resource.kind),
+          unorderedEquals([
+            OfflineResourceKind.dictionary,
+            OfflineResourceKind.commentary,
+          ]),
+        );
+        expect(
+          fixture.requests.any((uri) => uri.path == '/v1/all.json'),
+          isFalse,
+          reason: 'The complete public-topic dataset is an explicit opt-in.',
+        );
         await restored.offline.discover();
         expect(restored.offline.error, isNull);
         for (final identity in const {
           OfflineResourceKind.bible: 'fx',
-          OfflineResourceKind.dictionary: 'strongsgreek',
-          OfflineResourceKind.commentary: 'fixture',
           OfflineResourceKind.bookmarks: 'all',
         }.entries) {
           final resource = restored.offline.catalog.singleWhere(
@@ -301,7 +327,28 @@ final class _OfflineAppFixture {
         StudyInstallationFixture(OfflineResourceKind.dictionary),
         StudyInstallationFixture(OfflineResourceKind.commentary),
         StudyInstallationFixture(OfflineResourceKind.bookmarks),
-      ];
+      ] {
+    // This fixture publishes one complete module per Study service. Its
+    // catalogue must describe the actual bulk resources served below so that
+    // automatic preparation can finish before the zero-network restart.
+    for (final study in studies.where(
+      (item) => item.kind != OfflineResourceKind.bookmarks,
+    )) {
+      final field = study.kind == OfflineResourceKind.dictionary
+          ? 'dictionaries'
+          : 'commentaries';
+      final path = '$field.json';
+      final catalogue =
+          jsonDecode(utf8.decode(study.documents[path]!))
+              as Map<String, dynamic>;
+      catalogue[field] = (catalogue[field] as List)
+          .where((item) => (item as Map)['id'] == study.module)
+          .toList();
+      catalogue['module_count'] = 1;
+      study.documents[path] = utf8.encode(jsonEncode(catalogue));
+      study.updateSizesAndManifest();
+    }
+  }
 
   final List<int> bible;
   final List<StudyInstallationFixture> studies;

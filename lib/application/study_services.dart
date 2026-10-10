@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueChanged;
+
 import '../core/errors.dart';
 import '../data/api/api_configuration.dart';
 import '../data/api/api_transport.dart';
@@ -9,6 +11,7 @@ import '../data/repositories/installed_study_repositories.dart';
 import '../data/repositories/sql_notebook_repository.dart';
 import '../data/repositories/sql_public_topic_copy_repository.dart';
 import '../data/repositories/sql_study_preferences_repository.dart';
+import '../domain/models/offline_resource.dart';
 import '../domain/repositories/notebook_repository.dart';
 import '../domain/repositories/offline_resource_repository.dart';
 import 'commentary_controller.dart';
@@ -24,6 +27,7 @@ final class StudyServices {
     required ApiTransport transport,
     NotebookRepository? notebookRepository,
     OfflineResourceStore? offlineStore,
+    ValueChanged<String> Function(OfflineResourceKind kind)? captureResourceUse,
   }) {
     final SqlStudyPreferencesRepository preferences =
         SqlStudyPreferencesRepository(database);
@@ -38,6 +42,9 @@ final class StudyServices {
               online: ApiDictionaryRepository(transport),
             ),
       preferences: preferences,
+      captureResourceUse: captureResourceUse == null
+          ? null
+          : () => captureResourceUse(OfflineResourceKind.dictionary),
     );
     commentary = CommentaryController(
       repository: offlineStore == null
@@ -50,6 +57,9 @@ final class StudyServices {
               online: ApiCommentaryRepository(transport),
             ),
       preferences: preferences,
+      captureResourceUse: captureResourceUse == null
+          ? null
+          : () => captureResourceUse(OfflineResourceKind.commentary),
     );
     topics = TopicsController(
       repository: offlineStore == null

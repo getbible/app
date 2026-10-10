@@ -12,6 +12,7 @@ dart compile js -O4 tool/drift_worker.dart -o web/drift_worker.dart.js
 dart compile js -O2 tool/offline_bible_worker.dart -o web/offline_bible_worker.dart.js
 flutter build web --release --no-web-resources-cdn --base-href /flutter/
 npm ci --prefix tool/browser_smoke
+npm test --prefix tool/browser_smoke
 npx --prefix tool/browser_smoke playwright install --with-deps chromium firefox webkit
 python3 scripts/build_web_shell.py --build-dir build/web
 node tool/browser_smoke/run.mjs --build-dir build/web --base-path /flutter/ --browsers chromium,firefox,webkit
@@ -79,6 +80,12 @@ Google Chrome. Pinned Playwright browser revisions keep the required CI gates re
 WebKit is browser-engine evidence, not a claim of physical iOS Safari testing.
 All requested engines and both hosting modes run even when an earlier case fails;
 any failure returns a nonzero process status.
+
+Expected disconnect diagnostics are recorded separately with their completed
+fixture-GET abort, page and offline phase. Each abort can explain one exact
+engine network-error message. Firefox's network-failure CORS wording is accepted
+only with that provenance; genuine CORS policy/header failures remain errors.
+The classifier's focused Node tests run in CI before the browser journeys.
 
 Live deployment evidence is a separate bounded read-only probe:
 

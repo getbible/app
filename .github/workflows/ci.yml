@@ -173,6 +173,7 @@ jobs:
       - run: python scripts/build_web_shell.py --build-dir build/web
       - run: node --test tool/offline_shell/test.mjs
       - run: npm ci --prefix tool/browser_smoke
+      - run: npm test --prefix tool/browser_smoke
       - run: npx --prefix tool/browser_smoke playwright install --with-deps chromium firefox webkit
       - run: node --test tool/offline_shell/browser.test.mjs
       - name: Launch compiled app and verify persistence and offline installation in a real browser

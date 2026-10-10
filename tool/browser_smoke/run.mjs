@@ -5,6 +5,7 @@ import { resolve, sep, extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium, firefox, webkit } from 'playwright';
 import { measureWorker } from './worker-performance.mjs';
+import { classifyNetworkDiagnostics } from './network-diagnostics.mjs';
 import { apiFixtures, firstVerse, secondVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
 import { studyInstallationFixtures } from './study-fixtures.mjs';
 
@@ -95,11 +96,18 @@ async function runJourney(browser, { isolated, browserName }) {
   const { server, origin } = await serveBuild({ isolated });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'allow' });
   const errors = [];
+  const consoleErrors = [];
+  const injectedDisconnects = [];
+  const pageIds = new WeakMap();
+  let nextPageId = 0;
   const requests = [];
   const missingAssets = [];
   const workers = [];
   const fixtures = new Map([...apiFixtures(), ...studyInstallationFixtures()]);
   let apiOffline = false;
+  let networkPhase = 0;
+  const setApiOffline = (offline) => { apiOffline = offline; networkPhase++; };
+  const consoleDiagnostics = () => classifyNetworkDiagnostics(consoleErrors, injectedDisconnects);
   let prepareShell = false;
   let deferredShellLoads = 0;
   let page;
@@ -113,14 +121,14 @@ async function runJourney(browser, { isolated, browserName }) {
     }
   });
   context.on('page', (opened) => {
+    pageIds.set(opened, ++nextPageId);
     opened.on('worker', (worker) => workers.push(worker.url()));
     opened.on('pageerror', (error) => errors.push({ type: 'pageerror', message: error.stack ?? error.message }));
     opened.on('console', (message) => {
       if (message.type() !== 'error') return;
-      // A deliberately disconnected API logs a network error in Chromium.
-      // All uncaught exceptions and local asset errors remain failures.
-      if (apiOffline && /net::ERR_INTERNET_DISCONNECTED|Failed to load resource:.*(?:network connection was lost|Internet connection appears to be offline)|NetworkError when attempting to fetch resource/.test(message.text())) return;
-      errors.push({ type: 'console', message: message.text() });
+      consoleErrors.push({ type: 'console', message: message.text(),
+        locationUrl: message.location().url, pageId: pageIds.get(opened),
+        phase: networkPhase, apiOffline });
     });
     opened.on('response', (response) => {
       if (response.url().startsWith(origin) && response.status() >= 400) {
@@ -152,7 +160,15 @@ async function runJourney(browser, { isolated, browserName }) {
       errors.push({ type: 'unexpected-method', message: `${request.method()} ${url}` });
       return route.abort('blockedbyclient');
     }
-    if (apiOffline) return route.abort('internetdisconnected');
+    if (apiOffline) {
+      const phase = networkPhase;
+      let pageId;
+      try { pageId = pageIds.get(request.frame().page()); } catch { /* No page provenance: fail closed. */ }
+      await route.abort('internetdisconnected');
+      injectedDisconnects.push({ url, method: request.method(), knownFixture: true,
+        code: 'internetdisconnected', pageId, phase, apiOffline: true });
+      return;
+    }
     return route.fulfill({
       status: 200,
       contentType: fixture.contentType,
@@ -170,7 +186,7 @@ async function runJourney(browser, { isolated, browserName }) {
     assert.equal(new URL(page.url()).searchParams.get('verse'), '2',
       'First browser launch must preserve the incoming verse rather than choose the daily default');
     assert.equal(await page.evaluate(() => crossOriginIsolated), isolated);
-    assert.deepEqual(errors, [], 'Startup produced browser errors');
+    assert.deepEqual([...errors, ...consoleDiagnostics().unexpected], [], 'Startup produced browser errors');
     assert.deepEqual(missingAssets, [], 'Startup missed built assets');
     console.log(`${mode}: release reader opened`);
     const workerMetrics = await measureWorker(page);
@@ -198,7 +214,7 @@ async function runJourney(browser, { isolated, browserName }) {
 
     // Preserve coverage for readers that have cached a passage but have not
     // installed a complete Bible. Reopening must retain the note and text.
-    apiOffline = true;
+    setApiOffline(true);
     await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(45000);
@@ -211,7 +227,7 @@ async function runJourney(browser, { isolated, browserName }) {
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     assert.ok(requests.some((request) => request.apiOffline),
       'Cached chapter path must attempt current-source verification');
-    apiOffline = false;
+    setApiOffline(false);
     console.log(`${mode}: cached passage and note reopened without public APIs`);
 
     // Download the actual private snapshot, then import an edited copy through
@@ -283,7 +299,7 @@ async function runJourney(browser, { isolated, browserName }) {
     // A new page discards all Dart state. It reopens the production browser
     // database, while public APIs fail and local release assets still load.
     const requestsBeforeInstalledRestart = requests.length;
-    apiOffline = true;
+    setApiOffline(true);
     await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(45000);
@@ -384,6 +400,7 @@ async function runJourney(browser, { isolated, browserName }) {
     // above continue to prove that no public service is requested.
     await context.unrouteAll({ behavior: 'wait' });
     console.log(`${mode}: production application shell installed`);
+    networkPhase++;
     await context.setOffline(true);
     await page.close();
     page = await context.newPage();
@@ -401,7 +418,7 @@ async function runJourney(browser, { isolated, browserName }) {
     await page.screenshot({ path: join(outputDirectory, `${mode}-application-offline.png`) });
     assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
       'Network-disconnected application startup must not fetch public services');
-    assert.deepEqual(errors, [], 'Release UI produced browser errors');
+    assert.deepEqual([...errors, ...consoleDiagnostics().unexpected], [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
     return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
   } catch (error) {
@@ -411,7 +428,11 @@ async function runJourney(browser, { isolated, browserName }) {
     }
     throw error;
   } finally {
-    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({ errors, missingAssets, requests, workers, deferredShellLoads }, null, 2));
+    const diagnostics = consoleDiagnostics();
+    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({
+      errors: [...errors, ...diagnostics.unexpected], expectedDiagnostics: diagnostics.expected,
+      injectedDisconnects, missingAssets, requests, workers, deferredShellLoads,
+    }, null, 2));
     await context.tracing.stop({ path: join(outputDirectory, `${mode}-trace.zip`) });
     await context.close();
     await new Promise((resolveClose) => server.close(resolveClose));

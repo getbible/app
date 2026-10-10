@@ -43,6 +43,14 @@ viewport. CI records Android properties/logcat or the selected iOS simulator
 identity and screenshot. Timing and process memory are diagnostic measurements,
 not hard performance thresholds or physical-device benchmarks.
 
+The Android runner wakes its dedicated emulator, keeps it awake across the
+build, and dismisses the insecure keyguard. The clipboard journey requires
+Android's focused/resumed lifecycle, waits for the app's completed Copy action,
+and then reads the real OS clipboard. A failure retains window/activity/power
+state and an OS screenshot alongside logcat so a foreground-window failure can
+be distinguished from an application clipboard defect; clipboard assertions
+are never replaced by mocks on installed devices.
+
 `runtime-validation.yml` runs macOS/Windows desktop plus Android phone/tablet
 (API 35, 2 CPU cores, 2 GiB RAM) and iPhone/iPad simulator jobs. The Linux package
 job runs the same aggregate. Each target must pass; failure does not downgrade

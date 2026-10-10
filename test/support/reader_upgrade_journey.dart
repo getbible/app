@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -77,6 +80,23 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
       );
       await tester.pumpAndSettle();
       expect(find.text('My private note'), findsOneWidget);
+      if (nativeClipboard && defaultTargetPlatform == TargetPlatform.android) {
+        // Android's resumed lifecycle includes native window input focus.
+        // Widget focus and synthetic taps alone do not grant clipboard access.
+        await _waitForPlatformAction(
+          tester,
+          () =>
+              tester.binding.lifecycleState == AppLifecycleState.resumed ||
+              (tester.binding.lifecycleState == null &&
+                  // The integration binding's TestPlatformDispatcher masks
+                  // the engine's initial state. Use the real initial value
+                  // only until the binding receives its first lifecycle event.
+                  ui.PlatformDispatcher.instance.initialLifecycleState ==
+                      'AppLifecycleState.resumed'),
+          'Android must give the application window input focus before the '
+          'native clipboard journey; inspect runtime-evidence/window.txt.',
+        );
+      }
 
       Future<void> preview() async {
         await tester.tap(find.widgetWithText(TextButton, 'Fixture 1'));
@@ -93,7 +113,13 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
 
       await preview();
       await tester.tap(find.text('Copy'));
-      await tester.pumpAndSettle();
+      // A frame becoming idle does not acknowledge an asynchronous platform
+      // write. The preview presents this message only after setData completes.
+      await _waitForPlatformAction(
+        tester,
+        () => find.text('Scripture copied').evaluate().isNotEmpty,
+        'Copy must acknowledge the native clipboard write before reading it.',
+      );
       final ClipboardData? copied = await tester.runAsync<ClipboardData?>(
         () => Clipboard.getData('text/plain'),
       );
@@ -176,4 +202,22 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+}
+
+Future<void> _waitForPlatformAction(
+  WidgetTester tester,
+  bool Function() complete,
+  String reason,
+) async {
+  final Stopwatch deadline = Stopwatch()..start();
+  while (!complete() && deadline.elapsed < const Duration(seconds: 10)) {
+    // Platform channels run on the real event loop in both host widget tests
+    // and installed-app tests. Poll an explicit completion condition, never a
+    // guessed number of frames or an unconditional settling delay.
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  expect(complete(), isTrue, reason: reason);
 }

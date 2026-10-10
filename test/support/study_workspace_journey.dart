@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,8 +9,10 @@ import 'package:getbible_live/domain/models/notebook.dart';
 import 'package:getbible_live/domain/models/passage.dart';
 import 'package:getbible_live/domain/models/preferences.dart';
 import 'package:getbible_live/main.dart';
+import 'package:getbible_live/presentation/widgets/dictionary_panel.dart';
 import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
 import 'package:getbible_live/presentation/widgets/study_workspace.dart';
+import 'package:getbible_live/presentation/widgets/topics_panel.dart';
 import 'package:provider/provider.dart';
 
 import 'study_api_fixture.dart';
@@ -18,6 +22,7 @@ import 'study_api_fixture.dart';
 void studyWorkspaceJourney({
   bool useDeviceViewport = false,
   Size viewport = const Size(1250, 900),
+  TargetPlatformVariant? platform,
 }) {
   testWidgets(
     'Study dictionaries, commentary, topics and local notebooks compose without changing Scripture',
@@ -61,9 +66,30 @@ void studyWorkspaceJourney({
       await tester.pumpAndSettle();
 
       Future<void> settle() async {
-        await tester.runAsync(
-          () async => Future<void>.delayed(const Duration(milliseconds: 50)),
-        );
+        // SQLite and source fixtures complete on the real event loop. Keep it
+        // and Flutter frames moving until the actual operations are idle;
+        // simulator scheduling must not depend on a fixed storage delay.
+        final deadline = Stopwatch()..start();
+        do {
+          await tester.runAsync(
+            () async => Future<void>.delayed(const Duration(milliseconds: 1)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+          if (deadline.elapsed > const Duration(seconds: 10)) {
+            throw TimeoutException('Study operations did not become idle.');
+          }
+        } while (state.loading ||
+            state.study.dictionary.isLoading ||
+            state.study.dictionary.isDiscovering ||
+            state.study.commentary.isLoading ||
+            state.study.topics.loading ||
+            state.study.topics.loadingTopic ||
+            state.study.topics.loadingNames ||
+            state.study.topics.restoringPreferences ||
+            state.study.topics.savingPreferences.isNotEmpty ||
+            state.study.topics.copying ||
+            state.study.notebooks.isLoading ||
+            state.study.notebooks.isSaving);
         await tester.pumpAndSettle();
       }
 
@@ -87,8 +113,21 @@ void studyWorkspaceJourney({
 
       await openWord();
       expect(find.text('Source language: en'), findsOneWidget);
-      final Finder definition = find.text('Kadesh').first;
-      await tester.ensureVisible(definition);
+      // Use the exact published ID to distinguish repeated definitions. On
+      // short native viewports the list tile is not built until scrolled to.
+      final Finder definition = find.widgetWithText(ListTile, 'kadesh');
+      await tester.scrollUntilVisible(
+        definition,
+        150,
+        scrollable: find
+            .descendant(
+              of: find.byType(DictionaryPanel),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(definition.hitTestable(), findsOneWidget);
       await tester.tap(definition);
       await settle();
       expect(find.textContaining('Preserved paragraphs.'), findsOneWidget);
@@ -118,13 +157,35 @@ void studyWorkspaceJourney({
       );
 
       await choose(StudyTab.topics);
-      await tester.tap(find.text('Follow').first);
+      final topicScroll = find
+          .descendant(
+            of: find.byType(TopicsPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final follow = find.descendant(
+        of: find.widgetWithText(Card, 'Authority of the Bible'),
+        matching: find.widgetWithText(TextButton, 'Follow'),
+      );
+      await tester.scrollUntilVisible(follow, 150, scrollable: topicScroll);
+      await tester.pumpAndSettle();
+      expect(follow.hitTestable(), findsOneWidget);
+      await tester.tap(follow);
       await settle();
+      expect(state.study.topics.followed, contains('authority-of-the-bible'));
       expect(state.groups.length, groupsBefore);
       expect(state.notes.single.id, noteId);
-      await tester.tap(find.text('Authority of the Bible').first);
+      final topic = find.widgetWithText(ListTile, 'Authority of the Bible');
+      await tester.ensureVisible(topic);
+      await tester.pumpAndSettle();
+      expect(topic.hitTestable(), findsOneWidget);
+      await tester.tap(topic);
       await settle();
-      await tester.tap(find.text('Copy to my markings'));
+      final copy = find.text('Copy to my markings');
+      await tester.scrollUntilVisible(copy, 150, scrollable: topicScroll);
+      await tester.pumpAndSettle();
+      expect(copy.hitTestable(), findsOneWidget);
+      await tester.tap(copy);
       await settle();
       expect(find.text('Copy public topic to my markings?'), findsOneWidget);
       await tester.tap(find.text('Copy markings'));
@@ -134,21 +195,30 @@ void studyWorkspaceJourney({
       expect(state.notes.single.id, noteId);
 
       await choose(StudyTab.notes);
-      await tester.tap(find.text('New notebook'));
-      await settle();
-      final Finder title = find.widgetWithText(TextField, 'Notebook title');
-      await tester.ensureVisible(title);
-      await tester.enterText(title, 'Sunday sermon');
-      final Finder block = find.widgetWithText(
-        TextFormField,
-        'Study or sermon notes',
-      );
       final Finder notebookScroll = find
           .descendant(
             of: find.byKey(const ValueKey<String>('notes-panel-list')),
             matching: find.byType(Scrollable),
           )
           .first;
+      final createNotebook = find.text('New notebook');
+      await tester.scrollUntilVisible(
+        createNotebook,
+        150,
+        scrollable: notebookScroll,
+      );
+      await tester.pumpAndSettle();
+      expect(createNotebook.hitTestable(), findsOneWidget);
+      await tester.tap(createNotebook);
+      await settle();
+      final Finder title = find.widgetWithText(TextField, 'Notebook title');
+      await tester.scrollUntilVisible(title, 150, scrollable: notebookScroll);
+      await tester.pumpAndSettle();
+      await tester.enterText(title, 'Sunday sermon');
+      final Finder block = find.widgetWithText(
+        TextFormField,
+        'Study or sermon notes',
+      );
       await tester.scrollUntilVisible(block, 250, scrollable: notebookScroll);
       await tester.pumpAndSettle();
       await tester.enterText(block, 'Private draft survives closing Study.');
@@ -204,5 +274,6 @@ void studyWorkspaceJourney({
       await settle();
       expect(tester.takeException(), isNull);
     },
+    variant: platform ?? const DefaultTestVariant(),
   );
 }

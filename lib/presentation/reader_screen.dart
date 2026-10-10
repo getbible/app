@@ -70,6 +70,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   StudyContext? _studyContext;
   StudyTab _studyTab = StudyTab.markings;
   bool _studyModal = false;
+  ModalRoute<void>? _compactStudyRoute;
   bool _compactStudyScheduled = false;
   FocusNode? _readerFocusBeforeStudy;
   final FocusNode _readerFocus = FocusNode(debugLabel: 'Scripture reader');
@@ -173,7 +174,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     const VerticalDivider(width: 1),
                     SizedBox(
                       width: (constraints.maxWidth * .42).clamp(420, 560),
-                      child: _studyWorkspace(state),
+                      child: _studyWorkspace(state, _studyContext!),
                     ),
                   ],
                 ],
@@ -1035,7 +1036,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _showCompactStudy() async {
-    if (!mounted || _studyContext == null || _studyModal) return;
+    final captured = _studyContext;
+    if (!mounted || captured == null || _studyModal) return;
+    final state = context.read<AppState>();
+    ModalRoute<void>? route;
     _studyModal = true;
     try {
       await showModalBottomSheet<void>(
@@ -1043,32 +1047,40 @@ class _ReaderScreenState extends State<ReaderScreen> {
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
-        builder: (sheetContext) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-          ),
-          child: SizedBox(
-            height: MediaQuery.sizeOf(sheetContext).height * .92,
-            child: AnimatedBuilder(
-              animation: Listenable.merge([
-                context.read<AppState>(),
-                _studyRevision,
-              ]),
-              builder: (context, _) =>
-                  _studyWorkspace(context.read<AppState>()),
+        builder: (sheetContext) {
+          route = ModalRoute.of<void>(sheetContext);
+          _compactStudyRoute = route;
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
             ),
-          ),
-        ),
+            child: SizedBox(
+              height: MediaQuery.sizeOf(sheetContext).height * .92,
+              child: AnimatedBuilder(
+                animation: Listenable.merge([state, _studyRevision]),
+                builder: (context, _) => _studyWorkspace(state, captured),
+              ),
+            ),
+          );
+        },
       );
     } finally {
+      // The pop Future completes before the reverse transition. The outgoing
+      // sheet can still rebuild on keyboard metrics or storage notifications;
+      // retain its captured context and controller ownership until removal.
+      await route?.completed;
+      _compactStudyRoute = null;
       _studyModal = false;
-      if (mounted) _finishStudy();
+      if (mounted && identical(_studyContext, captured)) _finishStudy();
     }
   }
 
   void _closeStudy() {
     if (_studyModal) {
-      Navigator.of(context).pop();
+      // A repeated Close during the reverse animation must not pop the reader
+      // or a different modal after this sheet has already been popped.
+      final route = _compactStudyRoute;
+      if (route?.isCurrent ?? false) route!.navigator?.pop();
     } else {
       _finishStudy();
     }
@@ -1122,8 +1134,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     await _scrollToVerse(passage.verse);
   }
 
-  Widget _studyWorkspace(AppState state) {
-    final StudyContext captured = _studyContext!;
+  Widget _studyWorkspace(AppState state, StudyContext captured) {
     return StudyWorkspace(
       context: captured,
       initialTab: _studyTab,

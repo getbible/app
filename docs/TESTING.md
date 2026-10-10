@@ -392,6 +392,10 @@ test-only fixtures so mobile sandboxes do not depend on the repository's disk
 paths. Production application assets do not contain those fixture documents.
 `test/platform_compact_acceptance_test.dart` also runs the shared Study and
 offline-portability journeys at a 390 × 844 logical-pixel phone viewport.
+`test/study_ios_layout_test.dart` exercises the shorter iOS layout, including
+scrolling lazily rendered dictionary entries into view. Compact Study tests
+retain the panel's captured context through its closing animation and cover
+notifications while that route is being removed.
 
 ```bash
 python scripts/testing/embed_fixtures.py --check
@@ -405,6 +409,11 @@ iPad simulators. Reports retain selected device identity, driver output, mobile
 screenshots and measured worker elapsed time, UI heartbeat and process memory.
 The corpus is synthetic, and its metrics are evidence rather than an arbitrary
 speed threshold. Simulator results do not establish physical-device performance.
+Android clipboard acceptance requires the application's real resumed/input-focus
+state, waits for the platform write acknowledgment, and reads the actual OS
+clipboard. The dedicated emulator is kept awake; failure artifacts include
+window/activity/power state, all-buffer logcat and a native screenshot. Synthetic
+widget focus alone does not establish Android clipboard permission.
 
 The production Web build uses bundled rendering resources, generated static
 shell inventory and Chromium, Firefox and WebKit runtime journeys under plain

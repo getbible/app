@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import '../core/product_identity.dart';
 import '../core/ui_strings.dart';
 
 /// Renders startup while opening local data, with a non-destructive retry when
@@ -147,7 +148,7 @@ class _AppBootstrapState<T extends Object> extends State<AppBootstrap<T>> {
     return _BootstrapContent(
       content: content,
       child: MaterialApp(
-        title: 'getBible.live',
+        title: ProductIdentity.name,
         debugShowCheckedModeBanner: false,
         locale: GlobalMaterialLocalizations.delegate.isSupported(locale)
             ? locale

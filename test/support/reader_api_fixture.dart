@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-import 'package:getbible_live/data/api/getbible_api_client.dart';
+import 'package:getbible/data/api/getbible_api_client.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

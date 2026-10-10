@@ -63,7 +63,7 @@ Build the release app with the shared version/build metadata, then run:
 
 ```bash
 bash scripts/release/sign_macos.sh app \
-  build/macos/Build/Products/Release/getBible.live.app
+  build/macos/Build/Products/Release/getBible.app
 
 python3 scripts/release/package.py package --target macos \
   --metadata build/release-metadata.json --output dist \
@@ -108,7 +108,7 @@ workflow; a Developer ID DMG is not a Mac App Store package.
 | `IOS_PROVISIONING_PROFILE_BASE64` | Secret | Base64 of a current App Store distribution `.mobileprovision` for `life.getbible.mobile`, matching the certificate and requested entitlements. |
 
 The App ID/profile must enable Associated Domains for the existing
-`applinks:app.getbible.life` and `applinks:getbible.life` entries. The script
+`applinks:app.getbible.life` entry. The script
 validates those entitlements and does not remove them to make signing pass.
 App Store distribution profiles must have `get-task-allow` false and no
 ad-hoc device list or enterprise `ProvisionsAllDevices` flag. Renew profiles and

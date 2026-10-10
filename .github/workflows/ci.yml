@@ -76,6 +76,7 @@ jobs:
           cache: true
       - run: flutter pub get --enforce-lockfile
       - run: sha256sum -c assets/branding/BRAND_ASSETS.sha256
+      - run: python scripts/check_branding.py
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze --no-pub
       - run: python scripts/testing/embed_fixtures.py --check
@@ -131,7 +132,7 @@ jobs:
           sudo apt-get install -y ./dist/*.deb
           desktop-file-validate /usr/share/applications/life.getbible.mobile.desktop
           test "$(xdg-mime query default x-scheme-handler/getbible)" = life.getbible.mobile.desktop
-          xvfb-run -a python scripts/release/smoke_desktop.py /opt/getbible-live/getbible_life
+          xvfb-run -a python scripts/release/smoke_desktop.py /opt/getbible/getbible
       - uses: actions/upload-artifact@v4
         with:
           name: packages-linux-${{ needs.metadata.outputs.artifact_version }}
@@ -276,9 +277,9 @@ jobs:
           $process = Start-Process -FilePath $installer[0].FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$destination") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
           $registered = (Get-Item 'HKCU:\Software\Classes\getbible\shell\open\command').GetValue('')
-          $expected = '"' + (Join-Path $destination 'getbible_life.exe') + '" "%1"'
+          $expected = '"' + (Join-Path $destination 'getbible.exe') + '" "%1"'
           if ($registered -ne $expected) { throw "Incorrect getbible URI registration: $registered" }
-          python scripts/release/smoke_desktop.py (Join-Path $destination 'getbible_life.exe')
+          python scripts/release/smoke_desktop.py (Join-Path $destination 'getbible.exe')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
@@ -330,14 +331,14 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/getbible-zip" "$RUNNER_TEMP/getbible-smoke" "$RUNNER_TEMP/getbible-dmg"
           ditto -x -k dist/*.app.zip "$RUNNER_TEMP/getbible-zip"
-          test -x "$RUNNER_TEMP/getbible-zip/getBible.live.app/Contents/MacOS/getBible.live"
+          test -x "$RUNNER_TEMP/getbible-zip/getBible.app/Contents/MacOS/getBible"
           hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/getbible-dmg" dist/*.dmg
           trap 'hdiutil detach "$RUNNER_TEMP/getbible-dmg"' EXIT
-          ditto "$RUNNER_TEMP/getbible-dmg/getBible.live.app" "$RUNNER_TEMP/getbible-smoke/getBible.live.app"
+          ditto "$RUNNER_TEMP/getbible-dmg/getBible.app" "$RUNNER_TEMP/getbible-smoke/getBible.app"
           hdiutil detach "$RUNNER_TEMP/getbible-dmg"
           trap - EXIT
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$RUNNER_TEMP/getbible-smoke/getBible.live.app/Contents/Info.plist")" = getbible
-          python scripts/release/smoke_desktop.py "$RUNNER_TEMP/getbible-smoke/getBible.live.app/Contents/MacOS/getBible.live"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$RUNNER_TEMP/getbible-smoke/getBible.app/Contents/Info.plist")" = getbible
+          python scripts/release/smoke_desktop.py "$RUNNER_TEMP/getbible-smoke/getBible.app/Contents/MacOS/getBible"
       - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.target }}-${{ needs.metadata.outputs.artifact_version }}
@@ -522,7 +523,7 @@ jobs:
           MACOS_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
         run: |
-          bash scripts/release/sign_macos.sh app build/macos/Build/Products/Release/getBible.live.app
+          bash scripts/release/sign_macos.sh app build/macos/Build/Products/Release/getBible.app
           python scripts/release/package.py package --target macos --metadata build/release-metadata.json --output dist --signing-mode distribution --sign-hook scripts/release/sign_macos_artifact.sh
       - uses: actions/upload-artifact@v4
         with:

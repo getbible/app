@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/search.dart';
-import 'package:getbible_live/services/search_service.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/search.dart';
+import 'package:getbible/services/search_service.dart';
 
 void main() {
   final WholeTranslation corpus = WholeTranslation(

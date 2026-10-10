@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/native_ui_catalog.dart';
-import 'package:getbible_live/core/ui_strings.dart';
-import 'package:getbible_live/core/web_ui_catalog.dart';
+import 'package:getbible/core/native_ui_catalog.dart';
+import 'package:getbible/core/ui_strings.dart';
+import 'package:getbible/core/web_ui_catalog.dart';
 
 Map<String, Object?> _object(String path) =>
     (jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>);

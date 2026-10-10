@@ -1,6 +1,6 @@
-# getBible.live (Flutter implementation)
+# getBible
 
-Cross-platform Flutter implementation of [getBible.Life](https://app.getbible.life), maintained at [`getbible/app`](https://github.com/getbible/app). It targets Android, iOS, web, Windows, macOS, and Linux from one native Flutter codebase. Scripture comes from GetBible Bible v3, reference previews use Query v3, and private reader data remains on the device. The reader does not use a WebView.
+Cross-platform Flutter implementation of [getBible](https://app.getbible.life), maintained at [`getbible/app`](https://github.com/getbible/app). It targets Android, iOS, web, Windows, macOS, and Linux from one native Flutter codebase. Scripture comes from GetBible Bible v3, reference previews use Query v3, and private reader data remains on the device. The reader does not use a WebView.
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
@@ -18,6 +18,9 @@ The React application at [`getbible/app.getbible.life`](https://github.com/getbi
 | Linux | `flutter run -d linux` | Debian DEB installer and portable TAR.GZ |
 
 Download published versions from [GitHub Releases](https://github.com/getbible/app/releases).
+Alpha 5 establishes the corrected **getBible** naming and requires removing
+earlier alpha installations and their local test data. This development reset
+does not migrate previous installation or database names.
 See [installation and testing](docs/INSTALLING.md) for device requirements,
 unsigned-package behavior and checksum verification. Flutter creates application
 bundles; this repository's packaging scripts turn them into installers. Linux

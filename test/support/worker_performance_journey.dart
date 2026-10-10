@@ -4,8 +4,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/data/offline/bible_index_worker.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/data/offline/bible_index_worker.dart';
 
 /// A reproducible synthetic corpus exercises the actual native worker. Timing
 /// and memory are evidence, not flaky device-speed acceptance thresholds.

@@ -31,7 +31,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-APP = "getbible-live"
+APP = "getbible"
 MAINTAINER = "Llewellyn van der Merwe <5607939+Llewellynvdm@users.noreply.github.com>"
 
 
@@ -244,7 +244,7 @@ class LinuxPackager(Packager):
         repo, metadata = self.context.repo, self.context.metadata
         source = self.context.input or repo / f"build/linux/{self.arch}/release/bundle"
         bundle = self.bundle(source)
-        executable = require(bundle / "getbible_life")
+        executable = require(bundle / "getbible")
         header = executable.read_bytes()[:20]
         if len(header) < 20 or header[:5] != b"\x7fELF\x02" or header[5] != 1:
             raise PackagingError("Linux executable must be a little-endian 64-bit ELF")
@@ -261,12 +261,12 @@ class LinuxPackager(Packager):
         archive_tar(bundle, self.output(".tar.gz", "portable bundle"), metadata.source_date_epoch)
 
         deb = self.context.staging / "work/debian"
-        app = deb / "opt/getbible-live"
+        app = deb / "opt/getbible"
         app.parent.mkdir(parents=True)
         copy_tree(bundle, app)
-        launcher = deb / "usr/bin/getbible-live"
+        launcher = deb / "usr/bin/getbible"
         launcher.parent.mkdir(parents=True)
-        launcher.symlink_to("/opt/getbible-live/getbible_life")
+        launcher.symlink_to("/opt/getbible/getbible")
         desktop = deb / "usr/share/applications/life.getbible.mobile.desktop"
         desktop.parent.mkdir(parents=True)
         shutil.copy2(require(repo / "packaging/linux/life.getbible.mobile.desktop"), desktop)
@@ -282,8 +282,8 @@ class LinuxPackager(Packager):
         dependency_root = self.context.staging / "work/dependencies"
         (dependency_root / "debian").mkdir(parents=True)
         (dependency_root / "debian/control").write_text(
-            "Source: getbible-live\nSection: education\nPriority: optional\n"
-            f"Maintainer: {MAINTAINER}\n\nPackage: getbible-live\n"
+            "Source: getbible\nSection: education\nPriority: optional\n"
+            f"Maintainer: {MAINTAINER}\n\nPackage: getbible\n"
             "Architecture: any\nDescription: Native Scripture reader\n", encoding="utf-8",
         )
         elves = [executable, *sorted((bundle / "lib").glob("*.so*"))]
@@ -300,7 +300,7 @@ class LinuxPackager(Packager):
             f"Architecture: {'amd64' if self.arch == 'x64' else 'arm64'}\n"
             f"Maintainer: {MAINTAINER}\nSection: education\nPriority: optional\n"
             f"Depends: {matches[0]}\nInstalled-Size: {installed_kib}\n"
-            "Homepage: https://getbible.net/\nDescription: getBible.live native Scripture reader\n"
+            "Homepage: https://getbible.net/\nDescription: getBible native Scripture reader\n"
             " Read and study Scripture with private notes and markings.\n", encoding="utf-8",
         )
         # SOURCE_DATE_EPOCH is interpreted by dpkg-deb and does not mutate the
@@ -339,7 +339,7 @@ class WindowsPackager(Packager):
             raise PackagingError("The Windows installer currently requires --arch x64")
         repo, metadata = self.context.repo, self.context.metadata
         bundle = self.bundle(self.context.input or repo / "build/windows/x64/runner/Release")
-        executable = require(bundle / "getbible_life.exe")
+        executable = require(bundle / "getbible.exe")
         header = executable.read_bytes()
         if header[:2] != b"MZ" or len(header) < 64:
             raise PackagingError("Windows runner is not a PE executable")
@@ -440,7 +440,7 @@ class MacOSPackager(ApplePackager):
     signing = "unsigned distribution; local ad-hoc build signature may be present"
 
     def build(self) -> None:
-        bundle = self.read_app(self.context.input or self.context.repo / "build/macos/Build/Products/Release/getBible.live.app", macos=True)
+        bundle = self.read_app(self.context.input or self.context.repo / "build/macos/Build/Products/Release/getBible.app", macos=True)
         if self.context.signing_mode == "distribution":
             self.verify_signature(bundle, macos=True)
             run([tool("xcrun"), "stapler", "validate", bundle])
@@ -453,7 +453,7 @@ class MacOSPackager(ApplePackager):
         shutil.copy2(require(self.context.repo / "LICENSE"), image_root / "LICENSE")
         write_json(image_root / "release-metadata.json", asdict(self.context.metadata))
         image = self.output(".dmg", "macOS drag-to-Applications disk image")
-        run([tool("hdiutil"), "create", "-volname", "getBible.live", "-srcfolder", image_root, "-format", "UDZO", "-ov", image])
+        run([tool("hdiutil"), "create", "-volname", "getBible", "-srcfolder", image_root, "-format", "UDZO", "-ov", image])
         if self.context.signing_mode == "distribution":
             if not self.context.sign_hook:
                 raise PackagingError("Distribution macOS packaging requires --sign-hook to sign/notarize/staple the DMG")

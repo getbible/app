@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/dictionary_controller.dart';
-import 'package:getbible_live/domain/models/reference.dart';
-import 'package:getbible_live/presentation/widgets/dictionary_panel.dart';
+import 'package:getbible/application/dictionary_controller.dart';
+import 'package:getbible/domain/models/reference.dart';
+import 'package:getbible/presentation/widgets/dictionary_panel.dart';
 
 import 'support/dictionary_fixture.dart';
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/presentation/widgets/scripture_paragraph_selection.dart';
-import 'package:getbible_live/services/scripture_text.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/presentation/widgets/scripture_paragraph_selection.dart';
+import 'package:getbible/services/scripture_text.dart';
 
 void main() {
   for (final TargetPlatform platform in <TargetPlatform>[

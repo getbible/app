@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/dictionary_lookup.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/data/offline/dictionary_index_reader.dart';
+import 'package:getbible/application/dictionary_lookup.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/data/offline/dictionary_index_reader.dart';
 
 void main() {
   test(

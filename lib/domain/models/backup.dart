@@ -79,7 +79,7 @@ final class BackupData {
     'notes': notes.map((VerseNote item) => item.toJson()).toList(),
     if (preferences != null) 'preferences': preferences!.toJson(),
     'source': <String, Object?>{
-      'application': 'getBible.live Flutter',
+      'application': 'getBible',
       'schemaVersion': 1,
     },
   };

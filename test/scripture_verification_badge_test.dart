@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/cache.dart';
-import 'package:getbible_live/presentation/widgets/scripture_verification_badge.dart';
+import 'package:getbible/domain/models/cache.dart';
+import 'package:getbible/presentation/widgets/scripture_verification_badge.dart';
 
 void main() {
   Future<void> pumpBadge(WidgetTester tester, CacheFreshness freshness) async {

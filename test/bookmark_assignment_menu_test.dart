@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/annotations.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/service_envelopes.dart';
-import 'package:getbible_live/domain/models/unified_bookmarks.dart';
-import 'package:getbible_live/presentation/widgets/bookmark_assignment_menu.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/annotations.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/service_envelopes.dart';
+import 'package:getbible/domain/models/unified_bookmarks.dart';
+import 'package:getbible/presentation/widgets/bookmark_assignment_menu.dart';
 
 import 'support/reader_api_fixture.dart';
 

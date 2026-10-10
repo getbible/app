@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/data/api/api_transport.dart';
-import 'package:getbible_live/data/api/getbible_api_client.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/repositories/cached_bible_repository.dart';
-import 'package:getbible_live/domain/models/cache.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/data/api/api_transport.dart';
+import 'package:getbible/data/api/getbible_api_client.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/repositories/cached_bible_repository.dart';
+import 'package:getbible/domain/models/cache.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

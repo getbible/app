@@ -3,16 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/grouped_reference_lookup.dart';
-import 'package:getbible_live/application/reference_preview_controller.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/reference.dart';
-import 'package:getbible_live/domain/repositories/bible_repository.dart';
-import 'package:getbible_live/domain/repositories/query_repository.dart';
-import 'package:getbible_live/presentation/widgets/reference_preview.dart';
-import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
+import 'package:getbible/application/grouped_reference_lookup.dart';
+import 'package:getbible/application/reference_preview_controller.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/reference.dart';
+import 'package:getbible/domain/repositories/bible_repository.dart';
+import 'package:getbible/domain/repositories/query_repository.dart';
+import 'package:getbible/presentation/widgets/reference_preview.dart';
+import 'package:getbible/presentation/widgets/scripture_verse_text.dart';
 
 void main() {
   testWidgets(

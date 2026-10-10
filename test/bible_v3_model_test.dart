@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
+import 'package:getbible/domain/models/bible.dart';
 
 Object? fixture(String name) =>
     jsonDecode(File('test/fixtures/bible_v3/$name').readAsStringSync());

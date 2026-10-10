@@ -6,11 +6,11 @@ import 'package:drift/drift.dart'
     show QueryExecutor, QueryExecutorUser, OpeningDetails;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/offline_controller.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/offline_resource.dart';
-import 'package:getbible_live/domain/repositories/offline_resource_repository.dart';
+import 'package:getbible/application/offline_controller.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/offline_resource.dart';
+import 'package:getbible/domain/repositories/offline_resource_repository.dart';
 
 final _source = Uri.parse('https://example.test/v3');
 OfflineResourceDescriptor _resource({String revision = 'one', Uri? source}) =>

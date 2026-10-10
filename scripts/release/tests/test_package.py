@@ -35,7 +35,7 @@ class PackagingTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.repo = self.root / "repo"
         self.repo.mkdir()
-        (self.repo / "pubspec.yaml").write_text("name: getbible_live\nversion: 1.2.3+42\n", encoding="utf-8")
+        (self.repo / "pubspec.yaml").write_text("name: getbible\nversion: 1.2.3+42\n", encoding="utf-8")
         (self.repo / "LICENSE").write_text("Test packaging fixture license\n", encoding="utf-8")
         release.run(["git", "init", "--quiet", self.repo])
         release.run(["git", "add", "."], cwd=self.repo)
@@ -131,7 +131,7 @@ class PackagingTests(unittest.TestCase):
             "--output", str(self.root / "dist"), "--base-href", "/flutter/",
         ], check=True, capture_output=True, text=True)
         output = self.root / "dist"
-        archive = output / "getbible-live-1.2.3-build.42-web-browser.zip"
+        archive = output / "getbible-1.2.3-build.42-web-browser.zip"
         self.assertIn(archive.name, result.stdout)
         with zipfile.ZipFile(archive) as package:
             self.assertIsNone(package.testzip())
@@ -233,7 +233,7 @@ class PackagingTests(unittest.TestCase):
         (source / "data/flutter_assets").mkdir(parents=True)
         # Executable fixture exercises real ELF dependency discovery. Production
         # builds and launches are separate jobs, never inferred from this test.
-        for relative in ("getbible_life", "lib/libflutter_linux_gtk.so", "lib/libapp.so"):
+        for relative in ("getbible", "lib/libflutter_linux_gtk.so", "lib/libapp.so"):
             shutil.copy2(shutil.which("true"), source / relative)
         (source / "data/icudtl.dat").write_bytes(b"ICU fixture")
         (self.repo / "packaging/linux").mkdir(parents=True)
@@ -248,9 +248,9 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Depends: libc6", control)
         extracted = self.root / "extracted"
         release.run(["dpkg-deb", "--extract", package, extracted])
-        self.assertTrue((extracted / "opt/getbible-live/lib/libapp.so").exists())
+        self.assertTrue((extracted / "opt/getbible/lib/libapp.so").exists())
         desktop = (extracted / "usr/share/applications/life.getbible.mobile.desktop").read_text()
-        self.assertIn("Exec=/opt/getbible-live/getbible_life %u", desktop)
+        self.assertIn("Exec=/opt/getbible/getbible %u", desktop)
         self.assertIn("MimeType=x-scheme-handler/getbible;", desktop)
         with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
             self.assertTrue(any(name.endswith("/data/icudtl.dat") for name in archive.getnames()))

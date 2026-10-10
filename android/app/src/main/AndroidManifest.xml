@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="getBible.live"
+        android:label="getBible"
         android:name="${applicationName}"
         android:usesCleartextTraffic="false"
         android:icon="@mipmap/ic_launcher">
@@ -34,7 +34,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="app.getbible.life" />
-                <data android:scheme="https" android:host="getbible.life" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

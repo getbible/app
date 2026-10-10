@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/cache.dart';
-import 'package:getbible_live/presentation/reader_screen.dart';
+import 'package:getbible/domain/models/cache.dart';
+import 'package:getbible/presentation/reader_screen.dart';
 
 void main() {
   Future<void> pumpNotice(WidgetTester tester, CacheFreshness freshness) async {

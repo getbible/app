@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/presentation/boundary_turn_controller.dart';
+import 'package:getbible/presentation/boundary_turn_controller.dart';
 
 void main() {
   test('requires a deliberate second boundary gesture', () {

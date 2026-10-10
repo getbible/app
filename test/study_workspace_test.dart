@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/study_context.dart';
-import 'package:getbible_live/presentation/widgets/native_scripture_text.dart';
-import 'package:getbible_live/presentation/widgets/study_workspace.dart';
-import 'package:getbible_live/services/scripture_text.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/study_context.dart';
+import 'package:getbible/presentation/widgets/native_scripture_text.dart';
+import 'package:getbible/presentation/widgets/study_workspace.dart';
+import 'package:getbible/services/scripture_text.dart';
 
 const StudyContext study = StudyContext(
   passage: Passage(translation: 'tst', book: 1, chapter: 1, verse: 3),

@@ -49,7 +49,7 @@ private final class NativeFilesHandler: NSObject, UIDocumentPickerDelegate {
         return
       }
       let controller = UIActivityViewController(activityItems: [text], applicationActivities: nil)
-      controller.setValue(arguments?["subject"] as? String ?? "getBible.Life", forKey: "subject")
+      controller.setValue(arguments?["subject"] as? String ?? "getBible", forKey: "subject")
       controller.completionWithItemsHandler = { [weak self] _, completed, _, error in
         if error != nil {
           self?.fail("Sharing could not be completed. Save or copy the text instead.")
@@ -60,7 +60,7 @@ private final class NativeFilesHandler: NSObject, UIDocumentPickerDelegate {
       present(controller)
     case "saveText":
       let text = arguments?["text"] as? String ?? ""
-      let filename = arguments?["filename"] as? String ?? "getBible-Life.txt"
+      let filename = arguments?["filename"] as? String ?? "getBible.txt"
       guard text.utf8.count <= maxFileBytes, validFilename(filename) else {
         fail("The export text or filename exceeds the supported limits.")
         return

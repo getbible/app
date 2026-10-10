@@ -212,7 +212,7 @@ const Map<String, String> webUiMessages = <String, String>{
       "Imported {markings} new markings and {notes} notes; existing data was kept.",
   "backupImportError": "The study backup could not be imported.",
   "clearAllConfirm":
-      "Clear all local getBible.Life data? This permanently removes your markings, notes, colors, reading position, settings, cached Bible chapters, and translation search indexes from this browser.",
+      "Clear all local getBible data? This permanently removes your markings, notes, colors, reading position, settings, cached Bible chapters, and translation search indexes from this browser.",
   "deleteAllMarkingsConfirm":
       "Delete all {count} saved markings? Your color groups will remain. This cannot be undone.",
   "allMarkingsDeleted": "All markings were deleted.",

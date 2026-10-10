@@ -93,7 +93,7 @@ class SourceGitHub(test_publish.FakeGitHub):
         if path.startswith("/compare/"):
             return copy.deepcopy(self.comparison)
         if path.startswith("/contents/pubspec.yaml"):
-            return {"encoding": "base64", "content": base64.b64encode(f"name: getbible_live\nversion: {self.pubspec_version}\n".encode()).decode()}
+            return {"encoding": "base64", "content": base64.b64encode(f"name: getbible\nversion: {self.pubspec_version}\n".encode()).decode()}
         if path.startswith("/git/commits/"):
             return {"committer": {"date": self.date}}
         return super().call(path, method=method, data=data, raw=raw)
@@ -198,7 +198,7 @@ class PromotionTests(unittest.TestCase):
 
     def test_one_available_signed_platform_publishes_with_all_other_platforms_unsigned(self):
         metadata = self.fixture.metadata
-        prefix = f'getbible-live-{metadata["artifact_version"]}-windows-x64-signed'
+        prefix = f'getbible-{metadata["artifact_version"]}-windows-x64-signed'
         files = {prefix + suffix: b"signed fixture " + suffix.encode() for suffix in ("-setup.exe", "-portable.zip")}
         entries = [{"file": name, "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest(), "role": "signed Windows package"} for name, body in files.items()]
         manifest_name = prefix + "-manifest.json"

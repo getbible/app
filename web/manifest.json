@@ -1,6 +1,6 @@
 {
-    "name": "getBible.live",
-    "short_name": "getBible.live",
+    "name": "getBible",
+    "short_name": "getBible",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F8F3E8",

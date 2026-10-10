@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/annotations.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/services/scripture_text.dart';
+import 'package:getbible/domain/models/annotations.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/services/scripture_text.dart';
 
 void main() {
   group('original Scripture coordinate mapping', () {

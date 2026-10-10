@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/offline_controller.dart';
-import 'package:getbible_live/core/request_cancellation.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/offline_resource.dart';
-import 'package:getbible_live/domain/repositories/offline_resource_repository.dart';
-import 'package:getbible_live/presentation/widgets/offline_setup_panel.dart';
+import 'package:getbible/application/offline_controller.dart';
+import 'package:getbible/core/request_cancellation.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/offline_resource.dart';
+import 'package:getbible/domain/repositories/offline_resource_repository.dart';
+import 'package:getbible/presentation/widgets/offline_setup_panel.dart';
 
 void main() {
   testWidgets(

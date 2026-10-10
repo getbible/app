@@ -3,8 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/data/platform/platform_text_file_service.dart';
-import 'package:getbible_live/services/text_file_service.dart';
+import 'package:getbible/data/platform/platform_text_file_service.dart';
+import 'package:getbible/services/text_file_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

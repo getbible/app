@@ -132,7 +132,7 @@ class PublicationTests(unittest.TestCase):
             ("android", "multiarch", ("-debug.apk", "-unsigned-release.apk", "-unsigned-release.aab")),
             ("web", "browser", (".zip",)),
         ):
-            prefix = f'getbible-live-{self.metadata["artifact_version"]}-{target}-{arch}'
+            prefix = f'getbible-{self.metadata["artifact_version"]}-{target}-{arch}'
             files, entries = [], []
             for ending in endings:
                 path = self.dist / (prefix + ending)
@@ -183,7 +183,7 @@ class PublicationTests(unittest.TestCase):
             if artifact.name.endswith((".deb", "-setup.exe", ".dmg", "-debug.apk", ".app.zip")):
                 self.assertIn(f"https://github.com/getbible/app/releases/download/v1.0.0-beta.1/{artifact.name}", body)
         self.assertIn("/actions/runs/123", body)
-        self.assertIn("sudo apt install ./getbible-live-", body)
+        self.assertIn("sudo apt install ./getbible-", body)
         self.assertIn("http://localhost:8000/flutter/", body)
         self.assertIn("cannot run on a physical device", body)
         self.assertIn("not rebuilt", body)
@@ -196,6 +196,15 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(publish.ReleaseError, "Invalid web hosting path"):
             publish.publish(self.client, self.dist, self.metadata)
         self.assertEqual(self.client.writes, [])
+
+    def test_alpha_five_notes_explain_clean_install_before_downloads(self):
+        metadata = {**self.metadata, "release_version": "1.0.0-alpha.5"}
+        body = publish.release_notes(
+            "getbible/app", metadata, list(self.dist.glob("*-manifest.json")), 123
+        )
+        self.assertLess(body.index("requires a clean installation"), body.index("## Downloads"))
+        self.assertIn("does not migrate old package names or databases", body)
+        self.assertNotIn("Existing private data is retained", body)
 
     def test_existing_published_release_is_never_edited_even_at_a_new_commit(self):
         publish.publish(self.client, self.dist, self.metadata)

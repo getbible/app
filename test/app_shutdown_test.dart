@@ -4,13 +4,13 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/repositories/sql_notebook_repository.dart';
-import 'package:getbible_live/domain/models/notebook.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/repositories/notebook_repository.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/repositories/sql_notebook_repository.dart';
+import 'package:getbible/domain/models/notebook.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/repositories/notebook_repository.dart';
 
 import 'support/reader_api_fixture.dart';
 

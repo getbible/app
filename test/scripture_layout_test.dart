@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/bible.dart';
-import 'package:getbible_live/services/scripture_layout.dart';
+import 'package:getbible/domain/models/bible.dart';
+import 'package:getbible/services/scripture_layout.dart';
 
 void main() {
   test(

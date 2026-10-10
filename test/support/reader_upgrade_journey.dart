@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/app_state.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/domain/models/passage.dart';
-import 'package:getbible_live/domain/models/preferences.dart';
-import 'package:getbible_live/main.dart';
-import 'package:getbible_live/presentation/widgets/reference_preview.dart';
-import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
+import 'package:getbible/application/app_state.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/models/preferences.dart';
+import 'package:getbible/main.dart';
+import 'package:getbible/presentation/widgets/reference_preview.dart';
+import 'package:getbible/presentation/widgets/scripture_verse_text.dart';
 import 'package:provider/provider.dart';
 
 import 'reader_api_fixture.dart';

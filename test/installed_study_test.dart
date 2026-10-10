@@ -3,20 +3,20 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/errors.dart';
-import 'package:getbible_live/core/json.dart';
-import 'package:getbible_live/data/api/commentary_adapter.dart';
-import 'package:getbible_live/data/api/dictionary_adapters.dart';
-import 'package:getbible_live/data/api/public_topic_adapter.dart';
-import 'package:getbible_live/data/database/local_database.dart';
-import 'package:getbible_live/data/repositories/api_commentary_repository.dart';
-import 'package:getbible_live/data/repositories/api_dictionary_repository.dart';
-import 'package:getbible_live/data/repositories/api_public_topics_repository.dart';
-import 'package:getbible_live/data/repositories/installed_study_repositories.dart';
-import 'package:getbible_live/data/repositories/sql_public_topic_copy_repository.dart';
-import 'package:getbible_live/domain/models/annotations.dart';
-import 'package:getbible_live/domain/models/offline_resource.dart';
-import 'package:getbible_live/domain/models/passage.dart';
+import 'package:getbible/core/errors.dart';
+import 'package:getbible/core/json.dart';
+import 'package:getbible/data/api/commentary_adapter.dart';
+import 'package:getbible/data/api/dictionary_adapters.dart';
+import 'package:getbible/data/api/public_topic_adapter.dart';
+import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/data/repositories/api_commentary_repository.dart';
+import 'package:getbible/data/repositories/api_dictionary_repository.dart';
+import 'package:getbible/data/repositories/api_public_topics_repository.dart';
+import 'package:getbible/data/repositories/installed_study_repositories.dart';
+import 'package:getbible/data/repositories/sql_public_topic_copy_repository.dart';
+import 'package:getbible/domain/models/annotations.dart';
+import 'package:getbible/domain/models/offline_resource.dart';
+import 'package:getbible/domain/models/passage.dart';
 
 import 'support/study_installation_fixture.dart';
 

@@ -2,13 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/application/portability_controller.dart';
-import 'package:getbible_live/domain/models/annotations.dart';
-import 'package:getbible_live/domain/models/backup.dart';
-import 'package:getbible_live/domain/models/private_backup.dart';
-import 'package:getbible_live/domain/repositories/private_data_repository.dart';
-import 'package:getbible_live/presentation/widgets/portability_panel.dart';
-import 'package:getbible_live/services/text_file_service.dart';
+import 'package:getbible/application/portability_controller.dart';
+import 'package:getbible/domain/models/annotations.dart';
+import 'package:getbible/domain/models/backup.dart';
+import 'package:getbible/domain/models/private_backup.dart';
+import 'package:getbible/domain/repositories/private_data_repository.dart';
+import 'package:getbible/presentation/widgets/portability_panel.dart';
+import 'package:getbible/services/text_file_service.dart';
 
 void main() {
   testWidgets(

@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/core/native_ui_catalog.dart';
-import 'package:getbible_live/core/ui_strings.dart';
-import 'package:getbible_live/core/web_ui_catalog.dart';
+import 'package:getbible/core/native_ui_catalog.dart';
+import 'package:getbible/core/ui_strings.dart';
+import 'package:getbible/core/web_ui_catalog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

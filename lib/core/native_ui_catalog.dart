@@ -191,9 +191,9 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Follow": "native.follow",
   "Followed": "native.followed",
   "Garamond": "native.garamond",
-  "getBible.Life": "native.getbibleLife",
-  "getBible.Life — {wordsOfEternalLife}":
-      "native.getbibleLifeWordsOfEternalLife",
+  "getBible": "native.getbible",
+  "getBible — {wordsOfEternalLife}":
+      "native.getbibleWordsOfEternalLife",
   "Global and personal bookmark": "native.globalAndPersonalBookmark",
   "Global bookmark": "native.globalBookmark",
   "Global bookmarks": "native.globalBookmarks",

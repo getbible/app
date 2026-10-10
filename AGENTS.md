@@ -4,7 +4,7 @@ This file is authoritative for automated coding agents working in this repositor
 
 ## Mission
 
-Maintain a production-quality, native Flutter implementation named **getBible.live (Flutter implementation)** in `getbible/app`. Preserve the React website and its backup contract. Android, iOS, web, Windows, macOS, and Linux are supported Flutter targets, with mobile release signing treated as a platform-specific concern. Never replace the reader with a WebView, add tracking, invent cloud synchronization, or commit credentials/signing material.
+Maintain a production-quality, native Flutter implementation named **getBible** in `getbible/app`. Preserve the React website and its backup contract. Android, iOS, web, Windows, macOS, and Linux are supported Flutter targets, with mobile release signing treated as a platform-specific concern. Never replace the reader with a WebView, add tracking, invent cloud synchronization, or commit credentials/signing material.
 
 ## Read first
 

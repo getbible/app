@@ -43,7 +43,12 @@ Older website imports are recognized only by the exact deterministic marking ID
 collision renaming or group remapping. An arbitrary personal marking in that
 group remains personal. Ordinary older backups with no sources still import.
 
-The historical on-device database identifier remains `getbible_life` so an application-name or repository rename never strands existing local reader data.
+The current on-device database identifier is `getbible` (`getbible.sqlite` on
+native platforms). The product-name correction is an intentional alpha reset:
+developers must remove the previous test installation and its local data before
+installing this build. There are no database-name aliases, automatic data moves,
+or compatibility migrations for this rename. The schema migrations below apply
+within the current database identity; they do not import an earlier installation.
 
 ## Migration procedure
 
@@ -55,7 +60,7 @@ The historical on-device database identifier remains `getbible_life` so an appli
 
 ## Database schema 2
 
-The schema 1 → 2 migration runs transactionally and keeps the historical `getbible_life` database identity. It adds `fresh_until` and `must_revalidate` to cache bookkeeping, and partitions existing Scripture cache keys under `bible:v2:s1:`. Payloads and source hashes are retained. New Bible v3 model/cache serialization uses `bible:v3:s2:` and respects HTTP cache policy. Notes, marking groups, markings, saved quotes/ranges, preferences and last reading position are not rewritten.
+The schema 1 → 2 migration runs transactionally and uses the `getbible` database identity. It adds `fresh_until` and `must_revalidate` to cache bookkeeping, and partitions existing Scripture cache keys under `bible:v2:s1:`. Payloads and source hashes are retained. New Bible v3 model/cache serialization uses `bible:v3:s2:` and respects HTTP cache policy. Notes, marking groups, markings, saved quotes/ranges, preferences and last reading position are not rewritten.
 
 `test/fixtures/database_schema_v1.sql` records the released schema. Migration regressions reopen an actual schema-one SQLite file, verify every private table and legacy cache payload, and prove that a failed migration rolls back columns, keys and schema version. Exact-prefix tests preserve neighbouring numeric IDs and literal wildcard characters.
 
@@ -173,7 +178,7 @@ execution is verified separately from the storage contract.
 
 The forward schema 1/2/3/4 → 5 migration transaction adds `offline_generations`,
 `offline_active`, `offline_documents`, `offline_search` and `offline_attempts`.
-Every existing private/cache table and the historical database identity remain
+Every existing private/cache table within the current database identity remains
 unchanged. The released schema-4 fixture is
 `test/fixtures/database_schema_v4.sql`; `offline_resource_store_test.dart`
 verifies migration with private notes and source provenance. Ordinary caches,

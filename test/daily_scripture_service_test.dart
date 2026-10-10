@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getbible_live/domain/models/cache.dart';
-import 'package:getbible_live/services/daily_scripture_service.dart';
+import 'package:getbible/domain/models/cache.dart';
+import 'package:getbible/services/daily_scripture_service.dart';
 
 void main() {
   test('parses website daily aliases and deliberately opens KJV', () {

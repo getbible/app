@@ -1263,7 +1263,7 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
                 child: Text(
-                  UiStrings.of(context).text('getBible.Life'),
+                  UiStrings.of(context).text('getBible'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
@@ -2789,10 +2789,10 @@ class _ChapterFooter extends StatelessWidget {
                     padding: EdgeInsets.zero,
                   ),
                   onPressed: () =>
-                      launchUrl(Uri.parse('https://getbible.life')),
+                      launchUrl(Uri.parse('https://app.getbible.life')),
                   child: Text(
                     UiStrings.of(context).text(
-                      'getBible.Life — {wordsOfEternalLife}',
+                      'getBible — {wordsOfEternalLife}',
                       {'wordsOfEternalLife': state.ui('wordsOfEternalLife')},
                     ),
                   ),
@@ -2880,7 +2880,7 @@ class _ScriptureShareDialogState extends State<_ScriptureShareDialog> {
     final String reference = verses.length == 1
         ? '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}'
         : '${_chapter.bookName} ${_chapter.chapter}:${verses.first.verse}\u2013${verses.last.verse}';
-    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
+    return '${verses.map((Verse verse) => '${verse.verse}. ${verse.text}').join('\n')}\n\n$reference \u2014 ${_translation.translation}\nhttps://app.getbible.life/${_translation.abbreviation.toUpperCase()}/${Uri.encodeComponent(_chapter.bookName)}/${_chapter.chapter}?verse=${verses.first.verse}';
   }
 
   String get _value => _markdown

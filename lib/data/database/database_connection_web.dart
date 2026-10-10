@@ -14,7 +14,7 @@ Uri _databaseAsset(String name) => Uri.parse(_documentBaseUri).resolve(name);
 
 Future<QueryExecutor> openDatabaseExecutor() async {
   final WasmDatabaseResult result = await WasmDatabase.open(
-    databaseName: 'getbible_life',
+    databaseName: 'getbible',
     sqlite3Uri: _databaseAsset('sqlite3.wasm'),
     driftWorkerUri: _databaseAsset('drift_worker.dart.js'),
   );
@@ -29,7 +29,7 @@ Future<QueryExecutor> openDatabaseExecutor() async {
 
 Future<QueryExecutor> openMemoryDatabaseExecutor() async {
   final WasmDatabaseResult result = await WasmDatabase.open(
-    databaseName: 'getbible_life_test',
+    databaseName: 'getbible_test',
     sqlite3Uri: _databaseAsset('sqlite3.wasm'),
     driftWorkerUri: _databaseAsset('drift_worker.dart.js'),
   );

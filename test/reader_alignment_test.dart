@@ -96,6 +96,14 @@ void main() {
         await tester.tap(bookmark);
         await _settle(tester, state);
         expect(find.byType(BookmarkAssignmentMenu), findsOneWidget);
+        if (!compact) {
+          // A closed picker with one membership should fit its content rather
+          // than reserving an almost full-height, mostly empty modal.
+          expect(
+            tester.getSize(find.byType(BookmarkAssignmentMenu)).height,
+            lessThan(360),
+          );
+        }
         expect(find.text('First personal topic'), findsOneWidget);
         expect(find.widgetWithText(TextField, 'Find a topic'), findsNothing);
         expect(

@@ -118,149 +118,139 @@ final class _BookmarkAssignmentMenuState extends State<BookmarkAssignmentMenu> {
       final blocked = _saving || state.bookmarks.busy;
       final pickerOpen = _pickerOpen ??= assignments.isEmpty;
       return FocusTraversalGroup(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 4, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      strings('verseBookmarks', {
-                        'reference': widget.reference,
-                      }),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+        child: _AssignmentLayout(
+          header: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 4, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    strings('verseBookmarks', {'reference': widget.reference}),
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  IconButton(
-                    tooltip: strings.text('Close'),
-                    onPressed: widget.onClose,
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
+                ),
+                IconButton(
+                  tooltip: strings.text('Close'),
+                  onPressed: widget.onClose,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
             ),
-            const Divider(height: 1),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (widget.start != null)
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          widget.quote,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    for (final values in assignments.values)
-                      _assignment(values, blocked, strings),
-                    if (assignments.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(strings('noVerseBookmarks')),
-                      ),
-                    const SizedBox(height: 8),
-                    Semantics(
-                      expanded: pickerOpen,
-                      child: OutlinedButton.icon(
-                        onPressed: blocked
-                            ? null
-                            : () => setState(() => _pickerOpen = !pickerOpen),
-                        icon: Icon(pickerOpen ? Icons.remove : Icons.add),
-                        label: Text(strings('addAnotherTopic')),
-                        style: OutlinedButton.styleFrom(
-                          alignment: AlignmentDirectional.centerStart,
-                          minimumSize: const Size(0, 48),
-                        ),
-                      ),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.start != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      widget.quote,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (_saving || state.bookmarks.loading)
-                      const LinearProgressIndicator(),
-                    if (_error != null || state.bookmarks.error != null)
-                      Text(
-                        strings.text('Could not update bookmarks. {error}', {
-                          'error': (_error ?? state.bookmarks.error).toString(),
-                        }),
-                      ),
-                    if (pickerOpen) ...[
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _search,
-                        focusNode: _searchFocus,
-                        decoration: InputDecoration(
-                          labelText: strings('findTopic'),
-                          prefixIcon: const Icon(Icons.search),
+                  ),
+                for (final values in assignments.values)
+                  _assignment(values, blocked, strings),
+                if (assignments.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(strings('noVerseBookmarks')),
+                  ),
+                const SizedBox(height: 8),
+                Semantics(
+                  expanded: pickerOpen,
+                  child: OutlinedButton.icon(
+                    onPressed: blocked
+                        ? null
+                        : () => setState(() => _pickerOpen = !pickerOpen),
+                    icon: Icon(pickerOpen ? Icons.remove : Icons.add),
+                    label: Text(strings('addAnotherTopic')),
+                    style: OutlinedButton.styleFrom(
+                      alignment: AlignmentDirectional.centerStart,
+                      minimumSize: const Size(0, 48),
+                    ),
+                  ),
+                ),
+                if (_saving || state.bookmarks.loading)
+                  const LinearProgressIndicator(),
+                if (_error != null || state.bookmarks.error != null)
+                  Text(
+                    strings.text('Could not update bookmarks. {error}', {
+                      'error': (_error ?? state.bookmarks.error).toString(),
+                    }),
+                  ),
+                if (pickerOpen) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _search,
+                    focusNode: _searchFocus,
+                    decoration: InputDecoration(
+                      labelText: strings('findTopic'),
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    child: ListView(
+                      primary: false,
+                      shrinkWrap: true,
+                      children: [
+                        if (recent.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              strings('recentTopics'),
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
+                          ),
+                          for (final group in recent)
+                            _topic(group, marks, blocked, strings),
+                        ],
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Text(
+                            strings('allTopics'),
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
                         ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: 8),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 260),
-                        child: ListView(
-                          primary: false,
-                          shrinkWrap: true,
-                          children: [
-                            if (recent.isNotEmpty) ...[
-                              Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Text(
-                                  strings('recentTopics'),
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                              ),
-                              for (final group in recent)
-                                _topic(group, marks, blocked, strings),
-                            ],
-                            Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Text(
-                                strings('allTopics'),
-                                style: Theme.of(context).textTheme.labelMedium,
+                        for (final group in groups.where(
+                          (group) => !recentIds.contains(group.id),
+                        ))
+                          _topic(group, marks, blocked, strings),
+                        if (groups.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              strings(
+                                query.isEmpty
+                                    ? 'allTopicsAssigned'
+                                    : 'noMatchingTopics',
                               ),
                             ),
-                            for (final group in groups.where(
-                              (group) => !recentIds.contains(group.id),
-                            ))
-                              _topic(group, marks, blocked, strings),
-                            if (groups.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(
-                                  strings(
-                                    query.isEmpty
-                                        ? 'allTopicsAssigned'
-                                        : 'noMatchingTopics',
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: TextButton(
-                onPressed: blocked ? null : () => widget.onOpenTopic(null),
-                style: TextButton.styleFrom(
-                  alignment: AlignmentDirectional.centerStart,
-                  minimumSize: const Size(0, 48),
-                ),
-                child: Text(strings('manageTopics')),
+          ),
+          footer: Padding(
+            padding: const EdgeInsets.all(8),
+            child: TextButton(
+              onPressed: blocked ? null : () => widget.onOpenTopic(null),
+              style: TextButton.styleFrom(
+                alignment: AlignmentDirectional.centerStart,
+                minimumSize: const Size(0, 48),
               ),
+              child: Text(strings('manageTopics')),
             ),
-          ],
+          ),
         ),
       );
     },
@@ -426,4 +416,37 @@ final class _BookmarkAssignmentMenuState extends State<BookmarkAssignmentMenu> {
       }
     }
   }
+}
+
+/// Keeps the normal menu compact with stable chrome. When the keyboard and
+/// accessible text leave too little room for that chrome, the complete menu
+/// scrolls so every control remains reachable without truncating its label.
+final class _AssignmentLayout extends StatelessWidget {
+  const _AssignmentLayout({
+    required this.header,
+    required this.body,
+    required this.footer,
+  });
+
+  final Widget header, body, footer;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+      final scrollChrome = constraints.maxHeight < 180 * textScale;
+      final contents = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header,
+          const Divider(height: 1),
+          if (scrollChrome) body else Flexible(fit: FlexFit.loose, child: body),
+          const Divider(height: 1),
+          footer,
+        ],
+      );
+      return scrollChrome ? SingleChildScrollView(child: contents) : contents;
+    },
+  );
 }

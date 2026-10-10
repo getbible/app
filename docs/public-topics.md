@@ -94,7 +94,10 @@ Scoped provenance keeps the copy destination stable through restart and backup.
 Complete private backups contain saved personal/global memberships, source fields,
 recent topics, reader preferences, Follow/Hide and private-copy provenance.
 Website-compatible v2 exports retain supported source fields and reader data,
-but omit the complete app settings and notebooks. Public cached/installed API
+but omit the complete app settings and notebooks. They reject foreign-provider
+source records with guidance to use complete private backup: the website cannot
+preserve those distinct provider identities. Complete backups retain them without
+changing their origins. Public cached/installed API
 corpora are separate from these saved memberships and are excluded from private
 backups. Removing a public corpus does not remove saved bookmarks of either origin.
 

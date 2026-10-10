@@ -180,6 +180,10 @@ Run `python3 scripts/build_web_shell.py --build-dir build/web` after a local
 Flutter Web build to produce this manifest and the corresponding worker. The
 loader is disabled in source/development and enabled only by successful release
 shell generation. CI runs the generator before browser acceptance and packaging.
+The committed `web/flutter_bootstrap.js` uses Flutter's documented loader and
+build-configuration substitutions, then initializes without `serviceWorkerSettings`.
+This prevents Flutter's default offline-first worker from competing with the
+verified shell for the same scope; the generator rejects that competing setup.
 The host must serve `index.html` for otherwise-unmatched HTML navigations under
 the configured base path, preserving true 404 responses for missing assets.
 This makes first-visit friendly passage links work before service-worker

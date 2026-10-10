@@ -15,6 +15,14 @@ SQLite stores cache entries, marking groups, markings, notes, and settings. Read
 
 Export emits schema version 2 and website-compatible `value`/`colorId` fields. Flutter-only preferences are additive and may be ignored by the website.
 
+The reference website models only the official bookmark provider. Its identity
+rules do not distinguish another provider's `sourceScope`, even when an unknown
+field survives initial parsing. Website export therefore rejects any group or
+membership from another provider and directs the user to **Complete private
+backup**. It never silently strips, reclassifies or omits those saved records.
+Complete backups preserve provider scopes, and import keeps otherwise identical
+group IDs from different providers separate.
+
 Current website groups and whole-verse markings may contain
 `source: {"type": "shared-bookmark", "topicId": "faith"}`. That typed source
 round-trips through import, SQLite and export; editing a group's local label or
@@ -110,7 +118,8 @@ private-copy provenance.
 
 A website-compatible export remains available and is labelled as excluding
 notebooks/drafts and complete app settings. Both website schema versions 1 and 2
-remain accepted. The complete app envelope is not represented as a format the
+remain accepted. Foreign-provider source records require complete export, as
+described above. The complete app envelope is not represented as a format the
 reference website can restore. Human-readable Markdown is an export for reading
 and sharing, not a replacement for the complete restorable JSON backup.
 

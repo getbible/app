@@ -46,11 +46,14 @@ UiStrings.of(context).text(
 )
 ```
 
-The inventory command scans only explicit UI calls. A small reviewed list in
+The inventory command scans only explicit UI calls. A reviewed list in
 `tool/native_ui_defaults.json` registers UI-owned labels returned by framework-
-independent file/status services. Those services stay independent of Flutter.
+independent file/status services and backup validation boundaries. Those services stay independent of Flutter.
+The current native catalog has 442 templates. CI also rejects new plain static
+text, tooltip and input labels that would bypass this explicit catalog.
 A malformed/missing pack or translated placeholder falls back per message;
-private content is never transformed to fill a translation gap. Substitution is
+private content is never transformed to fill a translation gap. Unknown parser
+diagnostics retain their original detail under a localized failure explanation. Substitution is
 one pass, so braces inside a source name cannot become another placeholder.
 
 Native extensions are machine translated using the reference project's public
@@ -76,9 +79,11 @@ flutter test test/ui_strings_test.dart test/localization_contract_test.dart test
 The translation step is an explicit maintainer action requiring internet access.
 It submits only the public English UI catalog. It uses no application accounts,
 API keys, backups or user data. It preserves existing translations whose original
-English template is unchanged, validates message boundaries and placeholder
-identities, and stores complete language packs atomically. Partial progress is
-recoverable; errors return a nonzero status. For a single language, add
+English template is unchanged, validates message boundaries, placeholder
+identities and technical terms such as UTF-8/JSON, and stores complete language
+packs atomically. Partial progress is checkpointed under `build/ui-translations/`
+and can be resumed; errors return a nonzero status. Access denials and rate limits
+stop the affected target rather than attempting to bypass them. For a single language, add
 `--locales af`; normal generation uses two concurrent sessions and can explicitly
 use up to four with `--workers 4`.
 

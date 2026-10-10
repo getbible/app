@@ -129,9 +129,11 @@ and reopens actual SQLite to verify the final private edit survived.
 Its fault-injection case rejects a failed journal write, verifies that the draft,
 database and public reader remain usable, and retries shutdown after recovery.
 
-CI runs both native Linux journeys before building the Linux release. Integration
-tests use deterministic HTTP fixtures; public contracts and real downloaded
-resource documents are checked separately. Neither replaces physical-device
+CI runs the aggregate native Linux acceptance journey before building the Linux
+release: reader, Study, private portability, released-schema migration and
+background-worker behavior. Integration tests use deterministic HTTP fixtures;
+public contracts and real downloaded resource documents are checked separately.
+Neither replaces physical-device
 gestures, assistive technology, clipboard, process suspension or browser-runtime
 CORS QA. After an integration run, use the normal production `flutter build`
 command, without an integration-test entry point or `--no-pub`. CI first validates
@@ -222,18 +224,23 @@ cache/retry headers; actual deployed-browser CORS remains a separate gate.
 That recorded increment also validated unsigned Android release APK/AAB output.
 It predates the host and distribution workflow described below and is not evidence
 that the current head passed Apple/Windows builds or signed-package checks.
-Physical-device gestures and accessibility, full locale adoption, complete offline
-installations and private notebook portability retain their product release gates.
+At that historical increment, physical-device accessibility, full locale
+adoption, complete installations and private notebook portability were still
+open. The later sections record their implementation and current evidence;
+human linguistic review and physical-device acceptance remain separate gates.
 
 ## Distribution and host regression gates
 
 The current workflow restores the pinned Flutter SDK and lockfile, checks every
 native target on its corresponding host, and runs the production Web bundle in
-Chromium. `tool/browser_smoke` intercepts only the public Bible/daily endpoints
-with deterministic fixtures. The app uses its real SQLite WASM and worker, saves
-a private note and reopens it with API requests unavailable under both ordinary
-static hosting and cross-origin-isolated headers. Unexpected external requests,
-JavaScript exceptions and absent reader/note state fail the job.
+Chromium, Firefox and WebKit. `tool/browser_smoke` supplies deterministic fixtures
+at public API boundaries, including Bible/daily and Study installation resources.
+The app uses its real SQLite WASM and workers, downloads/restores a private backup,
+installs Bible and dictionary resources, and reopens with all networking disabled
+under both ordinary static hosting and cross-origin-isolated headers. Unexpected
+external requests, JavaScript exceptions and absent reader/note state fail the
+job. The separate shell tests cover verified asset caching, interrupted installs
+and deployment changes without taking over an existing page's unsaved work.
 
 Python standard-library suites cover developer preflight, checksum-verified SDK
 setup, package/version validation, Debian packaging, signing configuration,
@@ -246,20 +253,31 @@ python3 -m unittest discover -s scripts/release/tests -p 'test_*.py'
 
 Unsigned package builds require no signing credentials. Optional signed jobs
 run only on trusted main and only with complete per-platform configuration.
-Missing configuration is reported by name. A signing job that runs and fails is
-a real failure, not a successful unsigned fallback. Publishing a GitHub release
-requires a manual trigger and checks the authoritative pubspec version.
-The publication suite requires all unsigned target packages and configured signed
+Missing configuration skips only that platform's signed job and is reported by
+name. A signing job that runs and fails is a real failure, not a successful
+unsigned fallback. `publish-release.yml` automatically promotes a new version
+after a successful trusted `Flutter CI` run on main. Its manual trigger accepts
+an existing successful main `source_run_id` for recovery; neither path rebuilds
+the application. The source commit's `pubspec.yaml` is authoritative, and an
+already published version is left unchanged.
+
+The promotion/publication suites require main ancestry, matching source SHA,
+version and timestamp, all unsigned target artifacts and any successful signed
 targets, exact manifest/checksum coverage, increasing semantic/native versions,
-and upload digest verification. It exercises recovery of an interrupted draft at
-the original commit/build, rejects moved tags or mismatched uploads, and ensures
-an already published version is never overwritten. These API-contract tests do
-not create a real GitHub release or imply that signing credentials were present.
+and download/upload digest verification. They exercise recovery of an interrupted
+draft at the original commit/build, reject moved tags or mismatched uploads, and
+ensure an already published version is never overwritten. These API-contract
+tests do not create a real GitHub release or imply that signing credentials were
+present. CI retains package artifacts for 90 days; expired or incomplete source
+artifacts cannot be promoted.
 
 Linux installs its Debian output and launches the installed application. Windows
 silently installs its EXE into a temporary directory and launches that installed
-binary. macOS unpacks its produced ZIP and launches the contained app. These are
-loader/startup checks, not a substitute for interactive feature/device testing.
+binary. macOS inspects its ZIP, mounts the produced DMG read-only, copies the app
+to a temporary installation directory, unmounts the DMG, checks its custom URL
+scheme and launches the copied app. Linux and Windows also check installed
+launcher/protocol registration. These are loader/startup checks, not a substitute
+for interactive feature/device testing.
 
 The source-backed [October parity audit](PARITY_AUDIT_2026-10.md) records current
 reference behavior and outstanding product gaps. New daily-reference and bookmark
@@ -277,8 +295,8 @@ checksums and Debian installation also passed. This worker's display access
 prevented local native UI execution; the Linux reader and Study journeys passed
 on the native CI runner.
 
-Current native build, installed-package startup and downloadable-artifact status
-is recorded in [pull request #3 and its checks](https://github.com/getbible/app/pull/3).
+That increment's native build, installed-package startup and downloadable-artifact
+status is recorded in [pull request #3 and its checks](https://github.com/getbible/app/pull/3).
 Earlier green builds do not replace a complete passing matrix on the latest
 reviewed commit, including the Android build-mode regeneration repair above.
 No distribution credentials were supplied for this validation, and no signed
@@ -320,7 +338,8 @@ picker, test share cancellation and Save/Copy fallback, install/update/remove a
 large resource, restart without public network access, and verify private data
 after a storage-limit failure. Browser tests must include the configured non-root
 base path and both ordinary and isolated hosting. Physical device accessibility,
-suspension/eviction and signing/store acceptance remain steps 16–17.
+suspension/eviction and signing/store acceptance were deferred to steps 16–17
+at that increment; their current gates are recorded below.
 
 ### Recorded local validation for this increment
 
@@ -351,8 +370,10 @@ fresh page reading an unvisited chapter and searching installed Scripture with
 zero public HTTP requests. Both runs report no browser exceptions or missing
 assets. These checks include real browser storage and file workflows.
 
-The increment's package version is `1.0.0-alpha.2+3`. Package creation does not
-publish a GitHub release or submit to a store; those remain explicit actions.
+The increment's package version is `1.0.0-alpha.2+3`. At that increment, package
+creation did not publish a GitHub release; publication required an explicit
+action. The current automatic main promotion contract is described above.
+Store submission remains a separate action.
 
 ## Integrated release candidate: steps 16–17
 
@@ -369,6 +390,8 @@ Study, private portability, installed-resource reopening, released-schema
 migration and a 20,000-verse background-worker journey. It uses generated,
 test-only fixtures so mobile sandboxes do not depend on the repository's disk
 paths. Production application assets do not contain those fixture documents.
+`test/platform_compact_acceptance_test.dart` also runs the shared Study and
+offline-portability journeys at a 390 × 844 logical-pixel phone viewport.
 
 ```bash
 python scripts/testing/embed_fixtures.py --check
@@ -397,8 +420,10 @@ GitHub CI also installs the actual DEB/EXE/DMG outputs where supported, checks
 installed launchers/custom-protocol registration and launches the installed
 application. iOS unsigned device bundles are compile artifacts; use simulator
 APPs or a provisioned signed build for execution. Signed targets retain their
-independent configuration gates. Release publication accepts only the complete
-verified inventory from a successful trusted main run and does not rebuild it.
+independent configuration gates. Release publication automatically accepts a new
+version only from the complete verified inventory of a successful trusted main
+run, including the required runtime jobs, and does not rebuild it. A manual
+retry selects the original successful run rather than creating new packages.
 
 Focused regressions cover transactional bookmark reconciliation and origin
 removal, exact source annotations/citations, confirmed dictionary discovery,

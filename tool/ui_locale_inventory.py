@@ -15,6 +15,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MESSAGE = re.compile(r"(?:UiStrings\.of\([^)]*\)|strings|ui)\.text\(\s*(['\"])")
+STATIC_CONTROL = re.compile(
+    r"(?:\b(?:Text|SelectableText)\(\s*|"
+    r"\b(?:tooltip|semanticLabel|labelText|hintText|helperText):\s*)(['\"])"
+)
+UNTRANSLATED_BRANDS = {'GetBible API'}
 
 
 def read_literal(source: str, offset: int) -> tuple[str, int]:
@@ -78,7 +83,7 @@ def dart_catalog(source: str, name: str = 'nativeUiKeys') -> dict[str, str]:
 
 
 def inventory() -> dict[str, str]:
-    # The synchronized English asset has the exact same order as the catalog.
+    # The keyed catalog is authoritative; the reference English pack is empty.
     web = set(dart_catalog((ROOT / 'lib/core/web_ui_catalog.dart').read_text(encoding='utf-8'), 'webUiMessages').values())
     values = set()
     for path in sorted((ROOT / 'lib').rglob('*.dart')):
@@ -106,7 +111,29 @@ def inventory() -> dict[str, str]:
     return dict(sorted(messages.items()))
 
 
+def audit_static_controls() -> None:
+    """Catch newly added English controls before they bypass the inventory.
+
+    Dynamic source/user text is deliberately excluded; those boundaries still
+    require code review. Brand names are the only allowed plain static labels.
+    """
+    missing = []
+    for path in sorted((ROOT / 'lib/presentation').rglob('*.dart')):
+        source = path.read_text(encoding='utf-8')
+        for match in STATIC_CONTROL.finditer(source):
+            try:
+                value, _ = read_literal(source, match.end() - 1)
+            except ValueError:
+                continue  # Dynamic source metadata is not a UI template.
+            if value.strip() and value not in UNTRANSLATED_BRANDS:
+                line = source[:match.start()].count('\n') + 1
+                missing.append(f'{path.relative_to(ROOT)}:{line}: {value}')
+    if missing:
+        raise ValueError('Localize new static controls explicitly:\n' + '\n'.join(missing))
+
+
 def generate(check: bool = False) -> None:
+    audit_static_controls()
     messages = inventory()
     outputs = {
         'assets/native_locales/en.json': json.dumps(messages, ensure_ascii=False, indent=2) + '\n',

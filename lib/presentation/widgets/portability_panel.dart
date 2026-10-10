@@ -252,7 +252,19 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
               padding: const EdgeInsets.only(top: 16),
               child: Semantics(
                 liveRegion: true,
-                child: Text(UiStrings.of(context).text(message)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.controller.error != null &&
+                        !UiStrings.of(context).containsTemplate(message))
+                      Text(
+                        UiStrings.of(context).text(
+                          'The operation could not be completed. Please try another option.',
+                        ),
+                      ),
+                    Text(UiStrings.of(context).text(message)),
+                  ],
+                ),
               ),
             ),
         ],

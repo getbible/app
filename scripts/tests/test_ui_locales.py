@@ -1,7 +1,9 @@
 """Offline regression tests for public-UI-only localization tooling."""
 import importlib.util
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -20,6 +22,19 @@ translation = load_tool('translate_native_locales')
 class UiLocaleToolingTest(unittest.TestCase):
     def test_checked_in_inventory_covers_literal_control_templates(self):
         inventory.generate(check=True)
+
+    def test_plain_static_controls_cannot_silently_bypass_localization(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            widget = root / 'lib/presentation/example.dart'
+            widget.parent.mkdir(parents=True)
+            widget.write_text("TextField(helperText: 'Retry saving');", encoding='utf-8')
+            with patch.object(inventory, 'ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'Retry saving'):
+                    inventory.audit_static_controls()
+                widget.write_text("Text(UiStrings.of(context).text('Retry saving'));",
+                                  encoding='utf-8')
+                inventory.audit_static_controls()
 
     def test_ui_templates_require_explicit_variables(self):
         with self.assertRaisesRegex(ValueError, 'named'):

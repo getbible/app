@@ -117,6 +117,11 @@ void main() {
           }
         }
         final metadata = locales[locale]! as Map<String, Object?>;
+        expect(
+          metadata['target'] == 'en',
+          webUiFallbackLocales.contains(locale),
+          reason: '$locale must follow the reference fallback policy',
+        );
         if (metadata['target'] == 'en') {
           expect(
             translated,

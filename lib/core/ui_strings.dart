@@ -65,6 +65,7 @@ final class UiStrings {
           'tl': 'fil',
           'tsg': 'fil',
           'ppk': 'id',
+          'prs': 'fa',
           'zh': 'zh-Hans',
         }[locale] ??
         locale;
@@ -102,6 +103,12 @@ final class UiStrings {
     if (key != null) return call(key, variables);
     return interpolate(english, variables);
   }
+
+  /// Whether an application-owned message has an explicit localization entry.
+  /// Unknown parser/network diagnostics can retain their original text beneath
+  /// a localized explanation without submitting arbitrary data for translation.
+  bool containsTemplate(String english) =>
+      _englishKeys.containsKey(english) || nativeUiKeys.containsKey(english);
 
   static String interpolate(String template, Map<String, Object> variables) =>
       template.replaceAllMapped(_placeholder, (Match match) {
@@ -156,8 +163,14 @@ final class UiStrings {
     final String value = (language ?? 'en').trim().replaceAll('_', '-');
     if (value.isEmpty) return 'en';
     final String normalized = value.toLowerCase();
-    if (normalized == 'zh-cn' || normalized == 'zh-hans') return 'zh-Hans';
-    if (normalized == 'zh-tw' || normalized == 'zh-hant') return 'zh-Hant';
+    final List<String> subtags = normalized.split('-');
+    if (subtags.first == 'zh') {
+      // A script subtag wins over a region (for example zh-Hans-HK).
+      if (subtags.contains('hans')) return 'zh-Hans';
+      if (subtags.contains('hant')) return 'zh-Hant';
+      if (subtags.any(const {'tw', 'hk', 'mo'}.contains)) return 'zh-Hant';
+      if (subtags.any(const {'cn', 'sg'}.contains)) return 'zh-Hans';
+    }
     final String exact = supportedLocales.firstWhere(
       (String locale) => locale.toLowerCase() == normalized,
       orElse: () => '',

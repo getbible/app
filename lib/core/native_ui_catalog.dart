@@ -6,8 +6,43 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.0100InterveningUnitsAvailableWithAllWords",
   "0 results. Try different words or broader filters.":
       "native.0ResultsTryDifferentWordsOrBroaderFilters",
+  "A backup marking group is invalid.": "native.aBackupMarkingGroupIsInvalid",
+  "A backup marking has invalid coordinates or timestamps.":
+      "native.aBackupMarkingHasInvalidCoordinatesOrTimestamps",
+  "A backup marking refers to a missing group.":
+      "native.aBackupMarkingRefersToAMissingGroup",
+  "A backup marking refers to a missing marking group.":
+      "native.aBackupMarkingRefersToAMissingMarkingGroup",
+  "A backup verse note has invalid coordinates or timestamps.":
+      "native.aBackupVerseNoteHasInvalidCoordinatesOrTimestamps",
+  "A bookmark contains an invalid source.":
+      "native.aBookmarkContainsAnInvalidSource",
+  "A marking contains an invalid text range.":
+      "native.aMarkingContainsAnInvalidTextRange",
+  "A marking group contains an invalid color.":
+      "native.aMarkingGroupContainsAnInvalidColor",
+  "A notebook block is limited to 100,000 characters.":
+      "native.aNotebookBlockIsLimitedTo100000Characters",
+  "A notebook identity is invalid.": "native.aNotebookIdentityIsInvalid",
+  "A notebook reference requires a valid Scripture verse and label.":
+      "native.aNotebookReferenceRequiresAValidScriptureVerseAnd",
+  "A notebook timestamp is invalid.": "native.aNotebookTimestampIsInvalid",
+  "A private backup is limited to 64 MiB.":
+      "native.aPrivateBackupIsLimitedTo64MiB",
+  "A private setting contains an unsupported value.":
+      "native.aPrivateSettingContainsAnUnsupportedValue",
+  "A private topic copy refers to a missing group.":
+      "native.aPrivateTopicCopyRefersToAMissingGroup",
+  "A retained notebook draft has an invalid owner or base revision.":
+      "native.aRetainedNotebookDraftHasAnInvalidOwnerOr",
   "A running download is protected. If its window closed unexpectedly, retry after two minutes.":
       "native.aRunningDownloadIsProtectedIfItsWindowClosed",
+  "A scoped private preference key is invalid.":
+      "native.aScopedPrivatePreferenceKeyIsInvalid",
+  "A shared bookmark must cover a complete verse.":
+      "native.aSharedBookmarkMustCoverACompleteVerse",
+  "A topic choice must be true or false.":
+      "native.aTopicChoiceMustBeTrueOrFalse",
   "Abbreviation": "native.abbreviation",
   "About": "native.about",
   "Add group": "native.addGroup",
@@ -193,6 +228,11 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.installedOnThisDeviceAvailableOffline",
   "Introduction": "native.introduction",
   "Introduction citation unavailable": "native.introductionCitationUnavailable",
+  "Invalid alternate topic copy provenance.":
+      "native.invalidAlternateTopicCopyProvenance",
+  "Invalid bookmark source scope.": "native.invalidBookmarkSourceScope",
+  "Invalid recent bookmark topics.": "native.invalidRecentBookmarkTopics",
+  "Invalid topic copy provenance.": "native.invalidTopicCopyProvenance",
   "Keep your own backup of saved Scripture, verse notes, notebooks, drafts and preferences. Backups contain private text. Choose where you save them and who can access them.":
       "native.keepYourOwnBackupOfSavedScriptureVerseNotes",
   "{label} · {bytes} saved": "native.labelBytesSaved",
@@ -378,6 +418,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Show topic": "native.showTopic",
   "Showing the first 100 resources. Narrow your search to find more.":
       "native.showingTheFirst100ResourcesNarrowYourSearchTo",
+  "Six-digit hex color, for example {example}":
+      "native.sixDigitHexColorForExampleExample",
   "Source annotation": "native.sourceAnnotation",
   "Source language: {language}": "native.sourceLanguageLanguage",
   "Source: {name} · {language}": "native.sourceNameLanguage",
@@ -396,12 +438,38 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Text copied.": "native.textCopied",
   "The app could not open its local data. Check available storage and browser permissions, then retry. Do not clear site data to fix this error.":
       "native.theAppCouldNotOpenItsLocalDataCheck",
+  "The backup contains an invalid private setting.":
+      "native.theBackupContainsAnInvalidPrivateSetting",
+  "The backup contains duplicate canonical verse notes.":
+      "native.theBackupContainsDuplicateCanonicalVerseNotes",
+  "The backup contains duplicate draft journals.":
+      "native.theBackupContainsDuplicateDraftJournals",
+  "The backup contains duplicate marking group IDs.":
+      "native.theBackupContainsDuplicateMarkingGroupIDs",
+  "The backup contains duplicate marking groups.":
+      "native.theBackupContainsDuplicateMarkingGroups",
+  "The backup contains duplicate markings.":
+      "native.theBackupContainsDuplicateMarkings",
+  "The backup contains duplicate notebook blocks.":
+      "native.theBackupContainsDuplicateNotebookBlocks",
+  "The backup contains duplicate notebooks.":
+      "native.theBackupContainsDuplicateNotebooks",
+  "The backup contains duplicate settings.":
+      "native.theBackupContainsDuplicateSettings",
+  "The backup contains duplicate verse notes.":
+      "native.theBackupContainsDuplicateVerseNotes",
   "The backup could not be opened. Please try again.":
       "native.theBackupCouldNotBeOpenedPleaseTryAgain",
+  "The backup exceeds 100,000 private records.":
+      "native.theBackupExceeds100000PrivateRecords",
+  "The backup was imported. Reopen the reader to refresh its saved data.":
+      "native.theBackupWasImportedReopenTheReaderToRefresh",
   "The book introduction could not be loaded. Chapter commentary remains available.":
       "native.theBookIntroductionCouldNotBeLoadedChapterCommentary",
   "The commentary choice was not saved. Select it again to retry.":
       "native.theCommentaryChoiceWasNotSavedSelectItAgain",
+  "The complete backup exceeds the 64 MiB file limit.":
+      "native.theCompleteBackupExceedsThe64MiBFileLimit",
   "The daily passage could not be opened. {error}":
       "native.theDailyPassageCouldNotBeOpenedError",
   "The export filename is invalid.": "native.theExportFilenameIsInvalid",
@@ -421,20 +489,32 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.theNotebookCouldNotBeExportedYourPrivateDraft",
   "The notebook could not be saved or loaded. Your open draft is retained. {error}":
       "native.theNotebookCouldNotBeSavedOrLoadedYour",
+  "The notebook exceeds its document limits or contains duplicate block identities.":
+      "native.theNotebookExceedsItsDocumentLimitsOrContainsDuplicate",
   "The operation could not be completed. Please try another option.":
       "native.theOperationCouldNotBeCompletedPleaseTryAnother",
   "The passage could not be opened. Your notebook draft is retained. {error}":
       "native.thePassageCouldNotBeOpenedYourNotebookDraft",
+  "The private data operation failed. Your saved data remains available. Please retry.":
+      "native.thePrivateDataOperationFailedYourSavedDataRemains",
+  "The private preference value is invalid.":
+      "native.thePrivatePreferenceValueIsInvalid",
   "The reference could not be opened. {error}":
       "native.theReferenceCouldNotBeOpenedError",
   "The resource choice could not be saved on this device. The dictionary remains available.":
       "native.theResourceChoiceCouldNotBeSavedOnThis",
   "The saved commentary choice could not be read.":
       "native.theSavedCommentaryChoiceCouldNotBeRead",
+  "The saved reading position is invalid.":
+      "native.theSavedReadingPositionIsInvalid",
   "The selected file exceeds the size limit.":
       "native.theSelectedFileExceedsTheSizeLimit",
+  "The selected file is not a valid getBible backup.":
+      "native.theSelectedFileIsNotAValidGetBibleBackup",
   "The selected file is not valid UTF-8 text.":
       "native.theSelectedFileIsNotValidUTF8Text",
+  "The selected notebook is absent from the backup.":
+      "native.theSelectedNotebookIsAbsentFromTheBackup",
   "The selected verse could not be opened.":
       "native.theSelectedVerseCouldNotBeOpened",
   "The service requested a pause before retrying.":
@@ -442,18 +522,26 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "The source does not publish a download size.":
       "native.theSourceDoesNotPublishADownloadSize",
   "The text exceeds the size limit.": "native.theTextExceedsTheSizeLimit",
+  "This backup contains bookmarks from another provider. Export a complete private backup to preserve their source.":
+      "native.thisBackupContainsBookmarksFromAnotherProviderExportA",
   "This chapter has no commentary covering verse {verse}. Try Whole chapter to read its other material.":
       "native.thisChapterHasNoCommentaryCoveringVerseVerseTry",
   "This chapter was checked against the hash published by GetBible and matches the current source.":
       "native.thisChapterWasCheckedAgainstTheHashPublishedBy",
+  "This complete backup format is not supported.":
+      "native.thisCompleteBackupFormatIsNotSupported",
   "This edit exceeds the note block or notebook size limit. Shorten this block or another block before continuing.":
       "native.thisEditExceedsTheNoteBlockOrNotebookSize",
   "This edit exceeds the title or notebook size limit. Shorten the text before continuing.":
       "native.thisEditExceedsTheTitleOrNotebookSizeLimit",
   "This format does not contain notebooks or drafts.":
       "native.thisFormatDoesNotContainNotebooksOrDrafts",
+  "This getBible backup version is not supported.":
+      "native.thisGetBibleBackupVersionIsNotSupported",
   "This is the last known good copy saved on this device. It remains readable offline, but the current source hash could not be checked.":
       "native.thisIsTheLastKnownGoodCopySavedOn",
+  "This notebook format is unsupported.":
+      "native.thisNotebookFormatIsUnsupported",
   "This passage changed. Reopen its bookmark menu.":
       "native.thisPassageChangedReopenItsBookmarkMenu",
   "This passage is unavailable in the selected Bible.":
@@ -477,6 +565,9 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "This topic has no verse associations.":
       "native.thisTopicHasNoVerseAssociations",
   "Times New Roman": "native.timesNewRoman",
+  "Too many drafts.": "native.tooManyDrafts",
+  "Too many notebooks.": "native.tooManyNotebooks",
+  "Too many settings.": "native.tooManySettings",
   "Topic color {color}": "native.topicColorColor",
   "Topic name language": "native.topicNameLanguage",
   "Topics": "native.topics",
@@ -488,6 +579,7 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Unlocated source word": "native.unlocatedSourceWord",
   "{unsavedCount} other notebook draft(s) need saving.":
       "native.unsavedcountOtherNotebookDraftSNeedSaving",
+  "Unsupported reader preferences.": "native.unsupportedReaderPreferences",
   "Update available": "native.updateAvailable",
   "Update / verify": "native.updateVerify",
   "Use Complete private backup to save notebooks and retained drafts. Website-compatible backups contain verse notes and markings only.":

@@ -109,6 +109,11 @@ class PublicTranslator:
             result = json.load(response)
         if not isinstance(result, list) or not result:
             status = result.get('statusCode', 'invalid response') if isinstance(result, dict) else 'invalid response'
+            if str(status) in {'401', '403', '429'}:
+                # Some ordinary public-page responses report their HTTP-style
+                # status in JSON. Respect those denials just like HTTP errors.
+                raise urllib.error.HTTPError(endpoint, int(status),
+                                             'Public translation unavailable', {}, None)
             raise ValueError(f'Public translation service returned {status} for {target}.')
         return result[0]['translations'][0]['text']
 

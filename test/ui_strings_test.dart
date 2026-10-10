@@ -16,6 +16,9 @@ void main() {
       expect(UiStrings.normalizeLocale('zh_CN'), 'zh-Hans');
       expect(UiStrings.normalizeLocale('zh-tw'), 'zh-Hant');
       expect(UiStrings.normalizeLocale('ZH-hANs'), 'zh-Hans');
+      expect(UiStrings.normalizeLocale('zh-Hant-HK'), 'zh-Hant');
+      expect(UiStrings.normalizeLocale('zh_HK'), 'zh-Hant');
+      expect(UiStrings.normalizeLocale('zh-Hans-HK'), 'zh-Hans');
       expect(UiStrings.normalizeLocale(' pt_BR '), 'pt');
       expect(UiStrings.normalizeLocale('EN-us'), 'en');
       expect(UiStrings.normalizeLocale('enm'), 'enm');
@@ -30,6 +33,8 @@ void main() {
       expect(UiStrings.english.text(entry.value), entry.value);
     }
     expect(UiStrings.english('unknown'), 'unknown');
+    expect(UiStrings.english.containsTemplate('Copy'), isTrue);
+    expect(UiStrings.english.containsTemplate('Private diagnostic'), isFalse);
     for (final entry in nativeUiKeys.entries) {
       expect(UiStrings.english(entry.value), entry.key);
     }
@@ -43,6 +48,9 @@ void main() {
       expect(UiStrings(locale, const []).isRtl, isFalse, reason: locale);
     }
     expect(const UiStrings('zh-Hant', []).flutterLocale.scriptCode, 'Hant');
+    expect(const UiStrings('prs', []).flutterLocale.languageCode, 'fa');
+    expect(const UiStrings('hbo', []).flutterLocale.languageCode, 'he');
+    expect(const UiStrings('enm', []).flutterLocale.languageCode, 'en');
   });
 
   test('interpolation is one pass and leaves missing variables visible', () {

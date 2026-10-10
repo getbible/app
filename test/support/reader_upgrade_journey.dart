@@ -6,6 +6,7 @@ import 'package:getbible/data/database/local_database.dart';
 import 'package:getbible/domain/models/passage.dart';
 import 'package:getbible/domain/models/preferences.dart';
 import 'package:getbible/main.dart';
+import 'package:getbible/presentation/widgets/native_scripture_text.dart';
 import 'package:getbible/presentation/widgets/reference_preview.dart';
 import 'package:getbible/presentation/widgets/scripture_verse_text.dart';
 import 'package:provider/provider.dart';
@@ -189,6 +190,58 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
           );
       expect(opened?.passage, state.passage);
       expect(state.savedNotes.single.text, 'My private note');
+
+      // Inline bookmark controls contribute object-replacement characters to
+      // Flutter's selectable paragraph. Exercise the real Copy action so those
+      // controls and presentation-only verse numbers cannot reach a clipboard.
+      await tester.runAsync(() => state.setLayout(ReaderLayout.paragraph));
+      await tester.pumpAndSettle();
+      final paragraph = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is NativeScriptureText &&
+                widget.mapping.locations.length > 1,
+          )
+          .last;
+      final editable = tester.state<EditableTextState>(
+        find.descendant(of: paragraph, matching: find.byType(EditableText)),
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey<String>('verse-bookmarks-70')),
+      );
+      await tester.pumpAndSettle();
+      final mapping = tester.widget<NativeScriptureText>(paragraph).mapping;
+      final first = mapping.locations.singleWhere(
+        (item) => item.$1.verse == 70,
+      );
+      final last = mapping.locations.singleWhere((item) => item.$1.verse == 71);
+      editable.userUpdateTextEditingValue(
+        editable.textEditingValue.copyWith(
+          selection: TextSelection(
+            baseOffset: first.$2.start,
+            extentOffset: last.$2.end,
+          ),
+        ),
+        SelectionChangedCause.toolbar,
+      );
+      editable.showToolbar();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy').last);
+      const expectedParagraph = 'Verse 70 original. Verse 71 original.';
+      ClipboardData? paragraphCopy;
+      final deadline = Stopwatch()..start();
+      do {
+        paragraphCopy = await tester.runAsync<ClipboardData?>(
+          () => Clipboard.getData('text/plain'),
+        );
+        if (paragraphCopy?.text == expectedParagraph) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      } while (deadline.elapsed < const Duration(seconds: 10));
+      expect(paragraphCopy?.text, expectedParagraph);
+      expect(paragraphCopy?.text, isNot(contains('\uFFFC')));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },

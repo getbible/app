@@ -4,7 +4,7 @@ import 'package:getbible/domain/models/passage.dart';
 void main() {
   test('parses canonical passage links', () {
     final PassageLink? link = parsePassageLink(
-      Uri.parse('https://getbible.life/KJV/Ephesians/5?verse=2'),
+      Uri.parse('https://app.getbible.life/KJV/Ephesians/5?verse=2'),
     );
     expect(link?.translation, 'kjv');
     expect(link?.bookSlug, 'Ephesians');

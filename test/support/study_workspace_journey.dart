@@ -58,6 +58,7 @@ void studyWorkspaceJourney({
           ),
         );
         await state.initialize();
+        await state.bookmarks.initialize(locale: state.ui.locale);
         await state.saveVerseNote(1, 'Genesis 1:1', 'Private canonical note');
         return state;
       }))!;
@@ -99,6 +100,38 @@ void studyWorkspaceJourney({
       }
 
       Future<void> choose(StudyTab tab) async {
+        final workspace = tester.widget<StudyWorkspace>(
+          find.byType(StudyWorkspace),
+        );
+        if (workspace.contextual) {
+          if (tab == StudyTab.dictionary || tab == StudyTab.commentary) {
+            await tester.tap(
+              find.widgetWithText(
+                Tab,
+                tab == StudyTab.dictionary ? 'Dictionaries' : 'Commentaries',
+              ),
+            );
+            await settle();
+            return;
+          }
+          // Contextual Scripture study exposes dictionary/commentary tabs.
+          // Personal tools remain available from the reader's Study launcher.
+          await tester.tap(find.byTooltip('Close Study tools'));
+          await settle();
+          final launcher = find.byTooltip(state.ui('study'));
+          await tester.tap(
+            launcher.evaluate().isNotEmpty
+                ? launcher
+                : find.widgetWithText(OutlinedButton, state.ui('study')),
+          );
+          await settle();
+          expect(
+            tester
+                .widget<StudyWorkspace>(find.byType(StudyWorkspace))
+                .contextual,
+            isFalse,
+          );
+        }
         await tester.tap(find.byType(DropdownButtonFormField<StudyTab>));
         await tester.pumpAndSettle();
         await tester.tap(find.text(tab.label).last);
@@ -114,6 +147,13 @@ void studyWorkspaceJourney({
         await tester.pump(const Duration(milliseconds: 400));
         await settle();
         expect(find.byType(StudyWorkspace), findsOneWidget);
+        expect(
+          tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).contextual,
+          isTrue,
+        );
+        expect(find.widgetWithText(Tab, 'Dictionaries'), findsOneWidget);
+        expect(find.widgetWithText(Tab, 'Commentaries'), findsOneWidget);
+        expect(find.byType(DropdownButtonFormField<StudyTab>), findsNothing);
       }
 
       await openWord();
@@ -124,9 +164,9 @@ void studyWorkspaceJourney({
             matching: find.byType(Scrollable),
           )
           .first;
-      // A native IME transition can still constrain the panel after Study
-      // opens. Loaded metadata may be outside the lazy list's visible range.
-      final sourceLanguage = find.text('Source language: en');
+      // Attribution stays in the dictionary footer, including while a native
+      // IME transition still constrains the definition body's viewport.
+      final sourceLanguage = find.text('Public Domain · en');
       await tester.scrollUntilVisible(
         sourceLanguage,
         100,
@@ -135,9 +175,11 @@ void studyWorkspaceJourney({
       await tester.pumpAndSettle();
       expect(sourceLanguage, findsOneWidget);
       expect(sourceLanguage.hitTestable(), findsOneWidget);
-      // Use the exact published ID to distinguish repeated definitions. On
-      // short native viewports the list tile is not built until scrolled to.
-      final Finder definition = find.widgetWithText(ListTile, 'kadesh');
+      // Each confirmed definition is readable immediately. On short native
+      // viewports the lazy list must still be scrolled to its published entry.
+      final Finder definition = find.byKey(
+        const ValueKey<String>('dictionary-definition-easton/kadesh'),
+      );
       await tester.scrollUntilVisible(
         definition,
         150,
@@ -145,8 +187,6 @@ void studyWorkspaceJourney({
       );
       await tester.pumpAndSettle();
       expect(definition.hitTestable(), findsOneWidget);
-      await tester.tap(definition);
-      await settle();
       expect(find.textContaining('Preserved paragraphs.'), findsOneWidget);
       expect(state.current!.verses.first.text, originalText);
       if (initialKeyboardInset > 0) {
@@ -204,6 +244,11 @@ void studyWorkspaceJourney({
       expect(topic.hitTestable(), findsOneWidget);
       await tester.tap(topic);
       await settle();
+      expect(
+        state.study.topics.selectedTopic?.id,
+        'authority-of-the-bible',
+        reason: state.study.topics.topicError?.toString(),
+      );
       final copy = find.text('Copy to my markings');
       await tester.scrollUntilVisible(copy, 150, scrollable: topicScroll);
       await tester.pumpAndSettle();

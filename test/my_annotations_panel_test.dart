@@ -28,14 +28,7 @@ void main() {
       await tester.scrollUntilVisible(
         find.text(_longName),
         80,
-        scrollable: find.descendant(
-          of: find.byType(CustomScrollView),
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Scrollable &&
-                widget.axisDirection == AxisDirection.down,
-          ),
-        ),
+        scrollable: _panelScroll(),
       );
       expect(find.text(_longName), findsOneWidget);
       await tester.ensureVisible(find.text(_longName));
@@ -46,35 +39,28 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(state.preferences.activeMarkingGroupId, _groupId);
       await tester.scrollUntilVisible(
-        find.text('Open'),
+        find.text('Genesis 1:3 · TST'),
         80,
-        scrollable: find.descendant(
-          of: find.byType(CustomScrollView),
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Scrollable &&
-                widget.axisDirection == AxisDirection.down,
-          ),
-        ),
+        scrollable: _panelScroll(),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Open').hitTestable(), findsOneWidget);
-      await tester.tap(find.text('Open'));
+      expect(find.text('Genesis 1:3 · TST').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Genesis 1:3 · TST'));
       await tester.pumpAndSettle();
       expect(opened.single, _passage.copyWith(verse: 3));
-      await tester.ensureVisible(find.text('Remove personal bookmark'));
+      await tester.ensureVisible(find.byTooltip('Remove personal bookmark'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Remove personal bookmark').hitTestable(),
+        find.byTooltip('Remove personal bookmark').hitTestable(),
         findsOneWidget,
       );
-      await tester.tap(find.text('Remove personal bookmark'));
+      await tester.tap(find.byTooltip('Remove personal bookmark'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(state.savedMarkings, hasLength(1));
-      await tester.tap(find.text('Remove personal bookmark'));
+      await tester.tap(find.byTooltip('Remove personal bookmark'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
       await tester.pumpAndSettle();
@@ -176,19 +162,12 @@ void main() {
       });
       await _pump(tester, state, (_) {}, initialGroupId: _groupId);
       await tester.scrollUntilVisible(
-        find.text('Extended Book 7:1'),
+        find.text('Extended Book 7:1 · TST'),
         100,
-        scrollable: find.descendant(
-          of: find.byType(CustomScrollView),
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Scrollable &&
-                widget.axisDirection == AxisDirection.down,
-          ),
-        ),
+        scrollable: _panelScroll(),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Extended Book 7:1'), findsOneWidget);
+      expect(find.text('Extended Book 7:1 · TST'), findsOneWidget);
       final saved = state.savedMarkings.singleWhere(
         (mark) => mark.id == 'global-reference',
       );
@@ -219,6 +198,20 @@ void main() {
     },
   );
 }
+
+// Scripture is a native selectable document and has its own Scrollable. The
+// gesture must target the outer topic list, not those nested text viewports.
+Finder _panelScroll() => find
+    .descendant(
+      of: find
+          .descendant(
+            of: find.byType(MyAnnotationsPanel),
+            matching: find.byType(CustomScrollView),
+          )
+          .first,
+      matching: find.byType(Scrollable),
+    )
+    .first;
 
 void _setViewport(WidgetTester tester) {
   tester.view.physicalSize = const Size(320, 360);

@@ -21,7 +21,7 @@ class ScriptureStudyActions extends InheritedWidget {
   final ValueChanged<Verse> onNote;
   final List<ScriptureTextEmphasis> Function(Verse)? emphasisFor;
   final ValueChanged<String>? onReference;
-  final ValueChanged<String?>? onBookmarks;
+  final void Function(String?, int?)? onBookmarks;
 
   static ScriptureStudyActions? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ScriptureStudyActions>();

@@ -39,6 +39,7 @@ void main() {
     );
     for (final invalid in [
       'https://example.org/TST/Genesis/1',
+      'https://getbible.life/TST/Genesis/1',
       '//example.org/TST/Genesis/1',
       'javascript:/TST/Genesis/1',
       '/TST/Genesis/1?verse=1&verse=2',
@@ -172,7 +173,9 @@ void main() {
         tester
             .widgetList<SelectableText>(find.byType(SelectableText))
             .any(
-              (text) => text.textSpan?.toPlainText() == 'Verse 35 original.',
+              (text) =>
+                  text.textSpan?.toPlainText(includePlaceholders: false) ==
+                  'Verse 35 original.',
             ),
         isTrue,
         reason: 'The accessible label must retain native selectable Scripture.',

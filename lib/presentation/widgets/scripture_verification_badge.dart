@@ -26,18 +26,20 @@ class ScriptureVerificationBadge extends StatelessWidget {
     final label = verified
         ? strings.text('Verified Scripture')
         : strings.text('Saved Scripture');
-    return Semantics(
-      button: true,
-      expanded: expanded,
-      label: label,
-      child: IconButton(
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        tooltip: label,
-        onPressed: onPressed,
-        icon: Icon(
-          verified ? Icons.verified_user_outlined : Icons.cloud_off_outlined,
-          size: 18,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+    // Keep the expanded state on the native button's single accessibility node.
+    // A separate outer button/label creates a second, inert browser button.
+    return MergeSemantics(
+      child: Semantics(
+        expanded: expanded,
+        child: IconButton(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          tooltip: label,
+          onPressed: onPressed,
+          icon: Icon(
+            verified ? Icons.verified_user_outlined : Icons.cloud_off_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     );

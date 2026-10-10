@@ -1,4 +1,8 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getbible/domain/models/cache.dart';
 import 'package:getbible/presentation/widgets/scripture_verification_badge.dart';
@@ -29,6 +33,78 @@ void main() {
         ),
       ),
     );
+  }
+
+  for (final freshness in [
+    CacheFreshness.cachedVerified,
+    CacheFreshness.cachedUnverified,
+  ]) {
+    testWidgets('$freshness exposes one accessible verification button', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pumpBadge(tester, freshness);
+      final label = freshness == CacheFreshness.cachedVerified
+          ? 'Verified Scripture'
+          : 'Saved Scripture';
+      final owner = tester
+          .renderObject(find.byType(ScriptureVerificationBadge))
+          .owner!
+          .semanticsOwner!;
+      SemanticsNode verificationButton() {
+        final matches = <SemanticsNode>[];
+        void visit(SemanticsNode node) {
+          final data = node.getSemanticsData();
+          if (!node.isMergedIntoParent &&
+              data.flagsCollection.isButton &&
+              (data.label == label || data.tooltip == label)) {
+            matches.add(node);
+          }
+          node.visitChildren((child) {
+            visit(child);
+            return true;
+          });
+        }
+
+        visit(owner.rootSemanticsNode!);
+        // Count exported role-bearing nodes, including non-actionable outer
+        // buttons. Merged descendants are not exported as separate controls.
+        expect(matches, hasLength(1));
+        expect(
+          matches.single.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        return matches.single;
+      }
+
+      final button = verificationButton();
+      expect(
+        button.getSemanticsData().flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
+      owner.performAction(button.id, SemanticsAction.tap);
+      await tester.pumpAndSettle();
+      expect(find.byType(ScriptureVerificationNotice), findsOneWidget);
+      expect(
+        verificationButton().getSemanticsData().flagsCollection.isExpanded,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        verificationButton().getSemanticsData().flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(find.byType(ScriptureVerificationNotice), findsNothing);
+      expect(
+        verificationButton().getSemanticsData().flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
   }
 
   testWidgets('verified status toggles a dismissible inline explanation', (

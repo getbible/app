@@ -95,7 +95,9 @@ class _AppBootstrapState<T extends Object> extends State<AppBootstrap<T>> {
           ? [locale]
           : const [Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      home: Directionality(
+      // The temporary loading/error surface must not create a Navigator or
+      // consume the platform's launch route before the ready application does.
+      builder: (context, _) => Directionality(
         textDirection: _ui.isRtl ? TextDirection.rtl : TextDirection.ltr,
         child: Scaffold(
           body: SafeArea(

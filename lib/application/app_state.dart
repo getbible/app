@@ -290,6 +290,7 @@ final class AppState extends ChangeNotifier {
   /// Resolve published friendly names against this Bible's own catalogue.
   /// An invalid, missing or ambiguous source never becomes the default passage.
   Future<void> openPassageLink(Uri uri) async {
+    if (_closing) return;
     if (readerNavigationBlocked) {
       _failedLink = uri;
       error = 'Save or close the verse note before opening another passage.';
@@ -377,6 +378,7 @@ final class AppState extends ChangeNotifier {
   }
 
   Future<void> openDailyScripture() async {
+    if (_closing) return;
     _failedLink = null;
     final int request = ++_passageRequest;
     _dailyRequest = request;
@@ -424,6 +426,7 @@ final class AppState extends ChangeNotifier {
   }
 
   Future<void> loadPassage(Passage next, {bool Function()? ownsRequest}) {
+    if (_closing) return Future<void>.value();
     _failedLink = null;
     return _loadPassage(next, ++_passageRequest, ownsRequest: ownsRequest);
   }
@@ -523,6 +526,7 @@ final class AppState extends ChangeNotifier {
 
   /// A book opens at its discovered first chapter or its introduction node.
   Future<void> openBook(int book, {bool atEnd = false}) async {
+    if (_closing) return;
     _failedLink = null;
     final int request = ++_passageRequest;
     final String translation = passage.translation;
@@ -943,15 +947,22 @@ final class AppState extends ChangeNotifier {
 
   Future<void> _close() async {
     _closing = true;
-    // Invalidate network work before draining writes. A late chapter must not
-    // activate or enqueue a reading-position write after the drain starts.
-    _passageRequest++;
-    loading = false;
     onlineSearch.cancel(notify: false);
     await portability.close();
     await offline.close();
     await bookmarks.close();
     await _resourceRefresh;
+    // Private durability is the reversible shutdown gate. If it fails, the
+    // existing reader request and its loading state must remain usable.
+    await _ensurePrivateDraftsDurable(
+      ui.text(
+        'The latest notebook changes could not be saved. Return to Notebooks and retry before closing.',
+      ),
+    );
+    // Once that gate succeeds, cancel network activation before capturing the
+    // final position-write drain. New navigation is blocked while _closing.
+    _passageRequest++;
+    loading = false;
     await _positionWrite;
     await study.close();
     onlineSearch.removeListener(_searchChanged);
@@ -964,12 +975,17 @@ final class AppState extends ChangeNotifier {
     await database.close();
   }
 
-  Future<void> _flushPrivateDrafts() async {
+  Future<void> _flushPrivateDrafts() => _ensurePrivateDraftsDurable(
+    ui.text(
+      'The notebook could not be saved or loaded. Your open draft is retained. {error}',
+      {'error': ''},
+    ).trim(),
+  );
+
+  Future<void> _ensurePrivateDraftsDurable(String failureMessage) async {
     await study.notebooks.flush();
     if (study.notebooks.hasUndurableDrafts) {
-      throw const StorageException(
-        'Save or recover the latest notebook edits before importing or exporting a backup.',
-      );
+      throw StorageException(failureMessage);
     }
   }
 

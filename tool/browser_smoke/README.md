@@ -55,6 +55,12 @@ The first offline checks disconnect only public APIs, isolating database behavio
 from application delivery. The final check disables all networking after the
 versioned application shell has finished installation. This validates an already
 installed browser application; a first-ever visit still needs connectivity.
+During fixture-based phases the harness defers delivery of `offline_shell.js`:
+WebKit requests from controlled pages can bypass Playwright's HTTP interception.
+After installing fixture resources, the harness loads the exact production
+script, waits for native worker activation and only then disables all networking.
+It does not replace the registration API, worker, cache verification, application
+or database. The new offline page must be controlled by that actual worker.
 An online host must rewrite unknown HTML document routes to `index.html` while
 returning 404 for missing JavaScript, Wasm and other assets. The local harness
 implements that deployment contract. Worker activation leaves existing pages

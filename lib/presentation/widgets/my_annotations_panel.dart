@@ -683,8 +683,10 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
                         controller: _color,
                         decoration: InputDecoration(
                           labelText: UiStrings.of(context).text('Color'),
-                          helperText:
-                              'Six-digit hex color, for example #FDE68A',
+                          helperText: UiStrings.of(context).text(
+                            'Six-digit hex color, for example {example}',
+                            {'example': '#FDE68A'},
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),

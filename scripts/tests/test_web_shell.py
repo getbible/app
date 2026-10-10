@@ -52,6 +52,20 @@ class WebShellTests(unittest.TestCase):
         self.assertEqual(self.build(), first)
         self.assertEqual((self.root / shell.WORKER_NAME).read_bytes(), worker)
 
+    def test_custom_flutter_bootstrap_preserves_initialization_without_competing_worker(self):
+        source = (Path(__file__).resolve().parents[2] / "web/flutter_bootstrap.js").read_text()
+        self.assertEqual(source.count("{{flutter_js}}"), 1)
+        self.assertEqual(source.count("{{flutter_build_config}}"), 1)
+        # Model Flutter's documented two substitutions with ordinary executable
+        # loader/configuration declarations; the shell must accept the result.
+        built = source.replace("{{flutter_js}}", "const _flutter = {loader: {load() {}}};").replace(
+            "{{flutter_build_config}}", "_flutter.buildConfig = {builds: []};")
+        (self.root / "flutter_bootstrap.js").write_text(built)
+        manifest = self.build()
+        record = next(entry for entry in manifest["files"] if entry["path"] == "flutter_bootstrap.js")
+        self.assertEqual(record["sha256"], hashlib.sha256(built.encode()).hexdigest())
+        self.assertIn("_flutter.loader.load();", built)
+
     def test_asset_change_and_worker_behavior_change_have_separate_cache_identities(self):
         first = self.build()
         (self.root / "main.dart.js").write_text("changed application")

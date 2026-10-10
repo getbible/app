@@ -198,7 +198,9 @@ ReaderBackupMerge mergeReaderBackup(BackupData current, BackupData imported) {
                       ).hasMatch(item.id.substring(collisionPrefix.length)))) &&
               item.name == importedGroup.name &&
               item.color.toUpperCase() == importedGroup.color.toUpperCase() &&
-              item.source?.topicId == importedGroup.source?.topicId,
+              item.source?.topicId == importedGroup.source?.topicId &&
+              item.source?.effectiveScope ==
+                  importedGroup.source?.effectiveScope,
         )
         .firstOrNull;
     if (identical != null) {

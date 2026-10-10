@@ -1655,151 +1655,161 @@ class _ParagraphReader extends StatelessWidget {
         ),
       );
     }
-    return ScriptureParagraphSelection(
-      mapping: mapping,
-      child: NativeScriptureText(
-        span: TextSpan(
-          style: _scriptureStyle(context, state),
-          children: content,
-        ),
+    return Semantics(
+      container: true,
+      label: verses
+          .map(
+            (verse) =>
+                '$bookName ${origin.chapter}:${verse.verse}. ${verse.text}',
+          )
+          .join('\n'),
+      child: ScriptureParagraphSelection(
         mapping: mapping,
-        onWordTap: ScriptureStudyActions.maybeOf(context)?.onWord,
-        contextMenuBuilder: (BuildContext context, EditableTextState editable) {
-          final TextSelection selection = editable.textEditingValue.selection;
-          final List<ScriptureVerseSelection> ranges = mapping.selections(
-            selection.start,
-            selection.end,
-          );
-          return AdaptiveTextSelectionToolbar.buttonItems(
-            anchors: editable.contextMenuAnchors,
-            buttonItems: <ContextMenuButtonItem>[
-              for (final ContextMenuButtonItem button
-                  in editable.contextMenuButtonItems)
-                if (button.type == ContextMenuButtonType.copy &&
-                    ranges.isNotEmpty)
+        child: NativeScriptureText(
+          span: TextSpan(
+            style: _scriptureStyle(context, state),
+            children: content,
+          ),
+          mapping: mapping,
+          onWordTap: ScriptureStudyActions.maybeOf(context)?.onWord,
+          contextMenuBuilder: (BuildContext context, EditableTextState editable) {
+            final TextSelection selection = editable.textEditingValue.selection;
+            final List<ScriptureVerseSelection> ranges = mapping.selections(
+              selection.start,
+              selection.end,
+            );
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editable.contextMenuAnchors,
+              buttonItems: <ContextMenuButtonItem>[
+                for (final ContextMenuButtonItem button
+                    in editable.contextMenuButtonItems)
+                  if (button.type == ContextMenuButtonType.copy &&
+                      ranges.isNotEmpty)
+                    ContextMenuButtonItem(
+                      type: ContextMenuButtonType.copy,
+                      onPressed: () {
+                        editable.hideToolbar();
+                        unawaited(
+                          Clipboard.setData(
+                            ClipboardData(
+                              text: ranges
+                                  .map(
+                                    (ScriptureVerseSelection item) =>
+                                        item.quote,
+                                  )
+                                  .join(' '),
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  else
+                    button,
+                if (ranges.isNotEmpty) ...[
                   ContextMenuButtonItem(
-                    type: ContextMenuButtonType.copy,
+                    label: UiStrings.of(context).text('Search selected phrase'),
                     onPressed: () {
                       editable.hideToolbar();
+                      ScriptureStudyActions.maybeOf(
+                        context,
+                      )?.onSearch(ranges.map((item) => item.quote).join(' '));
+                    },
+                  ),
+                  ContextMenuButtonItem(
+                    label: UiStrings.of(context).text('Study selected word'),
+                    onPressed: () {
+                      editable.hideToolbar();
+                      final selected = ranges.first;
+                      ScriptureStudyActions.maybeOf(
+                        context,
+                      )?.onWord(selected.verse, selected.range);
+                    },
+                  ),
+                  ContextMenuButtonItem(
+                    label: UiStrings.of(context).text('Add or edit verse note'),
+                    onPressed: () {
+                      editable.hideToolbar();
+                      ScriptureStudyActions.maybeOf(
+                        context,
+                      )?.onNote(ranges.first.verse);
+                    },
+                  ),
+                ],
+                if (ranges.isNotEmpty)
+                  ContextMenuButtonItem(
+                    label: UiStrings.of(context).text('Bookmark topics'),
+                    onPressed: () {
+                      editable.hideToolbar();
+                      final selected = ranges.first;
                       unawaited(
-                        Clipboard.setData(
-                          ClipboardData(
-                            text: ranges
-                                .map(
-                                  (ScriptureVerseSelection item) => item.quote,
-                                )
-                                .join(' '),
-                          ),
+                        _showBookmarkAssignments(
+                          context,
+                          state,
+                          selected.verse,
+                          '$bookName ${origin.chapter}:${selected.verse.verse}',
+                          selections: ranges,
+                          onOpenTopic: ScriptureStudyActions.maybeOf(
+                            context,
+                          )?.onBookmarks,
                         ),
                       );
                     },
-                  )
-                else
-                  button,
-              if (ranges.isNotEmpty) ...[
-                ContextMenuButtonItem(
-                  label: UiStrings.of(context).text('Search selected phrase'),
-                  onPressed: () {
-                    editable.hideToolbar();
-                    ScriptureStudyActions.maybeOf(
+                  ),
+                if (ranges.isNotEmpty && state.activeGroup != null)
+                  ContextMenuButtonItem(
+                    label: UiStrings.of(
                       context,
-                    )?.onSearch(ranges.map((item) => item.quote).join(' '));
-                  },
-                ),
-                ContextMenuButtonItem(
-                  label: UiStrings.of(context).text('Study selected word'),
-                  onPressed: () {
-                    editable.hideToolbar();
-                    final selected = ranges.first;
-                    ScriptureStudyActions.maybeOf(
-                      context,
-                    )?.onWord(selected.verse, selected.range);
-                  },
-                ),
-                ContextMenuButtonItem(
-                  label: UiStrings.of(context).text('Add or edit verse note'),
-                  onPressed: () {
-                    editable.hideToolbar();
-                    ScriptureStudyActions.maybeOf(
-                      context,
-                    )?.onNote(ranges.first.verse);
-                  },
-                ),
-              ],
-              if (ranges.isNotEmpty)
-                ContextMenuButtonItem(
-                  label: UiStrings.of(context).text('Bookmark topics'),
-                  onPressed: () {
-                    editable.hideToolbar();
-                    final selected = ranges.first;
-                    unawaited(
-                      _showBookmarkAssignments(
-                        context,
-                        state,
-                        selected.verse,
-                        '$bookName ${origin.chapter}:${selected.verse.verse}',
-                        selections: ranges,
-                        onOpenTopic: ScriptureStudyActions.maybeOf(
-                          context,
-                        )?.onBookmarks,
-                      ),
-                    );
-                  },
-                ),
-              if (ranges.isNotEmpty && state.activeGroup != null)
-                ContextMenuButtonItem(
-                  label: UiStrings.of(
-                    context,
-                  ).text('Mark: {name}', {'name': state.activeGroup!.name}),
-                  onPressed: () {
-                    editable.hideToolbar();
-                    unawaited(
-                      state.markTextSelections(
-                        origin,
-                        ranges,
-                        bookName,
-                        state.activeGroup!.id,
-                      ),
-                    );
-                  },
-                ),
-              if (ranges.isNotEmpty && state.groups.length > 1)
-                ContextMenuButtonItem(
-                  label: UiStrings.of(context).text('More marking groups…'),
-                  onPressed: () async {
-                    editable.hideToolbar();
-                    final String? groupId = await showDialog<String>(
-                      context: context,
-                      builder: (BuildContext context) =>
-                          _MarkingGroupPicker(groups: state.groups),
-                    );
-                    if (context.mounted && groupId != null) {
-                      await state.markTextSelections(
-                        origin,
-                        ranges,
-                        bookName,
-                        groupId,
+                    ).text('Mark: {name}', {'name': state.activeGroup!.name}),
+                    onPressed: () {
+                      editable.hideToolbar();
+                      unawaited(
+                        state.markTextSelections(
+                          origin,
+                          ranges,
+                          bookName,
+                          state.activeGroup!.id,
+                        ),
                       );
-                    }
-                  },
-                ),
-              if (ranges.any(
-                (ScriptureVerseSelection item) => state.selectionHasMarking(
-                  item.verse.verse,
-                  item.range.start,
-                  item.range.end,
-                ),
-              ))
-                ContextMenuButtonItem(
-                  label: UiStrings.of(context).text('Remove highlighting'),
-                  onPressed: () {
-                    editable.hideToolbar();
-                    unawaited(state.removeTextSelections(origin, ranges));
-                  },
-                ),
-            ],
-          );
-        },
+                    },
+                  ),
+                if (ranges.isNotEmpty && state.groups.length > 1)
+                  ContextMenuButtonItem(
+                    label: UiStrings.of(context).text('More marking groups…'),
+                    onPressed: () async {
+                      editable.hideToolbar();
+                      final String? groupId = await showDialog<String>(
+                        context: context,
+                        builder: (BuildContext context) =>
+                            _MarkingGroupPicker(groups: state.groups),
+                      );
+                      if (context.mounted && groupId != null) {
+                        await state.markTextSelections(
+                          origin,
+                          ranges,
+                          bookName,
+                          groupId,
+                        );
+                      }
+                    },
+                  ),
+                if (ranges.any(
+                  (ScriptureVerseSelection item) => state.selectionHasMarking(
+                    item.verse.verse,
+                    item.range.start,
+                    item.range.end,
+                  ),
+                ))
+                  ContextMenuButtonItem(
+                    label: UiStrings.of(context).text('Remove highlighting'),
+                    onPressed: () {
+                      editable.hideToolbar();
+                      unawaited(state.removeTextSelections(origin, ranges));
+                    },
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -1839,7 +1849,9 @@ class _VerseLine extends StatelessWidget {
         ? null
         : _hexColor(wholeGroup.color).withAlpha(45);
     return Semantics(
-      label: reference,
+      // The web engine may expose a read-only selectable document only after
+      // focus. Keep Scripture available to readers before selection begins.
+      label: '$reference. ${verse.text}',
       container: true,
       child: ColoredBox(
         color: wholeColor ?? Colors.transparent,

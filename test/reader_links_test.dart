@@ -143,101 +143,134 @@ void main() {
   testWidgets('cold URL, native link and browser history use the real reader', (
     tester,
   ) async {
-    final state = (await tester.runAsync(
-      () async => AppState.fromDatabase(
-        await LocalDatabase.memory(),
-        api: ReaderApiFixture(lastVerse: 40).api,
-      ),
-    ))!;
-    addTearDown(state.close);
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: state,
-        child: GetBibleApp(
-          initialize: true,
-          initialUri: Uri.parse('/TST/Genesis/1?verse=35'),
+    final semantics = tester.ensureSemantics();
+    try {
+      final state = (await tester.runAsync(
+        () async => AppState.fromDatabase(
+          await LocalDatabase.memory(),
+          api: ReaderApiFixture(lastVerse: 40).api,
         ),
-      ),
-    );
-    await _settle(tester, state);
-    expect(state.passage.verse, 35);
-    expect(find.text('35'), findsOneWidget);
-    final router = GoRouter.of(tester.element(find.byType(ReaderScreen)));
-    expect(
-      router.routeInformationProvider.value.uri.queryParameters['verse'],
-      '35',
-    );
-    // Native activations arrive independently of the widget scheduling zone.
-    // Completed position writes from cold startup must not retain that zone.
-    await tester.runAsync(
-      () => state.openPassageLink(
-        Uri.parse('getbible:///TST/Extended-Book/7?verse=1'),
-      ),
-    );
-    await _settle(tester, state);
-    expect(
-      router.routeInformationProvider.value.uri.path,
-      '/TST/Extended-Book/7',
-    );
-    // Platform route information is the same callback used by browser Back.
-    await GoRouter.of(
-      tester.element(find.byType(ReaderScreen)),
-    ).routeInformationProvider.didPushRouteInformation(
-      RouteInformation(uri: Uri.parse('/TST/Genesis/1?verse=3')),
-    );
-    await _settle(tester, state);
-    expect(state.passage.book, 1);
-    expect(state.passage.verse, 3);
-    expect(find.text('3'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
+      ))!;
+      addTearDown(state.close);
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: state,
+          child: GetBibleApp(
+            initialize: true,
+            initialUri: Uri.parse('/TST/Genesis/1?verse=35'),
+          ),
+        ),
+      );
+      await _settle(tester, state);
+      expect(state.passage.verse, 35);
+      expect(find.text('35'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp(r'^Genesis 1:35\. Verse 35 original\.')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widgetList<SelectableText>(find.byType(SelectableText))
+            .any(
+              (text) => text.textSpan?.toPlainText() == 'Verse 35 original.',
+            ),
+        isTrue,
+        reason: 'The accessible label must retain native selectable Scripture.',
+      );
+      final router = GoRouter.of(tester.element(find.byType(ReaderScreen)));
+      expect(
+        router.routeInformationProvider.value.uri.queryParameters['verse'],
+        '35',
+      );
+      // Native activations arrive independently of the widget scheduling zone.
+      // Completed position writes from cold startup must not retain that zone.
+      await tester.runAsync(
+        () => state.openPassageLink(
+          Uri.parse('getbible:///TST/Extended-Book/7?verse=1'),
+        ),
+      );
+      await _settle(tester, state);
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        '/TST/Extended-Book/7',
+      );
+      // Platform route information is the same callback used by browser Back.
+      await GoRouter.of(
+        tester.element(find.byType(ReaderScreen)),
+      ).routeInformationProvider.didPushRouteInformation(
+        RouteInformation(uri: Uri.parse('/TST/Genesis/1?verse=3')),
+      );
+      await _settle(tester, state);
+      expect(state.passage.book, 1);
+      expect(state.passage.verse, 3);
+      expect(find.text('3'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets(
     'browser navigation keeps unsaved inline draft and its source URL',
     (tester) async {
-      final state = (await tester.runAsync(() async {
-        final state = AppState.fromDatabase(
-          await LocalDatabase.memory(),
-          api: ReaderApiFixture().api,
+      final semantics = tester.ensureSemantics();
+      try {
+        final state = (await tester.runAsync(() async {
+          final state = AppState.fromDatabase(
+            await LocalDatabase.memory(),
+            api: ReaderApiFixture().api,
+          );
+          await state.loadPassage(
+            const Passage(translation: 'tst', book: 1, chapter: 1, verse: 1),
+          );
+          return state;
+        }))!;
+        addTearDown(state.close);
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: state,
+            child: const GetBibleApp(),
+          ),
         );
-        await state.loadPassage(
-          const Passage(translation: 'tst', book: 1, chapter: 1, verse: 1),
+        await _settle(tester, state);
+        await tester.tap(find.text('1').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Add note'));
+        await tester.pumpAndSettle();
+        final editor = find.widgetWithText(TextField, 'Write your note…');
+        await tester.enterText(editor, 'Kept across history and layout');
+        await GoRouter.of(
+          tester.element(find.byType(ReaderScreen)),
+        ).routeInformationProvider.didPushRouteInformation(
+          RouteInformation(uri: Uri.parse('/TST/Extended-Book/7')),
         );
-        return state;
-      }))!;
-      addTearDown(state.close);
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(value: state, child: const GetBibleApp()),
-      );
-      await _settle(tester, state);
-      await tester.tap(find.text('1').first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Add note'));
-      await tester.pumpAndSettle();
-      final editor = find.widgetWithText(TextField, 'Write your note…');
-      await tester.enterText(editor, 'Kept across history and layout');
-      await GoRouter.of(
-        tester.element(find.byType(ReaderScreen)),
-      ).routeInformationProvider.didPushRouteInformation(
-        RouteInformation(uri: Uri.parse('/TST/Extended-Book/7')),
-      );
-      await _settle(tester, state);
-      expect(state.passage.book, 1);
-      expect(
-        tester.widget<TextField>(editor).controller!.text,
-        'Kept across history and layout',
-      );
-      final router = GoRouter.of(tester.element(find.byType(ReaderScreen)));
-      expect(router.routeInformationProvider.value.uri.path, '/TST/Genesis/1');
-      await tester.runAsync(() => state.setLayout(ReaderLayout.paragraph));
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<TextField>(editor).controller!.text,
-        'Kept across history and layout',
-      );
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+        await _settle(tester, state);
+        expect(state.passage.book, 1);
+        expect(
+          tester.widget<TextField>(editor).controller!.text,
+          'Kept across history and layout',
+        );
+        final router = GoRouter.of(tester.element(find.byType(ReaderScreen)));
+        expect(
+          router.routeInformationProvider.value.uri.path,
+          '/TST/Genesis/1',
+        );
+        await tester.runAsync(() => state.setLayout(ReaderLayout.paragraph));
+        await tester.pumpAndSettle();
+        expect(
+          find.bySemanticsLabel(RegExp(r'^Genesis 1:1\.  First verse\. ')),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<TextField>(editor).controller!.text,
+          'Kept across history and layout',
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        semantics.dispose();
+      }
     },
   );
 }

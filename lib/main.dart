@@ -16,21 +16,48 @@ import 'presentation/reader_router.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
-  runApp(
-    AppBootstrap<_ReaderSession>(
-      create: _ReaderSession.create,
-      discard: (session) async {
-        session.links.dispose();
-        await session.state.close();
-      },
-      builder: (context, session) => ChangeNotifierProvider.value(
-        value: session.state,
-        child: GetBibleApp(
-          initialize: true,
-          ownsState: true,
-          links: session.links,
-          initialUri: session.initialUri,
-        ),
+  runApp(ReaderBootstrap());
+}
+
+/// Owns startup resources and captures the launch route before the temporary
+/// loading application can report its own root route to the browser.
+class ReaderBootstrap extends StatelessWidget {
+  ReaderBootstrap({super.key, Future<AppState> Function()? createState})
+    : _createState = createState ?? _createDefaultState,
+      _launchUri = _captureLaunchUri();
+
+  final Future<AppState> Function() _createState;
+  final Uri _launchUri;
+
+  static Future<AppState> _createDefaultState() =>
+      AppState.create(initialize: false);
+
+  static Uri _captureLaunchUri() {
+    // PathUrlStrategy removes the document's deployment base (for example
+    // /flutter/) and preserves the literal query before storage/plugin awaits.
+    final location =
+        urlStrategy?.getPath() ??
+        WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+    final uri = Uri.tryParse(location);
+    return uri == null
+        ? Uri(path: '/invalid-native-link')
+        : readerLinkLocation(uri) ?? Uri(path: '/invalid-native-link');
+  }
+
+  @override
+  Widget build(BuildContext context) => AppBootstrap<_ReaderSession>(
+    create: () => _ReaderSession.create(_createState, _launchUri),
+    discard: (session) async {
+      session.links.dispose();
+      await session.state.close();
+    },
+    builder: (context, session) => ChangeNotifierProvider.value(
+      value: session.state,
+      child: GetBibleApp(
+        initialize: true,
+        ownsState: true,
+        links: session.links,
+        initialUri: session.initialUri,
       ),
     ),
   );
@@ -41,16 +68,19 @@ final class _ReaderSession {
   final AppState state;
   final NativeReaderLinks links;
   final Uri? initialUri;
-  static Future<_ReaderSession> create() async {
+  static Future<_ReaderSession> create(
+    Future<AppState> Function() createState,
+    Uri launchUri,
+  ) async {
     final links = NativeReaderLinks();
     try {
       final nativeUri = await links.initial();
-      final state = await AppState.create(initialize: false);
+      final state = await createState();
       return _ReaderSession(
         state,
         links,
         nativeUri == null
-            ? null
+            ? launchUri
             : readerLinkLocation(nativeUri) ??
                   Uri(path: '/invalid-native-link'),
       );

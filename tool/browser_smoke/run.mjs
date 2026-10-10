@@ -5,7 +5,7 @@ import { resolve, sep, extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium, firefox, webkit } from 'playwright';
 import { measureWorker } from './worker-performance.mjs';
-import { apiFixtures, firstVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
+import { apiFixtures, firstVerse, secondVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
 import { studyInstallationFixtures } from './study-fixtures.mjs';
 
 const { values } = parseArgs({ options: {
@@ -86,6 +86,7 @@ async function enableSemantics(page) {
 async function readerVisible(page) {
   await page.getByRole('button', { name: 'Genesis 1', exact: true }).waitFor();
   await page.getByRole('group', { name: `Genesis 1:1. ${firstVerse}`, exact: true }).waitFor();
+  await page.getByRole('group', { name: `Genesis 1:2. ${secondVerse}`, exact: true }).waitFor();
 }
 
 async function runJourney(browser, { isolated, browserName }) {
@@ -99,6 +100,8 @@ async function runJourney(browser, { isolated, browserName }) {
   const workers = [];
   const fixtures = new Map([...apiFixtures(), ...studyInstallationFixtures()]);
   let apiOffline = false;
+  let prepareShell = false;
+  let deferredShellLoads = 0;
   let page;
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   context.on('page', (opened) => {
@@ -120,6 +123,16 @@ async function runJourney(browser, { isolated, browserName }) {
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = request.url();
+    if (url === origin + basePath + 'offline_shell.js' && !prepareShell) {
+      // WebKit service-worker-controlled requests can bypass Playwright routing.
+      // Keep all fixture phases uncontrolled, then load the exact production
+      // shell script before the separate fully network-disconnected cold start.
+      // Native registration, worker bytes, cache verification and app code are
+      // untouched; only this script's initial delivery is deferred.
+      deferredShellLoads++;
+      return route.fulfill({ status: 200, contentType: 'text/javascript',
+        body: '// Offline shell registration is deferred until fixture setup completes.\n' });
+    }
     if (url.startsWith(origin + '/')) return route.continue();
     if (!/^https?:/.test(url)) return route.continue();
     requests.push({ method: request.method(), url, apiOffline });
@@ -143,9 +156,12 @@ async function runJourney(browser, { isolated, browserName }) {
   try {
     page = await context.newPage();
     page.setDefaultTimeout(45000);
-    await page.goto(origin + basePath + 'KJV/Genesis/1?verse=1', { waitUntil: 'domcontentloaded' });
+    await page.goto(origin + basePath + 'KJV/Genesis/1?verse=2', { waitUntil: 'domcontentloaded' });
     await enableSemantics(page);
     await readerVisible(page);
+    assert.ok(deferredShellLoads > 0, 'Fixture setup must defer the production shell loader');
+    assert.equal(new URL(page.url()).searchParams.get('verse'), '2',
+      'First browser launch must preserve the incoming verse rather than choose the daily default');
     assert.equal(await page.evaluate(() => crossOriginIsolated), isolated);
     assert.deepEqual(errors, [], 'Startup produced browser errors');
     assert.deepEqual(missingAssets, [], 'Startup missed built assets');
@@ -300,6 +316,8 @@ async function runJourney(browser, { isolated, browserName }) {
     // The generated application shell must cache its own exact release assets.
     // A fresh page with all networking disabled demonstrates a real cold start,
     // in addition to the earlier independent public-API offline checks.
+    prepareShell = true;
+    await page.addScriptTag({ url: origin + basePath + 'offline_shell.js' });
     // Activation never claims an existing page: a deploy must not switch the
     // asset generation underneath an open note editor. The next navigation is
     // controlled after the complete worker has activated.
@@ -307,6 +325,7 @@ async function runJourney(browser, { isolated, browserName }) {
       const registration = await navigator.serviceWorker.getRegistration();
       return registration?.active?.state === 'activated';
     }, undefined, { timeout: 90000 });
+    console.log(`${mode}: production application shell installed`);
     await context.setOffline(true);
     await page.close();
     page = await context.newPage();
@@ -334,7 +353,7 @@ async function runJourney(browser, { isolated, browserName }) {
     }
     throw error;
   } finally {
-    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({ errors, missingAssets, requests, workers }, null, 2));
+    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({ errors, missingAssets, requests, workers, deferredShellLoads }, null, 2));
     await context.tracing.stop({ path: join(outputDirectory, `${mode}-trace.zip`) });
     await context.close();
     await new Promise((resolveClose) => server.close(resolveClose));

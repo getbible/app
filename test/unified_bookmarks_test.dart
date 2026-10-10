@@ -4,11 +4,14 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getbible_live/application/portability_controller.dart';
 import 'package:getbible_live/application/unified_bookmarks_controller.dart';
 import 'package:getbible_live/core/request_cancellation.dart';
 import 'package:getbible_live/data/database/local_database.dart';
+import 'package:getbible_live/data/repositories/sql_private_data_repository.dart';
 import 'package:getbible_live/data/repositories/sql_unified_bookmarks_repository.dart';
 import 'package:getbible_live/domain/models/annotations.dart';
+import 'package:getbible_live/domain/models/backup.dart';
 import 'package:getbible_live/domain/models/notebook.dart';
 import 'package:getbible_live/domain/models/passage.dart';
 import 'package:getbible_live/domain/models/preferences.dart';
@@ -17,6 +20,7 @@ import 'package:getbible_live/domain/models/public_topic.dart';
 import 'package:getbible_live/domain/models/service_envelopes.dart';
 import 'package:getbible_live/domain/models/unified_bookmarks.dart';
 import 'package:getbible_live/domain/repositories/public_topics_repository.dart';
+import 'package:getbible_live/services/backup_service.dart';
 
 const _scope = SharedBookmarkSource.defaultScope;
 const _passage = Passage(translation: 'kjv', book: 43, chapter: 3);
@@ -78,6 +82,75 @@ Future<void> _seed(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('private merges keep provider-scoped group identities distinct', () {
+    const official = SharedBookmarkSource(topicId: 'faith');
+    const foreign = SharedBookmarkSource(
+      topicId: 'faith',
+      sourceScope: 'bookmarks:v1:https://other.example/v1',
+    );
+    BackupData fixture(SharedBookmarkSource source) => BackupData(
+      version: 2,
+      exportedAt: _time,
+      groups: [_group('local', 'Faith', source: source)],
+      markings: [_mark('membership', 'local', source: source)],
+      notes: [],
+    );
+    final imported = fixture(foreign);
+    final once = mergeReaderBackup(fixture(official), imported).data;
+    final twice = mergeReaderBackup(once, imported).data;
+    expect(twice.groups, hasLength(2));
+    expect(twice.markings, hasLength(2));
+    expect(twice.groups.map((group) => group.source!.effectiveScope).toSet(), {
+      official.effectiveScope,
+      foreign.effectiveScope,
+    });
+    expect(twice.markings.map((mark) => mark.groupId).toSet(), hasLength(2));
+  });
+
+  test(
+    'complete backup retains foreign origins while website export gives safe guidance',
+    () async {
+      final db = await LocalDatabase.memory();
+      addTearDown(db.close);
+      const foreign = SharedBookmarkSource(
+        topicId: 'faith',
+        sourceScope: 'bookmarks:v1:https://other.example/v1',
+      );
+      await _seed(
+        db,
+        [_group('local', 'Faith', source: foreign)],
+        [_mark('foreign', 'local', source: foreign)],
+      );
+      final snapshot = await db.privateSnapshot();
+      expect(
+        () => encodeBackup(snapshot.reader),
+        throwsA(isA<WebsiteBackupScopeException>()),
+      );
+      final controller = PortabilityController(
+        repository: SqlPrivateDataRepository(db),
+      );
+      addTearDown(controller.close);
+      expect(await controller.exportWebsite(), isNull);
+      expect(controller.error, const WebsiteBackupScopeException().message);
+      final complete = decodePrivateBackup(
+        (await controller.exportComplete())!,
+      );
+      expect(
+        complete.reader.groups.single.source?.effectiveScope,
+        foreign.effectiveScope,
+      );
+      expect(
+        complete.reader.markings.single.sharedSource?.effectiveScope,
+        foreign.effectiveScope,
+      );
+      expect(
+        complete.reader.markings.single.quote,
+        'Original private quotation',
+      );
+      expect(controller.error, isNull);
+    },
+  );
 
   test(
     'topic normalization covers canonical and compatibility Unicode without folding Scripture',

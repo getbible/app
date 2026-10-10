@@ -261,3 +261,26 @@ SQLite. Failure to journal a private edit leaves the database and controllers
 available for Retry. Closing an offline panel alone does not cancel a requested
 installation. Ordinary startup reads installed metadata locally and makes no
 catalogue or bulk-download request.
+
+## Decision record ADR-003: integrated reader and artifact promotion
+
+The final integration keeps topic reconciliation, contextual resource discovery
+and route ownership behind application and repository boundaries. Public topic
+memberships retain their source identity independently of personal memberships;
+reconciliation is transactional and must preserve private records. External
+links and browser history use the same guarded passage-opening operation as
+reader navigation, so an incoming route cannot silently discard an active draft.
+Interface translations apply only to application messages, never Scripture,
+resource text or private names.
+
+GitHub Releases distribute the immutable installers already produced by a
+successful supported-host CI run. Promotion validates the source revision,
+shared version metadata and every package checksum before publishing. It does
+not rebuild binaries, change their version or replace an existing published
+version. Alpha, beta and release-candidate channels remain prereleases.
+Optional signing remains independently configured per platform; absent keys
+leave development packages available without implying store approval.
+
+Automated host, simulator and browser evidence is recorded separately from
+physical-device, assistive-technology and store acceptance. Downloadable test
+installers must state their architecture, signing state and installation limits.

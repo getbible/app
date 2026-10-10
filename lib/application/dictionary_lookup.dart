@@ -88,6 +88,29 @@ abstract final class DictionaryIndexLookup {
     ]);
   }
 
+  static Future<List<DictionaryIndexEntry>> exactCooperatively(
+    DictionaryIndex index,
+    Iterable<String> candidates,
+    RequestCancellation cancellation,
+  ) async {
+    final terms = candidates
+        .map(foldDictionaryKey)
+        .where((term) => term.isNotEmpty)
+        .toSet();
+    final matches = <DictionaryIndexEntry>[];
+    for (var position = 0; position < index.entries.length; position++) {
+      if (position % 1024 == 0) {
+        cancellation.throwIfCancelled();
+        if (position > 0) await Future<void>.delayed(Duration.zero);
+      }
+      if (index.lookupKeysAt(position).any(terms.contains)) {
+        matches.add(index.entries[position]);
+      }
+    }
+    cancellation.throwIfCancelled();
+    return List.unmodifiable(matches);
+  }
+
   static List<DictionaryIndexEntry> filter(
     DictionaryIndex index,
     String query,
@@ -116,8 +139,9 @@ abstract final class DictionaryIndexLookup {
   static Future<List<DictionaryIndexEntry>> filterCooperatively(
     DictionaryIndex index,
     String query,
-    RequestCancellation cancellation,
-  ) async {
+    RequestCancellation cancellation, {
+    int? limit,
+  }) async {
     final String term = foldDictionaryKey(query);
     if (term.isEmpty) return const <DictionaryIndexEntry>[];
     final List<DictionaryIndexEntry> exact = <DictionaryIndexEntry>[];
@@ -131,13 +155,15 @@ abstract final class DictionaryIndexLookup {
       if (keys.contains(term)) {
         exact.add(index.entries[position]);
       } else if (keys.any((String key) => key.startsWith(term))) {
-        prefix.add(index.entries[position]);
+        if (limit == null || prefix.length < limit) {
+          prefix.add(index.entries[position]);
+        }
       }
     }
     cancellation.throwIfCancelled();
-    return List<DictionaryIndexEntry>.unmodifiable(<DictionaryIndexEntry>[
-      ...exact,
-      ...prefix,
-    ]);
+    final results = <DictionaryIndexEntry>[...exact, ...prefix];
+    return List<DictionaryIndexEntry>.unmodifiable(
+      limit == null ? results : results.take(limit),
+    );
   }
 }

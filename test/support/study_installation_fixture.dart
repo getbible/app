@@ -13,10 +13,10 @@ import 'package:getbible_live/domain/models/offline_resource.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-JsonMap _json(String path) => requireJsonMap(
-  jsonDecode(File('test/fixtures/$path').readAsStringSync()),
-  path,
-);
+import 'fixture_documents.dart';
+
+JsonMap _json(String path) =>
+    requireJsonMap(jsonDecode(fixtureText(path)), path);
 
 final class StudyInstallationFixture {
   StudyInstallationFixture(this.kind) {
@@ -30,18 +30,18 @@ final class StudyInstallationFixture {
         _json('dictionaries_v1/$module/metadata.json'),
       );
       _put('$module/index.json', _json('dictionaries_v1/$module/index.json'));
-      documents['$module.json'] = File(
-        'test/fixtures/offline_study_v1/dictionary.json',
-      ).readAsBytesSync();
+      documents['$module.json'] = fixtureBytes(
+        'offline_study_v1/dictionary.json',
+      );
     } else if (kind == OfflineResourceKind.commentary) {
       module = 'fixture';
       final fixture = _json('commentary_v1.json');
       _put('commentaries.json', fixture['catalogue']);
       _put('$module/metadata.json', fixture['metadata']);
       _put('$module/books.json', fixture['coverage']);
-      documents['$module.json'] = File(
-        'test/fixtures/offline_study_v1/commentary.json',
-      ).readAsBytesSync();
+      documents['$module.json'] = fixtureBytes(
+        'offline_study_v1/commentary.json',
+      );
     } else {
       module = 'all';
       _put(
@@ -49,9 +49,7 @@ final class StudyInstallationFixture {
         _json('public_topic_index.json')
           ..['counts'] = {'topics': 2, 'verses': 4, 'locales': 2},
       );
-      documents['all.json'] = File(
-        'test/fixtures/offline_study_v1/bookmarks.json',
-      ).readAsBytesSync();
+      documents['all.json'] = fixtureBytes('offline_study_v1/bookmarks.json');
     }
     updateSizesAndManifest();
     transport = ApiTransport(

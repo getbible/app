@@ -32,6 +32,8 @@ final class CommentaryController extends ChangeNotifier {
   CommentaryMetadata? _metadata;
   CommentaryCoverage? _coverage;
   CommentaryChapter? _chapter;
+  CommentaryChapter? _introduction;
+  Object? _introductionError;
   Object? _error;
   bool isInstalled = false;
   int _installationStatusGeneration = 0;
@@ -42,11 +44,15 @@ final class CommentaryController extends ChangeNotifier {
   bool _disposed = false;
 
   StudyContext? get context => _context;
-  List<CommentaryModule> get modules => _catalogue?.modules ?? const [];
+  List<CommentaryModule> get modules =>
+      _catalogue?.modules.where((module) => module.entryCount > 0).toList() ??
+      const [];
   CommentaryModule? get selectedModule => _selected;
   CommentaryMetadata? get metadata => _metadata;
   CommentaryCoverage? get coverage => _coverage;
   CommentaryChapter? get chapter => _chapter;
+  CommentaryChapter? get introduction => _introduction;
+  Object? get introductionError => _introductionError;
   Object? get error => _error;
   String? get preferenceWarning => _preferenceWarning;
   bool get isLoading => _loading;
@@ -133,8 +139,8 @@ final class CommentaryController extends ChangeNotifier {
         }
       }
       if (!_owner.owns(token)) return;
-      final List<CommentaryModule> compatible = modules
-          .where(isCompatible)
+      final available = modules
+          .where((module) => module.entryCount > 0)
           .toList();
       final CommentaryModule? previous = _selected;
       _selected =
@@ -143,11 +149,29 @@ final class CommentaryController extends ChangeNotifier {
               modules.any((CommentaryModule module) => module.id == previous.id)
           ? previous
           : null;
+      _selected ??= available.where((module) => module.id == saved).firstOrNull;
       if (_selected == null) {
-        for (final CommentaryModule module in compatible) {
-          if (module.id == saved) _selected = module;
+        var defaults = available;
+        final capability = repository;
+        if (capability is InstalledStudyResource) {
+          final installed = <CommentaryModule>[];
+          for (final module in available) {
+            if (await token.bind(
+              (capability as InstalledStudyResource).isInstalled(module.id),
+            )) {
+              installed.add(module);
+            }
+          }
+          if (!_owner.owns(token)) return;
+          if (installed.isNotEmpty) defaults = installed;
         }
-        _selected ??= compatible.isEmpty ? null : compatible.first;
+        _selected =
+            defaults.where((module) => module.id == 'tsk').firstOrNull ??
+            defaults.where(isCompatible).firstOrNull ??
+            defaults
+                .where((module) => _language(module.language) == 'en')
+                .firstOrNull ??
+            defaults.firstOrNull;
       }
       if (_selected != null) await _loadSelected(token);
     } catch (error) {
@@ -167,11 +191,9 @@ final class CommentaryController extends ChangeNotifier {
     final RequestCancellation token = _owner.begin();
     _selected = selected;
     _beginLoading();
-    if (isCompatible(selected)) {
-      final String language = _context!.language;
-      _rememberedChoices[language] = selected.id;
-      _remember(language, selected.id);
-    }
+    final String language = _context!.language;
+    _rememberedChoices[language] = selected.id;
+    _remember(language, selected.id);
     try {
       await _loadSelected(token);
     } catch (error) {
@@ -226,33 +248,49 @@ final class CommentaryController extends ChangeNotifier {
     }
     _metadata = metadata;
     _coverage = coverage;
-    if (!coverage.covers(context.book, context.chapter)) return;
-    try {
-      final CommentaryChapter chapter = await repository.chapter(
-        module.id,
-        context.book,
-        context.chapter,
-        cancellation: token,
-      );
-      if (!_owner.owns(token)) return;
-      if (chapter.language != module.language) {
-        throw const ApiFormatException(
-          'The commentary chapter has a different language.',
+    Future<CommentaryChapter?> read(int chapterNumber) async {
+      if (!coverage.covers(context.book, chapterNumber)) return null;
+      try {
+        final chapter = await repository.chapter(
+          module.id,
+          context.book,
+          chapterNumber,
+          cancellation: token,
         );
+        token.throwIfCancelled();
+        if (chapter.language != module.language ||
+            chapter.chapter != chapterNumber ||
+            chapter.book != context.book) {
+          throw const ApiFormatException(
+            'The commentary chapter identity changed during loading.',
+          );
+        }
+        return chapter;
+      } on ResourceUnavailableException {
+        if (chapterNumber == 0 && context.chapter != 0) rethrow;
+        return null;
       }
-      _chapter = chapter;
-    } on ResourceUnavailableException {
-      // A publication/coverage race remains an unavailable source chapter.
-      // Scripture and private drafts are unaffected; the explicit Retry stays.
-      if (!_owner.owns(token)) return;
-      _chapter = null;
     }
+
+    final chapters = await Future.wait<CommentaryChapter?>([
+      read(context.chapter),
+      if (context.chapter != 0)
+        read(0).catchError((Object error) {
+          if (_owner.owns(token)) _introductionError = error;
+          return null;
+        }),
+    ]);
+    if (!_owner.owns(token)) return;
+    _chapter = chapters.first;
+    _introduction = context.chapter == 0 ? null : chapters.last;
   }
 
   void _beginLoading() {
     _metadata = null;
     _coverage = null;
     _chapter = null;
+    _introduction = null;
+    _introductionError = null;
     _error = null;
     _preferenceWarning = null;
     _loading = true;
@@ -299,6 +337,8 @@ final class CommentaryController extends ChangeNotifier {
     _metadata = null;
     _coverage = null;
     _chapter = null;
+    _introduction = null;
+    _introductionError = null;
     _error = null;
     _preferenceWarning = null;
     if (notify) notifyListeners();

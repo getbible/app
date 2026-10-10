@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui_strings.dart';
 import '../../domain/models/bible.dart';
 
 /// A width-safe translation selector for drawers and compact reader surfaces.
@@ -20,7 +21,9 @@ class ReaderTranslationField extends StatelessWidget {
     return DropdownButtonFormField<String>(
       initialValue: value,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Translation'),
+      decoration: InputDecoration(
+        labelText: UiStrings.of(context).text('Translation'),
+      ),
       selectedItemBuilder: (BuildContext context) => translations
           .map(
             (Translation item) => Align(

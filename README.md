@@ -4,18 +4,24 @@ Cross-platform Flutter implementation of [getBible.Life](https://app.getbible.li
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
-> Development status: the reader provides lossless Bible v3 Scripture, online Search v3, reusable Query v3 previews, an adaptive Study workspace with dictionaries, commentaries and public topics, and separate local study/sermon notebooks. Canonical inline verse notes and personal markings retain their established identities. Complete private backups and explicitly installed Bibles/Study resources extend these workflows. Full localization, integrated reference-app parity and final platform/store release gates remain later work. See [feature parity](docs/FEATURE_PARITY.md).
+> Development status: the alpha reader includes Bible v3, Search and Query, contextual Study, unified personal/global bookmarks, private notebooks, complete backups and explicitly installed public resources. Integrated parity and automated platform acceptance are implemented in this candidate; actual run evidence and remaining device, language-review and store gates are recorded in [testing](docs/TESTING.md) and [feature parity](docs/FEATURE_PARITY.md). Downloadable development packages are not store-approved releases.
 
 ## Supported targets
 
 | Target | Development/test command | Distribution output |
 |---|---|---|
-| Android | `flutter run -d android` | APK or Play Store AAB |
-| iOS/iPadOS | `flutter run -d ios` | Xcode archive/App Store package |
-| Web | `flutter run -d chrome` | Static files in `build/web` |
-| Windows | `flutter run -d windows` | Windows runner bundle |
-| macOS | `flutter run -d macos` | macOS application bundle |
-| Linux | `flutter run -d linux` | Linux runner bundle |
+| Android | `flutter run -d android` | Installable development APK; optional signed APK/AAB |
+| iOS/iPadOS | `flutter run -d ios` | Simulator APP ZIP; unsigned device bundle; optional signed IPA |
+| Web | `flutter run -d chrome` | Static website ZIP with an offline application shell |
+| Windows | `flutter run -d windows` | Setup EXE and portable ZIP |
+| macOS | `flutter run -d macos` | Drag-to-Applications DMG and APP ZIP |
+| Linux | `flutter run -d linux` | Debian DEB installer and portable TAR.GZ |
+
+Download published versions from [GitHub Releases](https://github.com/getbible/app/releases).
+See [installation and testing](docs/INSTALLING.md) for device requirements,
+unsigned-package behavior and checksum verification. Flutter creates application
+bundles; this repository's packaging scripts turn them into installers. Linux
+currently has a DEB and portable bundle, not an AppImage.
 
 ## Requirements
 
@@ -79,8 +85,10 @@ Scripture on wide windows and in a keyboard-aware sheet on compact screens.
 Closing restores reader focus and preserves its passage and scroll position.
 
 Dictionary lookup retains source lexical IDs, lemmas, morphology and
-transliteration, resolves the selected resource's published index, and reads
-definitions on demand. Commentary uses published book/chapter coverage and
+transliteration and confirms definitions across available resource indexes.
+Installed resources are searched first when present; **Include online dictionaries**
+explicitly expands that scope. Suggestions and unavailable resources are distinct
+from confirmed definitions. Commentary uses published book/chapter coverage and
 retains ranged and introduction entries. Resource choices display their actual
 source language; unavailable coverage has an explicit state. Dictionary,
 commentary, topic and notebook citations reuse the same selected-Bible Query
@@ -124,9 +132,10 @@ Search remains **Online** by default; choose **Installed** for local full-text
 search, whose supported filters are stated in the search panel. Installed Study
 resources use the same native panels and citations. Public caches and downloaded
 corpora are excluded from private backups; reinstall public resources on a new
-device. On the web, resource storage persists in the browser, but application
-files must still be available from the static host. This is not a guarantee of
-cold-starting the website without its application files.
+device. Release Web packages also cache their application files after the first
+successful online visit. Once installation finishes, the browser can reopen the
+app with the network disabled. Browser storage eviction or clearing site data
+removes this capability and may remove private data; keep private backups.
 
 See [API/cache behavior](docs/API_AND_CACHE.md),
 [architecture](docs/ARCHITECTURE.md), [dictionaries](docs/dictionaries.md),
@@ -149,10 +158,11 @@ iOS simulator and Web packages. Download them from that run's **Artifacts**
 section. An unsigned iOS device bundle validates compilation; use the simulator
 bundle or a signed/TestFlight build for execution. Web files need an HTTP server.
 
-`pubspec.yaml` is the single alpha/beta/rc/stable version source. A manual
-**Flutter CI → Run workflow → Publish release** action on `main` publishes a new
-recorded version to GitHub Releases and skips an existing version. Signing is
-optional and independently configured per target. See [distribution](docs/DEPLOYMENT.md)
+`pubspec.yaml` is the single alpha/beta/rc/stable version source. Successful `main`
+CI automatically promotes its verified packages to GitHub Releases without
+rebuilding. An unchanged published version is skipped. **Publish tested packages**
+also accepts a successful `main` run ID for retrying publication of retained
+artifacts. Signing is optional and independently configured per target. See [distribution](docs/DEPLOYMENT.md)
 and [signing credentials](docs/SIGNING.md). Store submission comes later.
 
 **pub.dev is not an application testing service.** It is Dart and Flutter’s public package registry. This application is not intended to be published there as a reusable package. Test builds belong in GitHub Actions artifacts, GitHub Pages, TestFlight, Play Console internal testing, or locally attached Flutter devices.
@@ -233,6 +243,7 @@ All platform launchers, favicons, splash artwork, window icons, and in-app ident
 - [Personal study and sermon notebooks](docs/notebooks.md)
 - [Feature-parity ledger](docs/FEATURE_PARITY.md)
 - [Web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md)
+- [Interface localization and language review](docs/LOCALIZATION.md)
 - [Current reference-app parity audit (October 2026)](docs/PARITY_AUDIT_2026-10.md)
 - [Local development and launch troubleshooting](docs/LOCAL_DEVELOPMENT.md)
 - [Distribution signing requirements](docs/SIGNING.md)
@@ -240,6 +251,7 @@ All platform launchers, favicons, splash artwork, window icons, and in-app ident
 - [Brand assets](docs/BRANDING.md)
 - [Testing and QA](docs/TESTING.md)
 - [Deployment and distribution](docs/DEPLOYMENT.md)
+- [Download and install test packages](docs/INSTALLING.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
 - [Privacy policy draft](docs/PRIVACY.md)
 

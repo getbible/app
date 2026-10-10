@@ -206,10 +206,12 @@ reader only after a successful transaction. Imported journals remain recoverable
 without silently activating them. Cache deletion preserves private tables.
 
 Shared controllers, typed repositories and platform database/file adapters keep
-the six target platforms on one architecture. Store signing, publication,
-complete localization, physical-device accessibility/suspension and platform
-performance checks remain explicit later release gates. Feature tests and
-composed journeys do not substitute for those gates.
+the six target platforms on one architecture. Optional signing and automated
+GitHub publication are separate from store submission. Bundled localization,
+native runtime acceptance and worker measurements are implemented; human
+linguistic review, physical-device accessibility/suspension and store approval
+remain separate evidence. Feature tests and composed journeys do not substitute
+for those gates.
 
 ## Decision record ADR-002: portability and installed-resource ownership
 
@@ -261,3 +263,64 @@ SQLite. Failure to journal a private edit leaves the database and controllers
 available for Retry. Closing an offline panel alone does not cancel a requested
 installation. Ordinary startup reads installed metadata locally and makes no
 catalogue or bulk-download request.
+
+## Decision record ADR-003: integrated reader and artifact promotion
+
+The final integration keeps topic reconciliation, contextual resource discovery
+and route ownership behind application and repository boundaries. Public topic
+memberships retain their source identity independently of personal memberships;
+reconciliation is transactional and must preserve private records. External
+links and browser history use the same guarded passage-opening operation as
+reader navigation, so an incoming route cannot silently discard an active draft.
+Interface translations apply only to application messages, never Scripture,
+resource text or private names.
+
+GitHub Releases distribute the immutable installers already produced by a
+successful supported-host CI run. Promotion validates the source revision,
+shared version metadata and every package checksum before publishing. It does
+not rebuild binaries, change their version or replace an existing published
+version. Alpha, beta and release-candidate channels remain prereleases.
+Optional signing remains independently configured per platform; absent keys
+leave development packages available without implying store approval.
+
+Automated host, simulator and browser evidence is recorded separately from
+physical-device, assistive-technology and store acceptance. Downloadable test
+installers must state their architecture, signing state and installation limits.
+
+## Startup and shutdown ownership
+
+`AppBootstrap` displays loading and a non-destructive Retry surface while local
+storage opens. Its factory owns cleanup of partial initialization; the bootstrap
+closes a completed resource if its surface was removed before handoff. Once
+handed to the production reader, the reader session owns shutdown. Injected test
+or host states retain their caller's lifetime. `LocalDatabase.fromExecutor`
+releases a failed open/migration executor before Retry and preserves the original
+failure even if cleanup also fails. It never resets an existing database.
+
+Web startup rejects Drift's purely in-memory fallback for production private
+storage, because appearing to save data that disappears at the next launch is
+unsafe. Explicit in-memory test databases remain available. The recovery surface
+explains storage permissions/capacity and does not recommend clearing site data.
+Desktop cancellable exit awaits durable writes; notebook lifecycle flush errors
+retain their drafts and expose recovery. Forced process termination can still
+interrupt an uncommitted edit.
+
+## Integrated reader boundaries
+
+`ReaderRouter` owns address-bar/native-link transitions; `AppState` owns passage
+request cancellation, validation and persistence. A single persistent page keeps
+inline drafts and focus through URL changes. Previewing Scripture stays separate
+from explicitly opening it. `SourceAnnotations` presents typed source metadata
+and shared citation actions outside original selectable Scripture text.
+
+`UnifiedBookmarksController` discovers public metadata and coordinates explicit
+membership operations through a repository. `SqlUnifiedBookmarksRepository`
+commits reconciliation, origin-preserving memberships and active/recent group
+remaps transactionally. The database owns identities; a translated display label
+alone never establishes ownership when multiple private matches exist.
+
+`DictionaryDiscovery` owns bounded concurrent index/definition discovery and
+confirmed choices. Installed and online repositories share the actual background
+index parser. A native/Web worker keeps large parsing away from the UI event
+loop; the controller owns cancellation, scope, partial failures and history.
+Widgets render these states without issuing raw HTTP or SQL.

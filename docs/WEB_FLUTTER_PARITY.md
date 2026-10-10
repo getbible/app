@@ -7,8 +7,10 @@ live application define product behavior. Flutter implements the behavior with
 native widgets and local platform services. Platform-appropriate presentation is
 acceptable; changed data ownership or a missing workflow must be recorded.
 
-The [October 2026 audit](PARITY_AUDIT_2026-10.md) compares the reference commit
-`22172efd7ed46722c8f0da42b58222c8f1bc2360` with the Flutter implementation.
+The integrated candidate is aligned to reference commit
+`098eeaa06c75efde4a3c75a9984d66ac987add30`. The
+[October 2026 audit](PARITY_AUDIT_2026-10.md) records the earlier comparison at
+`22172efd7ed46722c8f0da42b58222c8f1bc2360` and the gaps it identified.
 Both applications now use the v3 Bible, Query and Search services. The
 [July audit](PARITY_AUDIT_2026-07.md) is historical and predates the reference's
 unified bookmarks and v3 Study workflows. Neither audit replaces the requirement
@@ -22,17 +24,17 @@ Paths in the reference column refer to `getbible/app.getbible.life`.
 |---|---|---|
 | Bible v3 and hashes | `lib/getbible.ts`, `lib/cache.ts` | `lib/data/api/`, `CachedBibleRepository`, lossless source models and complete installed Bible indexes. |
 | Query v3 previews | `lib/scripture-api.ts`, `app/components/ReferenceModal.tsx` | `QueryRepository`, `GroupedReferenceLookup`, `ReferencePreviewController`, `ReferencePreview`. |
-| Search v3 | `lib/scripture-api.ts`, `app/page.tsx` | `OnlineSearchController`, `ApiSearchRepository`, `SearchPanel`; input debounce differs. |
-| Dictionary/context lookup | `lib/study-api.ts`, `lib/dictionary-lookup.ts`, `StudyPanel.tsx` | Typed repository/controller and native panel; cross-resource confirmed-definition choices remain missing. |
+| Search v3 | `lib/scripture-api.ts`, `app/page.tsx` | `OnlineSearchController`, `ApiSearchRepository`, `SearchPanel`; 250 ms owned debounce and immediate submit. |
+| Dictionary/context lookup | `lib/study-api.ts`, `lib/dictionary-lookup.ts`, `StudyPanel.tsx` | `DictionaryDiscovery` confirms exact nonempty definitions across bounded resource indexes, distinguishes suggestions/failures and uses real workers for large indexes. Installed-first scope has an explicit online expansion. |
 | Commentary | `lib/study-api.ts`, `StudyPanel.tsx` | Typed sparse-coverage/range/citation workflow with explicit complete offline module installation. |
-| Topic identity and migration | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | Public topic/copy repositories plus private annotations; unified list and automatic reconciliation remain missing. |
+| Topic identity and migration | `lib/shared-bookmarks.ts`, `lib/bookmark-storage.ts` | `UnifiedBookmarksRepository`, SQL transaction store and controller reconcile source identity or unambiguous normalized names/aliases/locales; ambiguous independent private groups remain private. Metadata discovery is lazy on first bookmark use. |
 | Memberships and provenance | `lib/markings.ts`, `BookmarkMenu.tsx` | `annotations.dart`, `AppState`, annotation repository; preservation and full contextual menu are distinct acceptance gates. |
 | Canonical notes | `lib/notes.ts`, `app/page.tsx` | `VerseNote`, annotation repository, inline reader editor. |
-| Rich source annotations | `lib/annotations.ts`, `ScriptureText.tsx` | `ScriptureTextMap`/composer and native text; full source-note/reference surface remains missing. |
-| Reader restoration and URLs | `lib/reader-state.ts`, `app/page.tsx` | `AppState`, settings and passage parser; router/platform integration incomplete. |
+| Rich source annotations | `lib/annotations.ts`, `ScriptureText.tsx` | `ScriptureTextMap`/composer, `SourceAnnotations` and native selectable Scripture; source notes/citations below verses/paragraphs, unlocated lexical metadata and red Jesus quotations. |
+| Reader restoration and URLs | `lib/reader-state.ts`, `app/page.tsx` | `ReaderRouter`, `NativeReaderLinks`, `AppState` and persistent reader page; exact visible-verse restoration, friendly URLs/history, custom-scheme platform activation and draft-aware navigation. Verified HTTPS associations require external domain/team setup. |
 | Markdown and backups | `lib/markdown.ts`, `lib/markings.ts`, `app/page.tsx` | Native Save/Copy/share and previewed file import; separate complete private format includes notebooks and retained drafts while website v2 remains compatible. |
 | Daily Scripture | `lib/daily.ts` | Typed resolver and versioned daily cache; alias/range/ownership fixes have regressions awaiting current validation evidence. |
-| Appearance/localization | `lib/appearance.ts`, `lib/i18n.ts`, `public/locales/` | `ReaderPreferences`, `UiStrings`, `assets/locales/`; complete current-message adoption remains incomplete. |
+| Appearance/localization | `lib/appearance.ts`, `lib/i18n.ts`, `public/locales/` | `ReaderPreferences`, scoped `UiStrings`, pinned 282-message upstream catalogue, 69 packs and native extension messages. UI direction is independent of Scripture. High contrast/reduced motion respect preferences; generated language packs still require linguistic review. |
 
 ## Bookmark preservation rules
 
@@ -47,7 +49,9 @@ Automatic reconciliation in the reference preserves custom names/colors and
 surviving local IDs, resolves only unambiguous name/alias/locale matches, and
 retains every personal record. Global duplicates can collapse only within the
 same source/topic/coordinate identity. Flutter must implement these rules in a
-single SQLite transaction before it claims unified-bookmark parity.
+single SQLite transaction. The implemented store also remaps active/recent group
+choices while retaining private notebook data. Catalogue refresh is idempotent;
+it does not require changing the existing schema-5 structure.
 
 The existing **Copy to my markings** creates an independent private copy. That
 operation is different from the reference's **Download global bookmarks**, whose
@@ -97,10 +101,17 @@ dart run tool/sync_web_locales.dart ../app.getbible.life
 flutter test test/localization_contract_test.dart
 ```
 
-The existing locale test checks internal pack consistency. Until a pinned
-reference fixture/message contract is added, it cannot detect new upstream
-messages or prove all native controls use translations. The October audit found
-199 Flutter messages versus 218 reference messages across the same 69 locales.
+The pinned fixture `test/fixtures/ui_locale_contract.json` records the inspected
+reference commit and catalogue. Contract tests compare upstream keys and message
+positions, native call-site coverage and placeholders. The current reference has
+282 source messages and 69 locale packs; empty upstream packs intentionally use
+English. Native extension packs are generated only by the opt-in developer tool,
+committed to the repository, and loaded locally. Runtime and CI do not contact a
+translation service. Mechanical coverage is not a claim of human language review.
+
+The earlier audit's 199/218 message counts describe its historical commits, not
+this candidate. Re-synchronization must update the pinned fixture as well as the
+packs so a new upstream key cannot pass by comparing only local pack lengths.
 
 ## Release gate
 

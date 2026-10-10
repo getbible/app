@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,22 +9,35 @@ import 'package:getbible_live/domain/models/notebook.dart';
 import 'package:getbible_live/domain/models/passage.dart';
 import 'package:getbible_live/domain/models/preferences.dart';
 import 'package:getbible_live/main.dart';
+import 'package:getbible_live/presentation/widgets/dictionary_panel.dart';
 import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
 import 'package:getbible_live/presentation/widgets/study_workspace.dart';
+import 'package:getbible_live/presentation/widgets/topics_panel.dart';
 import 'package:provider/provider.dart';
 
 import 'study_api_fixture.dart';
 
 /// Exercises public resources and private editing through the production reader.
 /// The same journey runs in widget CI and the native Linux runner.
-void studyWorkspaceJourney() {
+void studyWorkspaceJourney({
+  bool useDeviceViewport = false,
+  Size viewport = const Size(1250, 900),
+  TargetPlatformVariant? platform,
+  double initialKeyboardInset = 0,
+}) {
   testWidgets(
     'Study dictionaries, commentary, topics and local notebooks compose without changing Scripture',
     (tester) async {
-      tester.view.physicalSize = const Size(1250, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      if (!useDeviceViewport) {
+        tester.view.physicalSize = viewport;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+      }
+      if (initialKeyboardInset > 0) {
+        tester.view.viewInsets = FakeViewPadding(bottom: initialKeyboardInset);
+        addTearDown(tester.view.resetViewInsets);
+      }
       final StudyApiFixture fixture = StudyApiFixture();
       const Passage origin = Passage(
         translation: 'tst',
@@ -56,9 +71,30 @@ void studyWorkspaceJourney() {
       await tester.pumpAndSettle();
 
       Future<void> settle() async {
-        await tester.runAsync(
-          () async => Future<void>.delayed(const Duration(milliseconds: 50)),
-        );
+        // SQLite and source fixtures complete on the real event loop. Keep it
+        // and Flutter frames moving until the actual operations are idle;
+        // simulator scheduling must not depend on a fixed storage delay.
+        final deadline = Stopwatch()..start();
+        do {
+          await tester.runAsync(
+            () async => Future<void>.delayed(const Duration(milliseconds: 1)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+          if (deadline.elapsed > const Duration(seconds: 10)) {
+            throw TimeoutException('Study operations did not become idle.');
+          }
+        } while (state.loading ||
+            state.study.dictionary.isLoading ||
+            state.study.dictionary.isDiscovering ||
+            state.study.commentary.isLoading ||
+            state.study.topics.loading ||
+            state.study.topics.loadingTopic ||
+            state.study.topics.loadingNames ||
+            state.study.topics.restoringPreferences ||
+            state.study.topics.savingPreferences.isNotEmpty ||
+            state.study.topics.copying ||
+            state.study.notebooks.isLoading ||
+            state.study.notebooks.isSaving);
         await tester.pumpAndSettle();
       }
 
@@ -81,18 +117,58 @@ void studyWorkspaceJourney() {
       }
 
       await openWord();
-      expect(find.text('Source language: en'), findsOneWidget);
-      final Finder definition = find.text('Kadesh').first;
-      await tester.ensureVisible(definition);
+      expect(state.study.dictionary.metadata?.language, 'en');
+      final dictionaryScroll = find
+          .descendant(
+            of: find.byType(DictionaryPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      // A native IME transition can still constrain the panel after Study
+      // opens. Loaded metadata may be outside the lazy list's visible range.
+      final sourceLanguage = find.text('Source language: en');
+      await tester.scrollUntilVisible(
+        sourceLanguage,
+        100,
+        scrollable: dictionaryScroll,
+      );
+      await tester.pumpAndSettle();
+      expect(sourceLanguage, findsOneWidget);
+      expect(sourceLanguage.hitTestable(), findsOneWidget);
+      // Use the exact published ID to distinguish repeated definitions. On
+      // short native viewports the list tile is not built until scrolled to.
+      final Finder definition = find.widgetWithText(ListTile, 'kadesh');
+      await tester.scrollUntilVisible(
+        definition,
+        150,
+        scrollable: dictionaryScroll,
+      );
+      await tester.pumpAndSettle();
+      expect(definition.hitTestable(), findsOneWidget);
       await tester.tap(definition);
       await settle();
       expect(find.textContaining('Preserved paragraphs.'), findsOneWidget);
       expect(state.current!.verses.first.text, originalText);
+      if (initialKeyboardInset > 0) {
+        // The regression holds the pending IME inset through the first lookup,
+        // then delivers its hide notification before continuing the journey.
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+      }
 
       await choose(StudyTab.commentary);
       await tester.tap(find.text('Whole chapter'));
       await settle();
       expect(find.textContaining('First ranged comment.'), findsOneWidget);
+      final introduction = find.widgetWithText(
+        ExpansionTile,
+        'Chapter introduction',
+      );
+      await tester.ensureVisible(introduction);
+      await tester.pumpAndSettle();
+      expect(introduction.hitTestable(), findsOneWidget);
+      await tester.tap(introduction);
+      await settle();
       expect(find.text('Chapter introduction.'), findsOneWidget);
       expect(
         fixture.requests.any((uri) => uri.path == '/v1/fixture/1/1.json'),
@@ -104,13 +180,35 @@ void studyWorkspaceJourney() {
       );
 
       await choose(StudyTab.topics);
-      await tester.tap(find.text('Follow').first);
+      final topicScroll = find
+          .descendant(
+            of: find.byType(TopicsPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final follow = find.descendant(
+        of: find.widgetWithText(Card, 'Authority of the Bible'),
+        matching: find.widgetWithText(TextButton, 'Follow'),
+      );
+      await tester.scrollUntilVisible(follow, 150, scrollable: topicScroll);
+      await tester.pumpAndSettle();
+      expect(follow.hitTestable(), findsOneWidget);
+      await tester.tap(follow);
       await settle();
+      expect(state.study.topics.followed, contains('authority-of-the-bible'));
       expect(state.groups.length, groupsBefore);
       expect(state.notes.single.id, noteId);
-      await tester.tap(find.text('Authority of the Bible').first);
+      final topic = find.widgetWithText(ListTile, 'Authority of the Bible');
+      await tester.ensureVisible(topic);
+      await tester.pumpAndSettle();
+      expect(topic.hitTestable(), findsOneWidget);
+      await tester.tap(topic);
       await settle();
-      await tester.tap(find.text('Copy to my markings'));
+      final copy = find.text('Copy to my markings');
+      await tester.scrollUntilVisible(copy, 150, scrollable: topicScroll);
+      await tester.pumpAndSettle();
+      expect(copy.hitTestable(), findsOneWidget);
+      await tester.tap(copy);
       await settle();
       expect(find.text('Copy public topic to my markings?'), findsOneWidget);
       await tester.tap(find.text('Copy markings'));
@@ -120,25 +218,31 @@ void studyWorkspaceJourney() {
       expect(state.notes.single.id, noteId);
 
       await choose(StudyTab.notes);
-      await tester.tap(find.text('New notebook'));
+      final Finder notebookScroll = find
+          .descendant(
+            of: find.byKey(const ValueKey<String>('notes-panel-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final createNotebook = find.text('New notebook');
+      await tester.scrollUntilVisible(
+        createNotebook,
+        150,
+        scrollable: notebookScroll,
+      );
+      await tester.pumpAndSettle();
+      expect(createNotebook.hitTestable(), findsOneWidget);
+      await tester.tap(createNotebook);
       await settle();
       final Finder title = find.widgetWithText(TextField, 'Notebook title');
-      await tester.ensureVisible(title);
+      await tester.scrollUntilVisible(title, 150, scrollable: notebookScroll);
+      await tester.pumpAndSettle();
       await tester.enterText(title, 'Sunday sermon');
       final Finder block = find.widgetWithText(
         TextFormField,
         'Study or sermon notes',
       );
-      await tester.scrollUntilVisible(
-        block,
-        250,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const ValueKey<String>('notes-panel-list')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      await tester.scrollUntilVisible(block, 250, scrollable: notebookScroll);
       await tester.pumpAndSettle();
       await tester.enterText(block, 'Private draft survives closing Study.');
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -161,6 +265,11 @@ void studyWorkspaceJourney() {
       fixture.offline = true;
       await openWord();
       await choose(StudyTab.notes);
+      // On a phone the reopened list starts above the editor, outside its
+      // lazy viewport. Scroll the actual notes panel to the saved block.
+      await tester.scrollUntilVisible(block, 250, scrollable: notebookScroll);
+      await tester.pumpAndSettle();
+      expect(block.hitTestable(), findsOneWidget);
       expect(
         find.text('Private draft survives closing Study.'),
         findsOneWidget,
@@ -188,5 +297,6 @@ void studyWorkspaceJourney() {
       await settle();
       expect(tester.takeException(), isNull);
     },
+    variant: platform ?? const DefaultTestVariant(),
   );
 }

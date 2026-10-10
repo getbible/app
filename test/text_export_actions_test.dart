@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getbible_live/core/ui_strings.dart';
 import 'package:getbible_live/presentation/widgets/text_export_actions.dart';
 import 'package:getbible_live/services/text_file_service.dart';
 
@@ -54,6 +55,46 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
+  testWidgets('Arabic actions preserve private Unicode text at 200% scale', (
+    WidgetTester tester,
+  ) async {
+    final strings = (await tester.runAsync(() => UiStrings.load('ar')))!;
+    const privateText = 'My {copy} notebook — λόγος 😀 العربية';
+    final files = FakeFiles();
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UiStringsScope(
+          strings: strings,
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+              child: Scaffold(
+                body: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _actions(files, privateText),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text(strings.text('Save file')), findsOneWidget);
+    expect(find.text('Save file'), findsNothing);
+    await tester.tap(find.text(strings('copy')));
+    await tester.pumpAndSettle();
+    expect(files.copiedText, privateText);
+    expect(find.text(strings.text('Text copied.')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('actions fit a narrow screen at large text scale', (
     WidgetTester tester,
   ) async {
@@ -91,10 +132,12 @@ Widget _app(FakeFiles files, {String text = 'text'}) =>
 class FakeFiles implements TextFileService {
   TextSaveResult saveResult = TextSaveResult.cancelled;
   bool failCopy = false;
+  String? copiedText;
   Completer<TextSaveResult>? pendingSave;
   @override
   Future<void> copyText(String text) async {
     if (failCopy) throw const TextFileException('Clipboard unavailable.');
+    copiedText = text;
   }
 
   @override

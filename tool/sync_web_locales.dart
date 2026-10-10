@@ -1,35 +1,162 @@
+import 'dart:convert';
 import 'dart:io';
 
-/// Copies the compact UI locale contract from a sibling checkout of
-/// getbible/app.getbible.life. Run from this repository's root:
+/// Synchronizes keyed English messages AND positional packs as one contract.
 ///
-///   dart run tool/sync_web_locales.dart ../app.getbible.life
+/// dart run tool/sync_web_locales.dart ../app.getbible.life [--check]
+///
+/// Only public UI copy is imported. No Scripture, private data or native
+/// extension translations are read, uploaded, translated or overwritten.
 void main(List<String> arguments) {
-  if (arguments.length != 1) {
+  final bool check = arguments.contains('--check');
+  final List<String> paths = arguments
+      .where((item) => item != '--check')
+      .toList();
+  if (paths.length != 1) {
     stderr.writeln(
-      'Usage: dart run tool/sync_web_locales.dart <web-repository>',
+      'Usage: dart run tool/sync_web_locales.dart <web-repository> [--check]',
     );
     exitCode = 64;
     return;
   }
-  final Directory source = Directory('${arguments.single}/public/locales');
-  final Directory target = Directory('assets/locales');
-  if (!source.existsSync()) {
-    stderr.writeln('Locale source does not exist: ${source.path}');
-    exitCode = 66;
-    return;
+  try {
+    synchronize(Directory(paths.single), check: check);
+  } on Object catch (error) {
+    stderr.writeln(error);
+    exitCode = 1;
   }
-  target.createSync(recursive: true);
-  final List<File> files =
-      source
-          .listSync()
-          .whereType<File>()
-          .where((File file) => file.path.endsWith('.json'))
-          .toList()
-        ..sort((File left, File right) => left.path.compareTo(right.path));
-  for (final File file in files) {
-    final String name = file.uri.pathSegments.last;
-    file.copySync('${target.path}/$name');
+}
+
+void synchronize(Directory source, {required bool check}) {
+  final String sourceText = File(
+    '${source.path}/lib/i18n.ts',
+  ).readAsStringSync();
+  const String marker = 'export const ENGLISH_UI_MESSAGES = {';
+  final int start = sourceText.indexOf(marker);
+  final int end = sourceText.indexOf('} as const;', start);
+  if (start < 0 || end < 0) {
+    throw const FormatException('Missing English catalog.');
   }
-  stdout.writeln('Copied ${files.length} locale contract files.');
+  final String body = sourceText.substring(start + marker.length, end);
+  final RegExp entry = RegExp(
+    r'^  (\w+): ("(?:[^"\\]|\\.)*"),$',
+    multiLine: true,
+  );
+  final Map<String, String> english = <String, String>{};
+  for (final RegExpMatch match in entry.allMatches(body)) {
+    final String key = match.group(1)!;
+    if (english.containsKey(key)) throw FormatException('Duplicate key $key');
+    english[key] = jsonDecode(match.group(2)!) as String;
+  }
+  if (english.isEmpty || body.replaceAll(entry, '').trim().isNotEmpty) {
+    throw const FormatException('Unrecognized English catalog syntax.');
+  }
+  final Directory packs = Directory('${source.path}/public/locales');
+  final List<String> locales =
+      (jsonDecode(File('${packs.path}/index.json').readAsStringSync()) as List)
+          .cast<String>();
+  if (locales.toSet().length != locales.length || !locales.contains('en')) {
+    throw const FormatException('Duplicate locales or missing English.');
+  }
+  final Map<String, String> outputs = <String, String>{};
+  final List<String> fallbacks = <String>[];
+  final RegExp placeholder = RegExp(r'\{([a-zA-Z][a-zA-Z0-9]*)\}');
+  String signature(String value) =>
+      (placeholder.allMatches(value).map((match) => match.group(1)!).toList()
+            ..sort())
+          .join('|');
+  for (final String locale in locales) {
+    if (!RegExp(r'^[a-z]{2,3}(?:-[A-Za-z]{4})?$').hasMatch(locale)) {
+      throw FormatException('Invalid locale $locale');
+    }
+    final String content = File(
+      '${packs.path}/$locale.json',
+    ).readAsStringSync();
+    final Object? decoded = jsonDecode(content);
+    if (decoded is! List ||
+        decoded.length != english.length ||
+        decoded.any((message) => message is! String)) {
+      throw FormatException('Unaligned locale $locale');
+    }
+    if (decoded.every((message) => (message as String).isEmpty)) {
+      fallbacks.add(locale);
+    }
+    for (final (int index, String original) in english.values.indexed) {
+      final String translated = decoded[index] as String;
+      if (translated.isNotEmpty &&
+          signature(translated) != signature(original)) {
+        throw FormatException('Invalid placeholders: $locale message $index');
+      }
+      if (locale == 'en' && translated.isNotEmpty && translated != original) {
+        throw FormatException('English pack drift at message $index');
+      }
+    }
+    outputs['assets/locales/$locale.json'] = content;
+  }
+  outputs['assets/locales/index.json'] = File(
+    '${packs.path}/index.json',
+  ).readAsStringSync();
+  String quote(String value) => jsonEncode(value).replaceAll(r'$', r'\$');
+  final StringBuffer catalog = StringBuffer(
+    '// Generated by tool/sync_web_locales.dart. Do not edit by hand.\n'
+    '// Source: getbible/app.getbible.life/lib/i18n.ts\n\n'
+    'const Map<String, String> webUiMessages = <String, String>{\n',
+  );
+  for (final entry in english.entries) {
+    catalog.writeln('  ${quote(entry.key)}: ${quote(entry.value)},');
+  }
+  catalog.writeln('};\n\nconst List<String> webUiLocales = <String>[');
+  for (final locale in locales) {
+    catalog.writeln('  ${quote(locale)},');
+  }
+  catalog.writeln('];');
+  catalog.writeln('\nconst List<String> webUiFallbackLocales = <String>[');
+  for (final locale in fallbacks) {
+    catalog.writeln('  ${quote(locale)},');
+  }
+  catalog.writeln('];');
+  // Use the installed Dart formatter for a deterministic generated source.
+  final Directory temporary = Directory.systemTemp.createTempSync(
+    'getbible-ui-',
+  );
+  try {
+    final File generated = File('${temporary.path}/catalog.dart')
+      ..writeAsStringSync(catalog.toString());
+    final ProcessResult format = Process.runSync(
+      Platform.resolvedExecutable,
+      <String>['format', generated.path],
+    );
+    if (format.exitCode != 0) throw StateError('Dart formatter failed.');
+    outputs['lib/core/web_ui_catalog.dart'] = generated.readAsStringSync();
+  } finally {
+    temporary.deleteSync(recursive: true);
+  }
+  final ProcessResult git = Process.runSync('git', <String>[
+    '-C',
+    source.path,
+    'rev-parse',
+    'HEAD',
+  ]);
+  if (git.exitCode != 0) {
+    throw StateError('Cannot determine reference revision.');
+  }
+  outputs['test/fixtures/ui_locale_contract.json'] =
+      '${const JsonEncoder.withIndent('  ').convert(<String, Object>{'source': 'https://github.com/getbible/app.getbible.life', 'revision': '${git.stdout}'.trim(), 'messageKeys': english.keys.toList(), 'locales': locales})}\n';
+  // Validate the entire source before touching any destination.
+  final List<String> changed = <String>[];
+  for (final entry in outputs.entries) {
+    final File file = File(entry.key);
+    if (file.existsSync() && file.readAsStringSync() == entry.value) continue;
+    changed.add(entry.key);
+    if (!check) {
+      file.parent.createSync(recursive: true);
+      file.writeAsStringSync(entry.value);
+    }
+  }
+  if (check && changed.isNotEmpty) {
+    throw StateError('Locale contract differs: ${changed.join(', ')}');
+  }
+  stdout.writeln(
+    '${locales.length} locale packs, ${english.length} messages; ${changed.length} files ${check ? 'different' : 'updated'}.',
+  );
 }

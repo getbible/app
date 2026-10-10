@@ -48,10 +48,16 @@ zero-result state. Invalid pagination or an incomplete reference is rejected
 before it becomes visible. Schema-invalid HTTP cache bodies are discarded so
 a corrected retry can reach the service.
 
-Each input change, repeated submission, translation change or close invalidates
-the prior request token. A late request cannot replace or append to current
-results. Closing never closes the shared transport. Rate-limit/temporary-error
-Retry-After intervals disable the Retry action until the requested pause has
+Input and filter changes now start a search after 250 ms of inactivity, matching
+reference commit `098eeaa`'s `app/page.tsx`. Enter and the Search action submit
+immediately and cancel the pending timer so the request is sent once. Blank
+input clears results without requesting an empty search. Each input change,
+repeated submission, translation change or close invalidates the prior request
+token and pending timer. A late request cannot replace or append to current
+results. A late result-opening failure also cannot overwrite a newer search's
+state. Disposal and context replacement cancel pending startup/debounce callbacks
+without notifying a locked widget tree. Closing never closes the shared transport.
+Rate-limit/temporary-error Retry-After intervals disable the Retry action until the requested pause has
 elapsed, in addition to the transport's bounded retry budget.
 The service pause survives clearing/closing Search and resubmitting another
 query or translation, so the Search action cannot bypass the server's pause.
@@ -71,7 +77,9 @@ term remains plain. Combining sequences and supplementary characters are
 preserved. Exact alphabetic terms avoid underlining adjoining words, and case
 sensitivity applies to emphasis.
 
-Filters and results share one scrollable surface, allowing safe use below a
+Native filter, result-summary and action messages use the UI locale; Scripture,
+Bible names and returned references keep their source values. Filters and results
+share one scrollable surface, allowing safe use below a
 keyboard and at large text sizes. Dropdowns have bounded widths, full semantic
 labels and native keyboard behavior. Result errors stay visible beside already
 loaded Scripture and provide explicit retry or restart actions.

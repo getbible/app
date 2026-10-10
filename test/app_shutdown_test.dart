@@ -51,6 +51,35 @@ void main() {
   });
 
   test(
+    'successful shutdown cancels late passage activation before storage closes',
+    () async {
+      final gate = Completer<void>();
+      final fixture = ReaderApiFixture()..delayedIndex = gate;
+      final state = AppState.fromDatabase(
+        await LocalDatabase.memory(),
+        api: fixture.api,
+      );
+      await state.loadPassage(
+        const Passage(translation: 'tst', book: 1, chapter: 1),
+      );
+      final pending = state.loadPassage(
+        const Passage(
+          translation: 'tst',
+          book: ReaderApiFixture.extendedBook,
+          chapter: 7,
+        ),
+      );
+      await fixture.indexStarted.future;
+      await state.close();
+      gate.complete();
+      await pending;
+      expect(state.passage.book, 1);
+      expect(state.loading, isFalse);
+      expect(state.error, isNull);
+    },
+  );
+
+  test(
     'failed journal write keeps app and draft usable until close retry',
     () async {
       final LocalDatabase database = await LocalDatabase.memory();
@@ -92,6 +121,12 @@ void main() {
       await fixture.indexStarted.future;
       expect(state.loading, isTrue);
       await expectLater(state.close(), throwsA(isA<StorageException>()));
+      expect(
+        state.loading,
+        isTrue,
+        reason:
+            'A failed private-durability gate must retain pending navigation.',
+      );
       expect(notebooks.hasUndurableDrafts, isTrue);
       expect(
         notebooks.notebook!.blocks.single.text,
@@ -110,6 +145,10 @@ void main() {
       await pendingPassage;
       expect(state.loading, isFalse);
       expect(state.passage.book, ReaderApiFixture.extendedBook);
+      await state.loadPassage(
+        const Passage(translation: 'tst', book: 1, chapter: 1),
+      );
+      expect(state.passage.book, 1);
 
       repository.failJournal = false;
       await notebooks.retry();

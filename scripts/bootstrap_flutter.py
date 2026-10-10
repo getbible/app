@@ -129,7 +129,7 @@ def install(destination):
         )
         print("SHA-256 verified; extracting...", flush=True)
         command = (
-            ["tar", "-xf", str(archive), "-C", str(staging)]
+            ["tar", "--no-same-owner", "-xf", str(archive), "-C", str(staging)]
             if host == "linux"
             else ["unzip", "-q", str(archive), "-d", str(staging)]
         )

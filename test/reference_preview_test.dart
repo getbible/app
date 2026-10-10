@@ -244,6 +244,7 @@ void main() {
       );
       Passage position = readerPosition;
       String? copied;
+      final Completer<void> copyAcknowledged = Completer<void>();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, (
             MethodCall method,
@@ -252,6 +253,7 @@ void main() {
               copied =
                   (method.arguments as Map<Object?, Object?>)['text']!
                       as String;
+              await copyAcknowledged.future;
             }
             return null;
           });
@@ -289,6 +291,10 @@ void main() {
       await tester.tap(find.text('Copy'));
       await tester.pump();
       expect(copied, contains('  Exact\nScripture 😀  '));
+      expect(find.text('Scripture copied'), findsNothing);
+      copyAcknowledged.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Scripture copied'), findsOneWidget);
       await tester.tap(find.byTooltip('Open in reader: 18'));
       await tester.pump();
       expect(

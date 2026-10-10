@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../application/app_state.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/annotations.dart';
 import '../../domain/models/passage.dart';
+import '../../domain/models/unified_bookmarks.dart';
 
 /// Existing canonical annotations remain independent of public Study resources.
 class MyAnnotationsPanel extends StatefulWidget {
@@ -14,10 +16,12 @@ class MyAnnotationsPanel extends StatefulWidget {
     required this.state,
     required this.onOpenPassage,
     this.showNotes = false,
+    this.initialGroupId,
   });
   final AppState state;
   final ValueChanged<Passage> onOpenPassage;
   final bool showNotes;
+  final String? initialGroupId;
   @override
   State<MyAnnotationsPanel> createState() => _MyAnnotationsPanelState();
 }
@@ -28,6 +32,18 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
   final TextEditingController _groupSearch = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _selectedGroup = widget.initialGroupId;
+    if (!widget.showNotes) {
+      Future<void>.microtask(() async {
+        if (!mounted) return;
+        await widget.state.bookmarks.initialize(locale: widget.state.ui.locale);
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _groupSearch.dispose();
     super.dispose();
@@ -35,7 +51,7 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.state,
+    animation: Listenable.merge([widget.state, widget.state.bookmarks]),
     builder: (BuildContext context, Widget? child) =>
         widget.showNotes ? _notes(widget.state) : _markings(widget.state),
   );
@@ -49,19 +65,21 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
       ),
     ),
     icon: const Icon(Icons.palette_outlined),
-    label: const Text('Manage groups'),
+    label: Text(UiStrings.of(context).text('Manage groups')),
   );
 
   Widget _markings(AppState state) {
+    if (_selectedGroup != null &&
+        !state.groups.any((group) => group.id == _selectedGroup)) {
+      _selectedGroup = null;
+    }
     if (_selectedGroup != null) {
       final MarkingGroup? group = state.groups
           .where((MarkingGroup item) => item.id == _selectedGroup)
           .firstOrNull;
-      final List<Marking> items =
-          state.savedMarkings
-              .where((Marking item) => item.groupId == _selectedGroup)
-              .toList()
-            ..sort(compareMarkings);
+      final List<BookmarkDisplayRow> items = bookmarkDisplayRows(
+        state.savedMarkings.where((item) => item.groupId == _selectedGroup),
+      );
       return CustomScrollView(
         key: ValueKey<String>('marking-group:$_selectedGroup'),
         slivers: <Widget>[
@@ -71,9 +89,14 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
               children: <Widget>[
                 ListTile(
                   leading: const Icon(Icons.arrow_back),
-                  title: Text(group?.name ?? 'Markings'),
+                  title: Text(
+                    group?.name ?? UiStrings.of(context).text('Markings'),
+                  ),
                   onTap: () => setState(() => _selectedGroup = null),
                 ),
+                if (group?.source?.effectiveScope ==
+                    state.bookmarks.publicTopics.sourceScope)
+                  _globalSection(state, topicId: group!.source!.topicId),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Align(
@@ -85,17 +108,20 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
             ),
           ),
           if (items.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('No markings in this group yet.'),
+                child: Text(
+                  UiStrings.of(context).text('No markings in this group yet.'),
+                ),
               ),
             )
           else
             SliverList.builder(
               itemCount: items.length,
               itemBuilder: (BuildContext context, int index) {
-                final Marking marking = items[index];
+                final BookmarkDisplayRow row = items[index];
+                final Marking marking = row.marking;
                 return Card(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -109,9 +135,19 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
                           Text(
-                            marking.reference,
+                            _displayReference(state, row),
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
+                          if (row.global)
+                            Text(
+                              row.personal
+                                  ? UiStrings.of(
+                                      context,
+                                    ).text('Global and personal bookmark')
+                                  : UiStrings.of(
+                                      context,
+                                    ).text('Global bookmark'),
+                            ),
                           Text(
                             marking.quote,
                             maxLines: 2,
@@ -121,15 +157,44 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
                             spacing: 8,
                             children: <Widget>[
                               TextButton.icon(
-                                label: const Text('Open'),
+                                label: Text(UiStrings.of(context).text('Open')),
                                 icon: const Icon(Icons.open_in_new),
                                 onPressed: () => _openMarking(state, marking),
                               ),
-                              TextButton.icon(
-                                label: const Text('Delete marking'),
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => _deleteMarking(state, marking),
-                              ),
+                              if (row.personal)
+                                TextButton.icon(
+                                  label: Text(
+                                    UiStrings.of(
+                                      context,
+                                    ).text('Remove personal bookmark'),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.person_remove_outlined,
+                                  ),
+                                  onPressed: state.bookmarks.busy
+                                      ? null
+                                      : () => _deleteOrigin(
+                                          state,
+                                          marking,
+                                          BookmarkOrigin.personal,
+                                        ),
+                                ),
+                              if (row.global)
+                                TextButton.icon(
+                                  label: Text(
+                                    UiStrings.of(
+                                      context,
+                                    ).text('Remove global bookmark'),
+                                  ),
+                                  icon: const Icon(Icons.public_off),
+                                  onPressed: state.bookmarks.busy
+                                      ? null
+                                      : () => _deleteOrigin(
+                                          state,
+                                          marking,
+                                          BookmarkOrigin.global,
+                                        ),
+                                ),
                             ],
                           ),
                         ],
@@ -146,13 +211,20 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
     final List<MarkingGroup> visible = state.groups
         .where(
           (MarkingGroup group) =>
-              query.isEmpty || group.name.toLowerCase().contains(query),
+              query.isEmpty ||
+              group.name.toLowerCase().contains(query) ||
+              (group.source?.effectiveScope ==
+                      state.bookmarks.publicTopics.sourceScope &&
+                  state.bookmarks
+                          .topic(group.source!.topicId)
+                          ?.matches(query) ==
+                      true),
         )
         .toList(growable: false);
     final Map<String, int> counts = <String, int>{};
-    for (final Marking marking in state.savedMarkings) {
+    for (final row in bookmarkDisplayRows(state.savedMarkings)) {
       counts.update(
-        marking.groupId,
+        row.marking.groupId,
         (int count) => count + 1,
         ifAbsent: () => 1,
       );
@@ -186,8 +258,10 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
                     children: <Widget>[
                       TextField(
                         controller: _groupSearch,
-                        decoration: const InputDecoration(
-                          hintText: 'Find a marking group',
+                        decoration: InputDecoration(
+                          hintText: UiStrings.of(
+                            context,
+                          ).text('Find a marking group'),
                           prefixIcon: Icon(Icons.search),
                           isDense: true,
                         ),
@@ -199,15 +273,20 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
                         alignment: AlignmentDirectional.centerStart,
                         child: _manageButton(),
                       ),
+                      _globalSection(state),
                     ],
                   ),
                 ),
               ),
               if (visible.isEmpty)
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.all(24),
-                    child: Text('No marking groups match this search.'),
+                    child: Text(
+                      UiStrings.of(
+                        context,
+                      ).text('No marking groups match this search.'),
+                    ),
                   ),
                 ),
               SliverPadding(
@@ -268,7 +347,14 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
                                         style: nameStyle,
                                       ),
                                       Text(
-                                        '$count ${count == 1 ? 'marking' : 'markings'}',
+                                        count == 1
+                                            ? UiStrings.of(context)(
+                                                'oneMarking',
+                                              )
+                                            : UiStrings.of(context)(
+                                                'markingCount',
+                                                {'count': count},
+                                              ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: countStyle,
@@ -301,38 +387,199 @@ class _MyAnnotationsPanelState extends State<MyAnnotationsPanel> {
     ),
   );
 
-  Future<void> _deleteMarking(AppState state, Marking marking) async {
-    final bool? confirmed = await showDialog<bool>(
+  String _displayReference(AppState state, BookmarkDisplayRow row) {
+    final marking = row.marking;
+    if (row.personal) return marking.reference;
+    final book = state.books
+        .where((book) => book.number == marking.passage.book)
+        .firstOrNull;
+    // Display current translation metadata without rewriting the imported
+    // reference or quotation. Dynamic book IDs also cover extended canons.
+    return book == null
+        ? marking.reference
+        : '${book.name} ${marking.passage.chapter}:${marking.verse}';
+  }
+
+  Future<void> _deleteOrigin(
+    AppState state,
+    Marking marking,
+    BookmarkOrigin origin,
+  ) async {
+    final strings = UiStrings.of(context);
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
+      builder: (context) => AlertDialog(
         scrollable: true,
-        title: const Text('Delete this marking?'),
-        content: Text('Remove the saved marking at ${marking.reference}?'),
-        actions: <Widget>[
+        title: Text(
+          origin == BookmarkOrigin.personal
+              ? UiStrings.of(context).text('Remove personal bookmark?')
+              : UiStrings.of(context).text('Remove global bookmark?'),
+        ),
+        content: Text(
+          strings.text(
+            'Remove this membership at {reference}? Other topics and the other origin remain saved.',
+            {'reference': marking.reference},
+          ),
+        ),
+        actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(strings('cancel')),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(strings.text('Remove')),
           ),
         ],
       ),
     );
-    if (confirmed == true) await state.deleteSavedMarking(marking.id);
+    if (confirmed == true) {
+      await state.bookmarks.removeMembership(
+        passage: marking.passage,
+        verse: marking.verse,
+        groupId: marking.groupId,
+        start: marking.start,
+        end: marking.end,
+        origin: origin,
+      );
+    }
+  }
+
+  Widget _globalControls(AppState state, {String? topicId}) {
+    final controller = state.bookmarks;
+    final strings = UiStrings.of(context);
+    final hasGlobal = state.savedMarkings.any(
+      (mark) =>
+          mark.sharedSource?.effectiveScope ==
+              controller.publicTopics.sourceScope &&
+          (topicId == null || mark.sharedSource?.topicId == topicId),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (topicId == null)
+            Text(
+              strings.text(
+                'Your topics and public topics share this bookmark list. Downloading adds global memberships; your personal bookmarks remain independent.',
+              ),
+            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: controller.busy
+                    ? null
+                    : () => unawaited(
+                        controller.download(
+                          topicId: topicId,
+                          translation: state.passage.translation,
+                          locale: state.ui.locale,
+                        ),
+                      ),
+                icon: const Icon(Icons.download),
+                label: Text(
+                  topicId == null
+                      ? UiStrings.of(
+                          context,
+                        ).text('Download all global bookmarks')
+                      : UiStrings.of(
+                          context,
+                        ).text('Download this topic’s global bookmarks'),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: controller.busy || !hasGlobal
+                    ? null
+                    : () => unawaited(_removeGlobal(state, topicId)),
+                icon: const Icon(Icons.public_off),
+                label: Text(
+                  topicId == null
+                      ? UiStrings.of(context).text('Remove global bookmarks')
+                      : UiStrings.of(
+                          context,
+                        ).text('Remove this topic’s global bookmarks'),
+                ),
+              ),
+            ],
+          ),
+          if (controller.busy) const LinearProgressIndicator(),
+          if (controller.error != null) ...[
+            Text(
+              strings.text(
+                'Global topics could not be updated. Your saved bookmarks are still available. {error}',
+                {'error': controller.error.toString()},
+              ),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: controller.busy
+                    ? null
+                    : () => unawaited(
+                        controller.initialize(locale: state.ui.locale),
+                      ),
+                child: Text(strings.text('Retry')),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Public-service status and download controls must not push private topics
+  // out of reach on a short screen, especially with large text or an error.
+  Widget _globalSection(AppState state, {String? topicId}) => ExpansionTile(
+    key: PageStorageKey<String>('global-bookmarks:${topicId ?? 'all'}'),
+    leading: Icon(
+      state.bookmarks.error == null ? Icons.public : Icons.error_outline,
+    ),
+    title: Text(UiStrings.of(context).text('Global bookmarks')),
+    children: [_globalControls(state, topicId: topicId)],
+  );
+
+  Future<void> _removeGlobal(AppState state, String? topicId) async {
+    final strings = UiStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: Text(strings.text('Remove downloaded global bookmarks?')),
+        content: Text(
+          strings.text(
+            'Personal bookmarks, topic names, colors, notes and notebooks will remain saved.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(strings('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(strings.text('Remove')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await state.bookmarks.removeGlobal(topicId: topicId);
   }
 
   Widget _notes(AppState state) {
     final List<VerseNote> notes = <VerseNote>[...state.savedNotes]
       ..sort(compareNotes);
     if (notes.isEmpty) {
-      return const SingleChildScrollView(
+      return SingleChildScrollView(
         padding: EdgeInsets.all(24),
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'No verse notes yet. Select a verse and choose Add note to create one.',
+            UiStrings.of(context).text(
+              'No verse notes yet. Select a verse and choose Add note to create one.',
+            ),
           ),
         ),
       );
@@ -411,12 +658,14 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
                         children: <Widget>[
                           Expanded(
                             child: Text(
-                              'Marking groups',
+                              UiStrings.of(context).text('Marking groups'),
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Close marking groups',
+                            tooltip: UiStrings.of(
+                              context,
+                            ).text('Close marking groups'),
                             onPressed: () => Navigator.of(context).pop(),
                             icon: const Icon(Icons.close),
                           ),
@@ -425,17 +674,19 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _name,
-                        decoration: const InputDecoration(
-                          labelText: 'Group name',
+                        decoration: InputDecoration(
+                          labelText: UiStrings.of(context).text('Group name'),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _color,
-                        decoration: const InputDecoration(
-                          labelText: 'Color',
-                          helperText:
-                              'Six-digit hex color, for example #FDE68A',
+                        decoration: InputDecoration(
+                          labelText: UiStrings.of(context).text('Color'),
+                          helperText: UiStrings.of(context).text(
+                            'Six-digit hex color, for example {example}',
+                            {'example': '#FDE68A'},
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -450,16 +701,18 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
                             ),
                             label: Text(
                               _saving
-                                  ? 'Saving…'
+                                  ? UiStrings.of(context).text('Saving…')
                                   : _editingId == null
-                                  ? 'Add group'
-                                  : 'Save group',
+                                  ? UiStrings.of(context).text('Add group')
+                                  : UiStrings.of(context).text('Save group'),
                             ),
                           ),
                           if (_editingId != null)
                             TextButton(
                               onPressed: _saving ? null : _clearEditor,
-                              child: const Text('Cancel edit'),
+                              child: Text(
+                                UiStrings.of(context).text('Cancel edit'),
+                              ),
                             ),
                         ],
                       ),
@@ -502,7 +755,9 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
                             _error = null;
                           }),
                     trailing: IconButton(
-                      tooltip: 'Delete ${group.name}',
+                      tooltip: UiStrings.of(
+                        context,
+                      ).text('Delete {name}', {'name': group.name}),
                       onPressed: _saving || widget.state.groups.length <= 1
                           ? null
                           : () => unawaited(_delete(group)),
@@ -560,18 +815,21 @@ class _ManageGroupsDialogState extends State<_ManageGroupsDialog> {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         scrollable: true,
-        title: const Text('Delete marking group?'),
+        title: Text(UiStrings.of(context).text('Delete marking group?')),
         content: Text(
-          'Delete “${group.name}” and its $count saved markings? This cannot be undone.',
+          UiStrings.of(context).text(
+            'Delete “{name}” and its {count} saved markings? This cannot be undone.',
+            {'name': group.name, 'count': count},
+          ),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(UiStrings.of(context).text('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(UiStrings.of(context).text('Delete')),
           ),
         ],
       ),

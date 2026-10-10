@@ -2,9 +2,10 @@
 
 The Study commentary tab browses public Commentary v1 resources online. It reads
 the discovered catalogue, the selected resource's metadata and sparse book/chapter
-coverage, then one covered chapter. It requests no verse endpoint, whole book or
-whole commentary. Opening this tab does not change Scripture, install a resource,
-or write private annotations.
+coverage, then the covered chapter and, when published, the same book's
+chapter-zero introduction. It requests no verse endpoint, whole book or whole
+commentary. Opening this tab does not change Scripture, install a resource, or
+write private annotations.
 
 `CommentaryRepository` defines the typed boundary. `ApiCommentaryRepository` uses
 the shared transport/cache/cancellation policy and strict `CommentaryAdapter`
@@ -16,17 +17,25 @@ book/chapter requests follow the commentary's published coverage. Commentary's
 `CommentaryController` owns the captured Study context, active module, loading,
 failure and request lifetime. A newer module/context, tab change, panel replacement
 or dismissal invalidates late responses. Widget teardown cancels synchronously
-without notifying a tree that is being rebuilt. Compatible resource choices are
-remembered per Bible language;
-preference writes are ordered, and a storage failure is visible without blocking
-the resource. A language mismatch requires explicit selection and is labelled
-with the actual source language. Missing coverage and a covered chapter with no
-matching verse are distinct successful outcomes. The controller never switches
+without notifying a tree that is being rebuilt. Explicit resource choices are
+remembered per Bible language, including deliberately selected foreign-language
+resources. Preference writes are ordered, and a storage failure is visible without blocking
+the resource. The default follows the current reference's
+`lib/commentary-preference.ts`:
+remembered resource, TSK, Bible language, English, then the first available
+resource. When local modules exist and no explicit choice is remembered, this
+ranking first considers installed modules so offline opening does not probe an
+unrelated online resource. Any language mismatch is labelled with the actual
+source language. Missing coverage and a covered chapter with no matching verse are distinct successful outcomes. The controller never switches
 to another commentary or chapter to fill a gap.
 
-Chapter mode includes introductions and all source entries in their original
-order. Verse mode includes every entry whose published `verses` contains the
-selected verse, or whose single `verse` matches it. A range anchored at an earlier
+Book and chapter introductions appear in separately expandable native sections,
+including while the verse-specific commentary is selected. They retain their
+source chapter/verse-zero coordinates. A failed book-introduction request displays
+its own retry status while preserving usable chapter commentary. Chapter mode
+includes all source entries in their original order, with introduction material
+in its labelled section. Verse mode includes every entry whose published
+`verses` contains the selected verse, or whose single `verse` matches it. A range anchored at an earlier
 verse therefore remains visible. Chapter 0 means a book introduction; verse 0
 means a chapter introduction. Neither becomes a Scripture coordinate. Entry text,
 OSIS, full range and structured references remain intact in immutable models.
@@ -89,3 +98,15 @@ source repository's current `spurious.json` against its real metadata and sparse
 coverage: 24,688 bytes produced 82 local documents. This independently checks
 the nested whole-book/chapter format used by installation. Source:
 [`getbible/commentaries`](https://github.com/getbible/commentaries/tree/main/v1).
+
+## Step 16 interaction alignment
+
+The resource and introduction workflows were compared with reference commit
+`098eeaa`'s `StudyPanel.tsx` and `commentary-preference.ts`. All native control,
+status and coordinate-label messages use the UI locale; resource metadata,
+quotation text, OSIS and citation labels remain in their published source form.
+Touch targets are padded, headings/controls retain native semantics, and each
+introduction expansion is keyboard accessible. Regression cases cover TSK versus
+saved/installed default priority, foreign-choice persistence, introduction failure
+isolation, source context, late responses and the existing narrow RTL/200% layout.
+Actual run and platform evidence is maintained in [Testing](TESTING.md).

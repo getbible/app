@@ -1,13 +1,14 @@
 name: getbible_live
 description: A local-first, cross-platform Flutter Bible reader powered by GetBible v3 Bible and Query services.
 publish_to: none
-version: 1.0.0-alpha.2+3
+version: 1.0.0-alpha.3+4
 
 environment:
   sdk: '>=3.12.2 <4.0.0'
   flutter: '>=3.44.6'
 
 dependencies:
+  app_links: 7.2.2
   crypto: 3.0.7
   cupertino_icons: 2.0.0
   drift:
@@ -20,6 +21,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   go_router:
     git:
       url: https://github.com/flutter/packages.git
@@ -29,6 +32,7 @@ dependencies:
   intl: 0.20.2
   path_provider: 2.1.6
   provider: 6.1.5+1
+  unorm_dart: 0.3.3
   url_launcher: 6.3.2
   uuid: 4.5.3
 
@@ -57,3 +61,4 @@ flutter:
     - assets/fonts/Roboto_LICENSE.txt
     - assets/branding/
     - assets/locales/
+    - assets/native_locales/

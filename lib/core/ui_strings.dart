@@ -1,112 +1,198 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
-/// Positional locale reader shared with app.getbible.life/lib/i18n.ts.
+import 'native_ui_catalog.dart';
+import 'web_ui_catalog.dart';
+
+/// Explicit UI-only localization contract shared with app.getbible.life.
+///
+/// Public resource metadata, Scripture and private user content must never be
+/// passed to [text]. They already carry their source language and direction.
 final class UiStrings {
-  const UiStrings(this.locale, this._messages);
+  const UiStrings(
+    this.locale,
+    this._messages, [
+    this._nativeMessages = const {},
+  ]);
 
   static const UiStrings english = UiStrings('en', <String>[]);
-  static const Map<String, int> _indexes = <String, int>{
-    'openBibleNavigation': 0,
-    'openTodaysScripture': 2,
-    'searchThisTranslation': 3,
-    'search': 4,
-    'previousChapter': 7,
-    'nextChapter': 8,
-    'openAsMarkdown': 10,
-    'study': 11,
-    'translation': 77,
-    'book': 78,
-    'chapter': 79,
-    'readerOptions': 81,
-    'textSize': 85,
-    'readingFont': 86,
-    'readingWidth': 87,
-    'page': 88,
-    'fullScreenWidth': 89,
-    'verseLayout': 90,
-    'oneVersePerLine': 91,
-    'continuousParagraph': 92,
-    'wordsOfEternalLife': 158,
-    'lovinglyMaintainedBy': 159,
-    'copy': 148,
-    'downloadMarkdown': 149,
-    'cancel': 176,
-    'previous': 178,
-    'next': 179,
+  static const List<String> supportedLocales = webUiLocales;
+  static final Map<String, int> _indexes = <String, int>{
+    for (final (int index, String key) in webUiMessages.keys.indexed)
+      key: index,
   };
-  static const Map<String, String> _english = <String, String>{
-    'openBibleNavigation': 'Open Bible navigation',
-    'openTodaysScripture': 'Open today\u2019s Scripture',
-    'searchThisTranslation': 'Search this translation',
-    'search': 'Search',
-    'previousChapter': 'Previous chapter',
-    'nextChapter': 'Next chapter',
-    'openAsMarkdown': 'Open chapter as Markdown',
-    'study': 'Study',
-    'translation': 'Translation',
-    'book': 'Book',
-    'chapter': 'Chapter',
-    'readerOptions': 'Reader options',
-    'textSize': 'Text size',
-    'readingFont': 'Reading font',
-    'readingWidth': 'Reading width',
-    'page': 'Page',
-    'fullScreenWidth': 'Full screen width',
-    'verseLayout': 'Verse layout',
-    'oneVersePerLine': 'One verse per line',
-    'continuousParagraph': 'Continuous paragraph',
-    'wordsOfEternalLife': 'The words of eternal life',
-    'lovinglyMaintainedBy': 'Lovingly maintained by',
-    'copy': 'Copy',
-    'downloadMarkdown': 'Download .md',
-    'cancel': 'Cancel',
-    'previous': 'Previous',
-    'next': 'Next',
+  static final Map<String, String> _englishKeys = <String, String>{
+    for (final MapEntry<String, String> entry in webUiMessages.entries)
+      entry.value: entry.key,
   };
+  static final Map<String, String> _nativeEnglish = <String, String>{
+    for (final entry in nativeUiKeys.entries) entry.value: entry.key,
+  };
+  static final RegExp _placeholder = RegExp(r'\{([a-zA-Z][a-zA-Z0-9]*)\}');
 
   final String locale;
   final List<String> _messages;
+  final Map<String, String> _nativeMessages;
 
-  String call(String key, [Map<String, Object> variables = const {}]) {
-    final int? index = _indexes[key];
-    String value = index != null && index < _messages.length
-        ? _messages[index]
-        : '';
-    if (value.isEmpty) value = _english[key] ?? key;
-    for (final MapEntry<String, Object> item in variables.entries) {
-      value = value.replaceAll('{${item.key}}', '${item.value}');
-    }
-    return value;
+  static UiStrings of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<UiStringsScope>()?.strings ??
+      english;
+
+  /// RTL applies to native controls independently of Scripture's direction.
+  bool get isRtl =>
+      !webUiFallbackLocales.contains(locale) &&
+      const <String>{'ar', 'cop', 'he', 'hbo', 'prs', 'syr'}.contains(locale);
+
+  Locale get flutterLocale {
+    // Match the reference packs' documented modern-language aliases for
+    // Flutter's built-in selection menus and date/dialog accessibility labels.
+    if (webUiFallbackLocales.contains(locale)) return const Locale('en');
+    final String frameworkCode =
+        const <String, String>{
+          'enm': 'en',
+          'hbo': 'he',
+          'grc': 'el',
+          'cu': 'ru',
+          'cop': 'ar',
+          'got': 'de',
+          'mlf': 'ml',
+          'rmq': 'es',
+          'nd': 'zu',
+          'nn': 'nb',
+          'syr': 'ar',
+          'tl': 'fil',
+          'tsg': 'fil',
+          'ppk': 'id',
+          'prs': 'fa',
+          'zh': 'zh-Hans',
+        }[locale] ??
+        locale;
+    final List<String> parts = frameworkCode.split('-');
+    return Locale.fromSubtags(
+      languageCode: parts.first,
+      scriptCode: parts.length > 1 && parts[1].length == 4 ? parts[1] : null,
+    );
   }
 
-  static Future<UiStrings> load(String? language) async {
+  String call(String key, [Map<String, Object> variables = const {}]) {
+    final String fallback = webUiMessages[key] ?? _nativeEnglish[key] ?? key;
+    final int? index = _indexes[key];
+    final String candidate = _nativeEnglish.containsKey(key)
+        ? _nativeMessages[key] ?? ''
+        : index != null && index < _messages.length
+        ? _messages[index]
+        : '';
+    // A malformed translated placeholder must not lose an important count,
+    // resource identity or confirmation parameter. Fall back per message.
+    final String template =
+        candidate.isNotEmpty && _samePlaceholders(candidate, fallback)
+        ? candidate
+        : fallback;
+    return interpolate(template, variables);
+  }
+
+  /// Looks up a literal UI template; unknown native extensions retain English.
+  ///
+  /// This is deliberately not a translation service. Only widget-owned control
+  /// labels belong here. The checked-in native message inventory makes missing
+  /// translations visible to reviewers and translation contributors.
+  String text(String english, [Map<String, Object> variables = const {}]) {
+    final String? key = _englishKeys[english] ?? nativeUiKeys[english];
+    if (key != null) return call(key, variables);
+    return interpolate(english, variables);
+  }
+
+  /// Whether an application-owned message has an explicit localization entry.
+  /// Unknown parser/network diagnostics can retain their original text beneath
+  /// a localized explanation without submitting arbitrary data for translation.
+  bool containsTemplate(String english) =>
+      _englishKeys.containsKey(english) || nativeUiKeys.containsKey(english);
+
+  static String interpolate(String template, Map<String, Object> variables) =>
+      template.replaceAllMapped(_placeholder, (Match match) {
+        final String name = match.group(1)!;
+        return variables.containsKey(name) ? '${variables[name]}' : match[0]!;
+      });
+
+  static bool _samePlaceholders(String first, String second) {
+    String signature(String value) =>
+        (_placeholder
+                .allMatches(value)
+                .map((Match match) => match.group(1)!)
+                .toList()
+              ..sort())
+            .join('|');
+    return signature(first) == signature(second);
+  }
+
+  static Future<UiStrings> load(String? language, {AssetBundle? bundle}) async {
     final String locale = normalizeLocale(language);
     if (locale == 'en') return english;
+    List<String> messages = const <String>[];
+    Map<String, String> native = const <String, String>{};
+    final AssetBundle assets = bundle ?? rootBundle;
     try {
       final Object? decoded = jsonDecode(
-        await rootBundle.loadString('assets/locales/$locale.json'),
+        await assets.loadString('assets/locales/$locale.json'),
       );
-      if (decoded is List<Object?>) {
-        return UiStrings(
-          locale,
-          decoded.map((Object? item) => item is String ? item : '').toList(),
-        );
+      if (decoded is List<Object?> && decoded.every((item) => item is String)) {
+        messages = decoded.cast<String>();
       }
     } on Object {
-      // Missing or malformed packs deliberately fall back message-by-message.
+      // Missing or malformed packs deliberately fall back message by message.
     }
-    return UiStrings(locale, const <String>[]);
+    try {
+      final Object? decoded = jsonDecode(
+        await assets.loadString('assets/native_locales/$locale.json'),
+      );
+      if (decoded is Map<String, Object?>) {
+        native = <String, String>{
+          for (final entry in decoded.entries)
+            if (entry.value is String) entry.key: entry.value! as String,
+        };
+      }
+    } on Object {
+      // Native extensions fall back independently of the reference pack.
+    }
+    return UiStrings(locale, messages, native);
   }
 
   static String normalizeLocale(String? language) {
     final String value = (language ?? 'en').trim().replaceAll('_', '-');
     if (value.isEmpty) return 'en';
-    return switch (value.toLowerCase()) {
-      'zh-cn' => 'zh-Hans',
-      'zh-tw' => 'zh-Hant',
-      _ => value,
-    };
+    final String normalized = value.toLowerCase();
+    final List<String> subtags = normalized.split('-');
+    if (subtags.first == 'zh') {
+      // A script subtag wins over a region (for example zh-Hans-HK).
+      if (subtags.contains('hans')) return 'zh-Hans';
+      if (subtags.contains('hant')) return 'zh-Hant';
+      if (subtags.any(const {'tw', 'hk', 'mo'}.contains)) return 'zh-Hant';
+      if (subtags.any(const {'cn', 'sg'}.contains)) return 'zh-Hans';
+    }
+    final String exact = supportedLocales.firstWhere(
+      (String locale) => locale.toLowerCase() == normalized,
+      orElse: () => '',
+    );
+    if (exact.isNotEmpty) return exact;
+    final String languageCode = normalized.split('-').first;
+    return supportedLocales.contains(languageCode) ? languageCode : 'en';
   }
+}
+
+/// Placed above the Navigator so dialogs and newly pushed routes use the same
+/// current pack as the reader and rebuild when its selected Bible changes.
+class UiStringsScope extends InheritedWidget {
+  const UiStringsScope({
+    required this.strings,
+    required super.child,
+    super.key,
+  });
+
+  final UiStrings strings;
+
+  @override
+  bool updateShouldNotify(UiStringsScope oldWidget) =>
+      !identical(strings, oldWidget.strings);
 }

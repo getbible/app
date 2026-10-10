@@ -3,8 +3,10 @@ import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, stat } from 'node:fs/promises';
 import { resolve, sep, extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { chromium } from 'playwright';
-import { apiFixtures, firstVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
+import { chromium, firefox, webkit } from 'playwright';
+import { measureWorker } from './worker-performance.mjs';
+import { classifyNetworkDiagnostics } from './network-diagnostics.mjs';
+import { apiFixtures, firstVerse, secondVerse, noteText, restoredNoteText, unvisitedVerse } from './fixtures.mjs';
 import { studyInstallationFixtures } from './study-fixtures.mjs';
 
 const { values } = parseArgs({ options: {
@@ -12,13 +14,19 @@ const { values } = parseArgs({ options: {
   'base-path': { type: 'string', default: '/flutter/' },
   'output-dir': { type: 'string', default: 'build/browser-smoke' },
   'browser-channel': { type: 'string' },
+  browsers: { type: 'string', default: 'chromium' },
 } });
+const selectedBrowsers = values.browsers.split(',');
+const browserTypes = { chromium, firefox, webkit };
+assert.ok(selectedBrowsers.length && selectedBrowsers.every((name) => Object.hasOwn(browserTypes, name)), 'Unsupported browser');
+assert.equal(new Set(selectedBrowsers).size, selectedBrowsers.length, 'Duplicate browser');
+assert.ok(!values['browser-channel'] || selectedBrowsers.every((name) => name === 'chromium'), 'Browser channel applies only to Chromium');
 const buildDirectory = resolve(values['build-dir']);
 const outputDirectory = resolve(values['output-dir']);
 const basePath = values['base-path'];
 assert.match(basePath, /^\/(?:[a-zA-Z0-9._~-]+\/)*$/, 'Base path must start and end in /');
 assert.ok(!basePath.split('/').some((segment) => segment === '.' || segment === '..'), 'Base path cannot contain dot segments');
-for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js', 'offline_bible_worker.dart.js']) {
+for (const asset of ['index.html', 'main.dart.js', 'sqlite3.wasm', 'drift_worker.dart.js', 'offline_bible_worker.dart.js', 'offline_service_worker.js', 'offline-shell-manifest.json']) {
   assert.ok((await stat(join(buildDirectory, asset))).isFile(), `Missing built asset: ${asset}`);
 }
 const index = await readFile(join(buildDirectory, 'index.html'), 'utf8');
@@ -32,18 +40,26 @@ const contentTypes = new Map([
   ['.otf', 'font/otf'], ['.woff2', 'font/woff2'],
 ]);
 
-/** Serves only the built directory; unknown paths are 404, never HTML fallbacks. */
+/** Uses the documented SPA rewrite for HTML navigation; missing assets stay 404. */
 async function serveBuild({ isolated }) {
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
       const relativePath = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : null;
-      const filePath = relativePath === null ? '' : resolve(buildDirectory, relativePath || 'index.html');
+      let filePath = relativePath === null ? '' : resolve(buildDirectory, relativePath || 'index.html');
       if (!filePath.startsWith(buildDirectory + sep)) {
         response.writeHead(404).end();
         return;
       }
-      const body = await readFile(filePath);
+      let body;
+      try {
+        body = await readFile(filePath);
+      } catch (error) {
+        if (error.code !== 'ENOENT' || extname(filePath) || !request.headers.accept?.includes('text/html') ||
+            (request.headers['sec-fetch-dest'] && request.headers['sec-fetch-dest'] !== 'document')) throw error;
+        filePath = join(buildDirectory, 'index.html');
+        body = await readFile(filePath);
+      }
       const headers = { 'content-type': contentTypes.get(extname(filePath)) ?? 'application/octet-stream' };
       if (isolated) {
         headers['cross-origin-opener-policy'] = 'same-origin';
@@ -71,29 +87,48 @@ async function enableSemantics(page) {
 async function readerVisible(page) {
   await page.getByRole('button', { name: 'Genesis 1', exact: true }).waitFor();
   await page.getByRole('group', { name: `Genesis 1:1. ${firstVerse}`, exact: true }).waitFor();
+  await page.getByRole('group', { name: `Genesis 1:2. ${secondVerse}`, exact: true }).waitFor();
 }
 
-async function runJourney(browser, { isolated }) {
-  const mode = isolated ? 'cross-origin-isolated' : 'standard-hosting';
+async function runJourney(browser, { isolated, browserName }) {
+  const hosting = isolated ? 'cross-origin-isolated' : 'standard-hosting';
+  const mode = `${browserName}-${hosting}`;
   const { server, origin } = await serveBuild({ isolated });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'allow' });
   const errors = [];
+  const consoleErrors = [];
+  const injectedDisconnects = [];
+  const pageIds = new WeakMap();
+  let nextPageId = 0;
   const requests = [];
   const missingAssets = [];
   const workers = [];
   const fixtures = new Map([...apiFixtures(), ...studyInstallationFixtures()]);
   let apiOffline = false;
+  let networkPhase = 0;
+  const setApiOffline = (offline) => { apiOffline = offline; networkPhase++; };
+  const consoleDiagnostics = () => classifyNetworkDiagnostics(consoleErrors, injectedDisconnects);
+  let prepareShell = false;
+  let deferredShellLoads = 0;
   let page;
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  // Observe independently of fixture interception, including the final phase
+  // where the native service worker owns delivery and all routing is removed.
+  context.on('request', (request) => {
+    const url = request.url();
+    if (/^https?:/.test(url) && !url.startsWith(origin + '/')) {
+      requests.push({ method: request.method(), url, apiOffline });
+    }
+  });
   context.on('page', (opened) => {
+    pageIds.set(opened, ++nextPageId);
     opened.on('worker', (worker) => workers.push(worker.url()));
     opened.on('pageerror', (error) => errors.push({ type: 'pageerror', message: error.stack ?? error.message }));
     opened.on('console', (message) => {
       if (message.type() !== 'error') return;
-      // A deliberately disconnected API logs a network error in Chromium.
-      // All uncaught exceptions and local asset errors remain failures.
-      if (apiOffline && message.text().includes('net::ERR_INTERNET_DISCONNECTED')) return;
-      errors.push({ type: 'console', message: message.text() });
+      consoleErrors.push({ type: 'console', message: message.text(),
+        locationUrl: message.location().url, pageId: pageIds.get(opened),
+        phase: networkPhase, apiOffline });
     });
     opened.on('response', (response) => {
       if (response.url().startsWith(origin) && response.status() >= 400) {
@@ -104,9 +139,18 @@ async function runJourney(browser, { isolated }) {
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = request.url();
+    if (url === origin + basePath + 'offline_shell.js' && !prepareShell) {
+      // WebKit service-worker-controlled requests can bypass Playwright routing.
+      // Keep all fixture phases uncontrolled, then load the exact production
+      // shell script before the separate fully network-disconnected cold start.
+      // Native registration, worker bytes, cache verification and app code are
+      // untouched; only this script's initial delivery is deferred.
+      deferredShellLoads++;
+      return route.fulfill({ status: 200, contentType: 'text/javascript',
+        body: '// Offline shell registration is deferred until fixture setup completes.\n' });
+    }
     if (url.startsWith(origin + '/')) return route.continue();
     if (!/^https?:/.test(url)) return route.continue();
-    requests.push({ method: request.method(), url, apiOffline });
     const fixture = fixtures.get(url);
     if (!fixture) {
       errors.push({ type: 'unexpected-network-request', message: `${request.method()} ${url}` });
@@ -116,7 +160,15 @@ async function runJourney(browser, { isolated }) {
       errors.push({ type: 'unexpected-method', message: `${request.method()} ${url}` });
       return route.abort('blockedbyclient');
     }
-    if (apiOffline) return route.abort('internetdisconnected');
+    if (apiOffline) {
+      const phase = networkPhase;
+      let pageId;
+      try { pageId = pageIds.get(request.frame().page()); } catch { /* No page provenance: fail closed. */ }
+      await route.abort('internetdisconnected');
+      injectedDisconnects.push({ url, method: request.method(), knownFixture: true,
+        code: 'internetdisconnected', pageId, phase, apiOffline: true });
+      return;
+    }
     return route.fulfill({
       status: 200,
       contentType: fixture.contentType,
@@ -127,13 +179,26 @@ async function runJourney(browser, { isolated }) {
   try {
     page = await context.newPage();
     page.setDefaultTimeout(45000);
-    await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
+    await page.goto(origin + basePath + 'KJV/Genesis/1?verse=2', { waitUntil: 'domcontentloaded' });
     await enableSemantics(page);
     await readerVisible(page);
+    assert.ok(deferredShellLoads > 0, 'Fixture setup must defer the production shell loader');
+    assert.equal(new URL(page.url()).searchParams.get('verse'), '2',
+      'First browser launch must preserve the incoming verse rather than choose the daily default');
     assert.equal(await page.evaluate(() => crossOriginIsolated), isolated);
-    assert.deepEqual(errors, [], 'Startup produced browser errors');
+    assert.deepEqual([...errors, ...consoleDiagnostics().unexpected], [], 'Startup produced browser errors');
     assert.deepEqual(missingAssets, [], 'Startup missed built assets');
     console.log(`${mode}: release reader opened`);
+    const workerMetrics = await measureWorker(page);
+    await writeFile(join(outputDirectory, `${mode}-worker-performance.json`), JSON.stringify(workerMetrics, null, 2));
+    assert.equal(workerMetrics.verses, 20000);
+    assert.ok(workerMetrics.maximumVerseBatch <= 100);
+    assert.ok(workerMetrics.uiHeartbeatTicks > 0, 'UI event loop must remain live while the worker parses');
+    const dictionaryMetrics = await measureWorker(page, 'dictionary-index');
+    await writeFile(join(outputDirectory, `${mode}-dictionary-performance.json`), JSON.stringify(dictionaryMetrics, null, 2));
+    assert.equal(dictionaryMetrics.entries, 20000);
+    assert.ok(dictionaryMetrics.maximumEntryBatch <= 128);
+    assert.ok(dictionaryMetrics.uiHeartbeatTicks > 0, 'Dictionary index parsing must leave the UI event loop live');
 
     // Verse-number context actions exercise the actual rendered release UI.
     await page.getByText('1', { exact: true }).click();
@@ -149,7 +214,7 @@ async function runJourney(browser, { isolated }) {
 
     // Preserve coverage for readers that have cached a passage but have not
     // installed a complete Bible. Reopening must retain the note and text.
-    apiOffline = true;
+    setApiOffline(true);
     await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(45000);
@@ -162,7 +227,7 @@ async function runJourney(browser, { isolated }) {
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     assert.ok(requests.some((request) => request.apiOffline),
       'Cached chapter path must attempt current-source verification');
-    apiOffline = false;
+    setApiOffline(false);
     console.log(`${mode}: cached passage and note reopened without public APIs`);
 
     // Download the actual private snapshot, then import an edited copy through
@@ -234,7 +299,7 @@ async function runJourney(browser, { isolated }) {
     // A new page discards all Dart state. It reopens the production browser
     // database, while public APIs fail and local release assets still load.
     const requestsBeforeInstalledRestart = requests.length;
-    apiOffline = true;
+    setApiOffline(true);
     await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(45000);
@@ -271,9 +336,91 @@ async function runJourney(browser, { isolated }) {
     await page.screenshot({ path: join(outputDirectory, `${mode}-offline.png`) });
     assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
       'Installed restart, reading and search must stay within the local database');
-    assert.deepEqual(errors, [], 'Release UI produced browser errors');
+    // The generated application shell must cache its own exact release assets.
+    // A fresh page with all networking disabled demonstrates a real cold start,
+    // in addition to the earlier independent public-API offline checks.
+    prepareShell = true;
+    await page.addScriptTag({ url: origin + basePath + 'offline_shell.js' });
+    // Activation never claims an existing page: a deploy must not switch the
+    // asset generation underneath an open note editor. The next navigation is
+    // controlled after the complete worker has activated.
+    // Playwright's polling predicate must be synchronous: an async predicate
+    // yields a truthy Promise before registration has actually completed.
+    // Await the native lifecycle instead, with a bounded installation timeout.
+    await page.evaluate(async () => {
+      let timeout;
+      try {
+        await Promise.race([
+          (async () => {
+            const registration = await navigator.serviceWorker.ready;
+            const worker = registration.active;
+            if (worker.state === 'activated') return;
+            await new Promise((resolveActive, reject) => {
+              const changed = () => {
+                if (worker.state === 'activated') {
+                  worker.removeEventListener('statechange', changed);
+                  resolveActive();
+                } else if (worker.state === 'redundant') {
+                  worker.removeEventListener('statechange', changed);
+                  reject(new Error('Application shell became redundant before activation'));
+                }
+              };
+              worker.addEventListener('statechange', changed);
+              changed();
+            });
+          })(),
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => reject(new Error('Application shell activation timed out')), 90000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
+    const shellState = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const cacheNames = await caches.keys();
+      return {
+        pageUrl: location.href,
+        baseUri: document.baseURI,
+        scope: registration?.scope,
+        worker: registration?.active?.scriptURL,
+        workerState: registration?.active?.state,
+        caches: await Promise.all(cacheNames.map(async (name) => ({
+          name, entries: (await (await caches.open(name)).keys()).length,
+        }))),
+      };
+    });
+    await writeFile(join(outputDirectory, `${mode}-shell.json`), JSON.stringify(shellState, null, 2));
+    assert.equal(shellState.scope, origin + basePath);
+    assert.equal(shellState.worker, origin + basePath + 'offline_service_worker.js');
+    assert.equal(shellState.workerState, 'activated');
+    // Fixture setup is complete. Let the browser's native offline navigation
+    // use its service worker without Playwright interception; request events
+    // above continue to prove that no public service is requested.
+    await context.unrouteAll({ behavior: 'wait' });
+    console.log(`${mode}: production application shell installed`);
+    networkPhase++;
+    await context.setOffline(true);
+    await page.close();
+    page = await context.newPage();
+    page.setDefaultTimeout(45000);
+    // The inbound route differs from the saved Genesis 2 position, proving
+    // actual browser deep-link delivery wins over last-reading restoration.
+    await page.goto(origin + basePath + 'KJV/Genesis/1?verse=1', { waitUntil: 'domcontentloaded' });
+    assert.equal(await page.evaluate(() => navigator.serviceWorker.controller !== null), true,
+      'A new offline navigation must use the activated application shell');
+    await enableSemantics(page);
+    await readerVisible(page);
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await page.getByRole('button', { name: 'Next chapter', exact: true }).first().click();
+    await page.getByRole('group', { name: `Genesis 2:1. ${unvisitedVerse}`, exact: true }).waitFor();
+    await page.screenshot({ path: join(outputDirectory, `${mode}-application-offline.png`) });
+    assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
+      'Network-disconnected application startup must not fetch public services');
+    assert.deepEqual([...errors, ...consoleDiagnostics().unexpected], [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
-    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'no browser errors'] };
+    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: join(outputDirectory, `${mode}-failure.png`) }).catch(() => {});
@@ -281,26 +428,42 @@ async function runJourney(browser, { isolated }) {
     }
     throw error;
   } finally {
-    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({ errors, missingAssets, requests, workers }, null, 2));
+    const diagnostics = consoleDiagnostics();
+    await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({
+      errors: [...errors, ...diagnostics.unexpected], expectedDiagnostics: diagnostics.expected,
+      injectedDisconnects, missingAssets, requests, workers, deferredShellLoads,
+    }, null, 2));
     await context.tracing.stop({ path: join(outputDirectory, `${mode}-trace.zip`) });
     await context.close();
     await new Promise((resolveClose) => server.close(resolveClose));
   }
 }
 
-const browser = await chromium.launch({ channel: values['browser-channel'] });
 const results = [];
-try {
-  for (const isolated of [false, true]) {
-    try {
-      results.push(await runJourney(browser, { isolated }));
-      console.log(`PASS ${results.at(-1).mode}`);
-    } catch (error) {
-      results.push({ mode: isolated ? 'cross-origin-isolated' : 'standard-hosting', status: 'failed', error: error.message });
-      throw error;
+let failed = false;
+for (const browserName of selectedBrowsers) {
+  let browser;
+  try {
+    browser = await browserTypes[browserName].launch(
+      browserName === 'chromium' ? { channel: values['browser-channel'] } : {},
+    );
+    for (const isolated of [false, true]) {
+      try {
+        results.push(await runJourney(browser, { isolated, browserName }));
+        console.log(`PASS ${results.at(-1).mode}`);
+      } catch (error) {
+        failed = true;
+        results.push({ browser: browserName, mode: isolated ? 'cross-origin-isolated' : 'standard-hosting', status: 'failed', error: error.stack ?? error.message });
+        console.error(error);
+      }
     }
+  } catch (error) {
+    failed = true;
+    results.push({ browser: browserName, status: 'failed', error: error.stack ?? error.message });
+    console.error(error);
+  } finally {
+    await writeFile(join(outputDirectory, 'results.json'), JSON.stringify(results, null, 2));
+    await browser?.close();
   }
-} finally {
-  await writeFile(join(outputDirectory, 'results.json'), JSON.stringify(results, null, 2));
-  await browser.close();
 }
+if (failed) process.exitCode = 1;

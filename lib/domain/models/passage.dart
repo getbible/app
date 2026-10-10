@@ -1,3 +1,5 @@
+import 'package:unorm_dart/unorm_dart.dart' as unicode;
+
 import '../../core/json.dart';
 
 final class Passage {
@@ -71,7 +73,8 @@ final class Passage {
   int get hashCode => Object.hash(translation, book, chapter, verse);
 }
 
-String bookSlug(String name) => name
+String bookSlug(String name) => unicode
+    .nfc(name)
     .trim()
     .replaceAll(RegExp(r'[\s_/]+'), '-')
     .replaceAll(RegExp(r'^-+|-+$'), '');
@@ -105,6 +108,11 @@ final class PassageLink {
 }
 
 PassageLink? parsePassageLink(Uri uri) {
+  uri = readerLinkLocation(uri) ?? Uri(path: '/');
+  if (uri.queryParametersAll['verse']?.length != null &&
+      uri.queryParametersAll['verse']!.length != 1) {
+    return null;
+  }
   final List<String> parts = uri.pathSegments
       .where((String part) => part.isNotEmpty)
       .toList();
@@ -121,15 +129,44 @@ PassageLink? parsePassageLink(Uri uri) {
   if (!RegExp(r'^[a-z0-9_-]+$').hasMatch(translation) ||
       parts[1].isEmpty ||
       chapter == null ||
-      chapter < 1 ||
+      chapter < 0 ||
       (verseSource != null && verse == null) ||
-      (verse != null && verse < 1)) {
+      (verse != null && (verse < 1 || chapter == 0))) {
     return null;
   }
   return PassageLink(
     translation: translation,
-    bookSlug: Uri.decodeComponent(parts[1]),
+    // Uri.pathSegments already decoded exactly once. Decoding again changes
+    // literal percent sequences in published names and may throw on valid URLs.
+    bookSlug: parts[1],
     chapter: chapter,
     verse: verse,
   );
 }
+
+/// Normalize only supported public/native links; never reinterpret another
+/// origin or an arbitrary URI scheme as a Scripture reference.
+Uri? readerLinkLocation(Uri uri) {
+  if (uri.toString().length > 4096) return null;
+  if (uri.userInfo.isNotEmpty || uri.hasPort) return null;
+  if (uri.scheme == 'getbible') {
+    final path = uri.host.isEmpty ? uri.path : '/${uri.host}${uri.path}';
+    return Uri(path: path, query: uri.hasQuery ? uri.query : null);
+  }
+  if (uri.hasScheme &&
+      (uri.scheme != 'https' ||
+          !const {'app.getbible.life', 'getbible.life'}.contains(uri.host))) {
+    return null;
+  }
+  if (!uri.hasScheme && uri.hasAuthority) return null;
+  // Accept links from older hash-based deployments as well as the current
+  // friendly path router. The web host serves index.html for reader routes.
+  if (uri.fragment.startsWith('/')) {
+    return readerLinkLocation(Uri.parse(uri.fragment));
+  }
+  return Uri(path: uri.path, query: uri.hasQuery ? uri.query : null);
+}
+
+Uri shareablePassageUri(Passage passage, String bookName) => Uri.parse(
+  'https://app.getbible.life${canonicalPassagePath(passage, bookName)}',
+);

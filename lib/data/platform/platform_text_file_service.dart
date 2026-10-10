@@ -11,17 +11,19 @@ import 'browser_text_share_stub.dart'
 final class PlatformTextFileService implements TextFileService {
   PlatformTextFileService({
     this.channel = const MethodChannel('life.getbible.mobile/files'),
+    this.textFilesLabel = 'Text and JSON files',
     TargetPlatform? platform,
   }) : _platform = platform ?? defaultTargetPlatform;
 
   final MethodChannel channel;
+  final String textFilesLabel;
   final TargetPlatform _platform;
   bool _busy = false;
   bool get _mobile =>
       !kIsWeb &&
       (_platform == TargetPlatform.android || _platform == TargetPlatform.iOS);
-  static const XTypeGroup _textTypes = XTypeGroup(
-    label: 'Text and JSON files',
+  XTypeGroup get _textTypes => XTypeGroup(
+    label: textFilesLabel,
     extensions: <String>['json', 'txt', 'md'],
     uniformTypeIdentifiers: <String>['public.json', 'public.plain-text'],
   );

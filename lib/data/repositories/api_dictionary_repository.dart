@@ -1,7 +1,3 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
-
 import '../../core/errors.dart';
 import '../../core/request_cancellation.dart';
 import '../../domain/models/dictionary.dart';
@@ -11,6 +7,7 @@ import '../api/api_configuration.dart';
 import '../api/api_transport.dart';
 import '../api/dictionary_adapters.dart';
 import '../api/service_envelope_adapters.dart';
+import '../offline/dictionary_index_reader.dart';
 
 /// Online reads are deliberately limited to discovery, index and chosen entry.
 /// Whole-module installation has a separate, explicit later lifecycle.
@@ -46,18 +43,11 @@ final class ApiDictionaryRepository implements DictionaryRepository {
       cancellation: cancellation,
     );
     try {
-      final _DictionaryIndexInput input = _DictionaryIndexInput(
+      return await readDictionaryIndex(
         response.bytes,
         module,
+        cancellation: cancellation,
       );
-      // Tiny indexes do not justify isolate setup; large published dictionaries
-      // build their normalized search keys away from the native UI isolate.
-      final Future<DictionaryIndex> parsing = response.bytes.length < 256 * 1024
-          ? Future<DictionaryIndex>.value(_parseIndex(input))
-          : compute(_parseIndex, input);
-      return await (cancellation == null
-          ? parsing
-          : cancellation.bind(parsing));
     } on FormatException catch (error) {
       transport.discardResponse(response);
       throw ApiFormatException('The dictionary index is invalid.', error);
@@ -100,18 +90,6 @@ final class ApiDictionaryRepository implements DictionaryRepository {
     }
   }
 }
-
-final class _DictionaryIndexInput {
-  const _DictionaryIndexInput(this.bytes, this.module);
-  final List<int> bytes;
-  final String module;
-}
-
-DictionaryIndex _parseIndex(_DictionaryIndexInput input) =>
-    DictionaryAdapters.index(
-      jsonDecode(utf8.decode(input.bytes, allowMalformed: false)),
-      input.module,
-    );
 
 String _segment(String value) {
   if (value.isEmpty ||

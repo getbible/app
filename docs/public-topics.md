@@ -1,52 +1,129 @@
-# Public topics and private copies
+# Unified bookmarks and public topics
 
-The Study Topics workspace reads the public [GetBible Bookmarks v1 API](https://getbible.net/api/bookmarks/v1/). It discovers the current index, summary catalogue and available name languages, then requests one selected topic or the current chapter's reverse associations. Ordinary browsing never downloads `all.json` or `catalog.json`, installs a corpus, or writes to the public service.
+**Bookmarks** is one native list for personal topics and published GetBible topics.
+The verse and selected-text bookmark menus use that same list. A group can hold
+both personal memberships and downloaded global memberships at the same verse;
+their origins remain separate in storage. A visible whole-verse row combines
+those origins and prefers the user's saved quotation. Selected-text rows retain
+their translation and exact original UTF-16 range.
 
-`PublicTopicsRepository` is the domain boundary. `ApiPublicTopicsRepository` owns transport and the strict static-document adapters; `TopicsController` owns cancellation, local choices and independent resource errors; `TopicsPanel` renders native controls and delegates Scripture to the shared Query preview. Closing or selecting another topic invalidates late reads. The shared transport belongs to the application, so dismissal does not close another panel's HTTP client.
+## Catalog metadata and migration
 
-Topic summaries have an integer `verses` count. Individual topic files have sorted, unique coordinate triples and translated names. IDs come from the published catalogue, never from English names, aliases or translated labels. Partial locale documents fall back to canonical English names. The index's checksum describes the complete public catalogue and is retained as its revision identity. After a changed revision, resources are revalidated, including a previously cached topic that has since been deleted. HTTP 404 remains an unavailable resource; a successful empty reverse map means there are no associations.
+Opening Bookmarks or its contextual assignment menu discovers the public
+[GetBible Bookmarks v1 API](https://getbible.net/api/bookmarks/v1/) catalog and
+localized topic-name documents. This is lazy metadata loading: it does not fetch
+verse membership documents, download Scripture, or install an offline corpus.
+Locale requests have a concurrency limit of four. Revision checks surround the
+metadata read; a failed or changing catalog leaves saved private groups readable.
+On a pristine installation, unchanged bundled fallback groups are replaced by
+actual API topic metadata without assigning any verses.
 
-The public coordinates cover books 1–66. That dataset limit does not change Bible v3 discovery, navigation or extended-book reading. Unsupported contextual chapters show the limit while the full topic browser remains usable. Selecting a chapter association requests a structured reference in the user's selected Bible. Query resolves discovered book names, bounds batches and reports unavailable verses without substituting a different translation or successful partial Scripture.
+`UnifiedBookmarksController` owns public request cancellation, progress, recent
+topic choices and operation lifetime. `UnifiedBookmarksRepository` is the domain
+boundary. `SqlUnifiedBookmarksRepository` applies the pure reconciliation plan
+to the latest SQLite snapshot inside one transaction. Widgets perform no HTTP,
+raw JSON parsing or SQL. Shutdown cancels and drains public requests and pending
+local writes before the database closes.
 
-Follow and Hide are local settings keyed by the service root and stable public topic ID. They never create private markings, notes or groups. Public refresh does not enter the annotation repository. Preference restoration disables those actions until their saved state is known, and failures remain independent of readable public data.
+Matching uses an explicit source topic identity first, then a historical stable
+ID, then an unambiguous canonical/localized name or alias. Label comparison uses
+the reference app's Unicode NFKD, combining-mark removal, lowercase and
+letter/number normalization; the pinned `unorm_dart` package supplies Unicode
+normalization. This transformation is never applied to Scripture or saved quotes.
+An explicit different topic ID or provider scope cannot be overridden by a label.
+Ambiguous aliases and multiple independent personal groups with the same label
+stay separate. The app does not guess which private identity to discard.
 
-Copy to my markings first presents the target name and new/already-present association counts. Confirmation creates an independent private group with a freshly allocated `private-topic-` identity, then canonical whole-verse markings. Private starter/custom IDs and names are never reused to identify that destination. The local SQL adapter records scoped provenance and commits group, markings and provenance in one collision-checked transaction. A failed transaction rolls back every insertion. Imports through the adapter are serialized; the database rechecks identities and provenance against independent writers.
+An earlier imported public group can be absorbed into one unambiguous existing
+private group. Its surviving local ID, name, color, order and timestamp are kept.
+Marking IDs, original timestamps, quotes and selected ranges remain unchanged;
+only group membership references and missing historical origin metadata change.
+Identical legacy global memberships may be collapsed; personal records are never
+collapsed by catalog reconciliation. Active and recent group settings, plus
+independent copy destinations, follow the same remap in the transaction. Notes,
+notebooks and unactivated draft journals are not rewritten. Repeating migration
+is idempotent. This is a data reconciliation using schema 5's existing columns,
+not an in-place change to a released SQL schema.
 
-Copying the same topic again adds only missing canonical identities. Existing private names, colors, quote text, creation dates and inline notes remain unchanged. Later public removal does not delete the copy; an explicit later copy can add new coordinates while retaining earlier private associations. If the user deletes their entire copy group, an explicit copy can create a fresh independent group. No automatic synchronization is implied.
+## Explicit download and removal
 
-Complete private backups include scoped copy provenance and Follow/Hide choices alongside copied groups and markings. Website-compatible v2 exports retain reader data and supported source fields, but omit these additional private settings. Importing an older website backup therefore does not restore those choices or copy-destination preferences. Public cache or installed-resource removal never deletes private copied annotations.
+Expand **Global bookmarks** in the unified list or a topic to access public
+download, removal, retry and status controls. Keeping this section collapsed
+initially leaves private search and saved topics reachable on short screens with
+large text, including when the public service is unavailable.
 
-`test/public_topics_test.dart` covers the published and constructed positive documents, shape/identity failures, partial names, empty reverse maps, exact lazy GET routes, invalid-response cache recovery, catalogue revision/deletion, local-only choices, extended Bible IDs, late request ownership, collision rollback, preservation of existing groups/notes, duplicate-safe/additive copies and deletion/recreation. Native widget tests exercise selected-Bible previews, explicit confirmation and a narrow 200% text surface with scrollable content. Positive fixtures are independently validated against the current live OpenAPI JSON Schema. Physical-device selection, clipboard, accessibility and store review remain platform release gates.
+**Download all global bookmarks** and **Download this topic's global bookmarks**
+fetch public coordinates only after the user requests them. Per-topic reads run
+in bounded batches and the complete result is validated before one additive
+transaction. A catalog revision change, malformed response, cancellation or
+storage failure cannot commit a partial collection. Existing global semantic
+memberships are reused, including across translations; a colliding record ID
+receives a free ID without replacing the occupied personal record.
+
+**Remove global bookmarks** requires confirmation and removes only downloaded
+memberships belonging to the current public provider, optionally narrowed to one
+topic. Names, colors, personal memberships, notes and notebooks remain. This
+operation is independent of uninstalling a public API corpus in **Set up offline
+use**. The contextual menu separately offers **Remove personal bookmark** and
+**Remove global bookmark**, each for the selected group and exact verse/range.
+Selecting another topic adds a personal membership without deleting other topics.
+The six most recently selected topics are persisted and shown first in the picker.
+
+Public origins without a provider field are the historical official GetBible
+source. Custom providers use the additive `sourceScope` member in source JSON.
+Matching, deduplication and bulk removal respect that scope. Renaming a topic or
+editing its color never removes its source identity or turns personal memberships
+into global ones.
+
+## Study browsing and independent copies
+
+The Study Topics workspace still supports on-demand browsing, Follow/Hide,
+chapter reverse associations and selected-Bible reference previews. Follow and
+Hide are local settings keyed by service root and stable public topic ID. They do
+not assign verses. Study offers global download into the unified list and an
+**Open saved topic** action. Public coordinates cover books 1–66; this dataset
+limit does not restrict Bible v3 navigation or extended-book reading.
+
+The additional **Copy to my markings** action remains available for an explicitly
+independent private copy. Confirmation previews its destination and new/already
+present counts. Copied memberships are personal, have collision-safe identities,
+and are never removed by global-bookmark cleanup. Repeated copies add only missing
+canonical coordinates; public updates do not synchronize or delete private copies.
+Scoped provenance keeps the copy destination stable through restart and backup.
+
+Complete private backups contain saved personal/global memberships, source fields,
+recent topics, reader preferences, Follow/Hide and private-copy provenance.
+Website-compatible v2 exports retain supported source fields and reader data,
+but omit the complete app settings and notebooks. They reject foreign-provider
+source records with guidance to use complete private backup: the website cannot
+preserve those distinct provider identities. Complete backups retain them without
+changing their origins. Public cached/installed API
+corpora are separate from these saved memberships and are excluded from private
+backups. Removing a public corpus does not remove saved bookmarks of either origin.
 
 ## Complete offline public topics
 
 **Set up offline use** explicitly downloads `all.json` with `index.json` and
-`checksums.json`. The index's checksum must equal the exact full-body SHA-256;
-both requested paths must retain the same manifest hashes through final
-verification. Workers validate the complete dataset and derive topic summaries,
-individual topics, localized name maps and chapter reverse associations before
-atomic activation. A bulk topic is not parsed as an individual topic: its
-`names` are assembled from the bulk locale documents, preserving partial locale
-coverage and English fallback. Unknown locale/topic IDs remain unavailable.
+`checksums.json`. The index checksum must equal the exact full-body SHA-256, and
+requested paths must retain their manifest hashes through final verification.
+Workers validate the dataset and derive summaries, individual topics, localized
+name maps and chapter reverse associations before atomic activation. Partial
+locale documents retain English fallback; unknown identities stay unavailable.
 
-`InstalledPublicTopicsRepository` reads this complete snapshot without HTTP after
-restart and uses the same public-topic source scope as the online repository.
-Missing reverse indexes represent no associations only for valid canonical
-chapters within the still-active complete generation. A replaced generation
-cannot be mistaken for an empty chapter. The panel identifies the installed
-source and offers **Set up offline use**. Topic coordinates still require the
-chosen Bible to be available for Scripture preview; public-topic installation
-contains no Scripture text and never silently downloads a Bible.
+`InstalledPublicTopicsRepository` serves that complete source-scoped snapshot
+without HTTP after restart. Its metadata and per-topic reads also support unified
+bookmark reconciliation/download without network access. Public topics contain
+coordinates, not Scripture; previews still require the chosen Bible to be
+available. Resource removal preserves saved memberships and independent copies.
 
-Uninstalling the public dataset removes only its owned public generation.
-Independent **Copy to my markings** groups, copied markings, local choices,
-copy provenance and private verse notes remain intact. The complete-module
-suite exercises a private copy before removal and a duplicate-safe repeat copy
-after removal, in addition to locale and reverse-index equivalence.
+## Verification
 
-On 9 October 2026 the processor validated the generated source repository's
-complete `all.json` (218,400 UTF-8 bytes) against the exact SHA-256 published in
-its `index.json`. Its 61 topics and 54 locales produced 653 local documents.
-This verifies real bulk locale composition and reverse associations independently
-of the constructed fixtures. Source:
-[`getbible/bookmarks`](https://github.com/getbible/bookmarks/tree/main/v1).
+`test/unified_bookmarks_test.dart` covers Unicode/name/alias/source matching,
+ambiguous private identities, mixed origins, idempotent SQL reconciliation and
+download, active/recent remaps, actual SQLite reopen, late-write rollback,
+malformed batches, request cancellation and unchanged notebook/draft data.
+`test/bookmark_assignment_menu_test.dart` exercises independent origin removal
+and a narrow contextual surface at 200% text. Existing preservation, public-topic,
+private-backup and installed-Study suites cover their respective boundaries.
+Test execution results are recorded in [TESTING.md](TESTING.md); physical-device
+selection and accessibility acceptance remain separate from automated coverage.

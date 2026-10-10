@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../application/portability_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/private_backup.dart';
 import '../../services/text_file_service.dart';
 import 'text_export_actions.dart';
@@ -43,7 +44,10 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
       );
       if (!mounted) return;
       if (text == null) {
-        setState(() => _status = 'File selection cancelled.');
+        setState(
+          () =>
+              _status = UiStrings.of(context).text('File selection cancelled.'),
+        );
       } else {
         await widget.controller.prepareImport(text);
       }
@@ -52,7 +56,9 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
         setState(() {
           _status = error is TextFileException
               ? error.message
-              : 'The backup could not be opened. Please try again.';
+              : UiStrings.of(
+                  context,
+                ).text('The backup could not be opened. Please try again.');
         });
       }
     } finally {
@@ -74,8 +80,8 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
     setState(() {
       _export = text;
       _exportLabel = complete
-          ? 'Complete private backup'
-          : 'Website-compatible backup';
+          ? UiStrings.of(context).text('Complete private backup')
+          : UiStrings.of(context).text('Website-compatible backup');
       _filename = 'getbible-${complete ? 'private' : 'website'}-$date.json';
     });
   }
@@ -89,12 +95,15 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
-          Text('Private data', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            UiStrings.of(context).text('Private data'),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
-          const Text(
-            'Keep your own backup of saved Scripture, verse notes, notebooks, '
-            'drafts and preferences. Backups contain private text. Choose where '
-            'you save them and who can access them.',
+          Text(
+            UiStrings.of(context).text(
+              'Keep your own backup of saved Scripture, verse notes, notebooks, drafts and preferences. Backups contain private text. Choose where you save them and who can access them.',
+            ),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -104,24 +113,32 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
               FilledButton.icon(
                 onPressed: _busy ? null : () => _prepareExport(complete: true),
                 icon: const Icon(Icons.backup_outlined),
-                label: const Text('Prepare complete backup'),
+                label: Text(
+                  UiStrings.of(context).text('Prepare complete backup'),
+                ),
               ),
               OutlinedButton(
                 onPressed: _busy ? null : () => _prepareExport(complete: false),
-                child: const Text('Prepare website backup'),
+                child: Text(
+                  UiStrings.of(context).text('Prepare website backup'),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Website backups include saved groups, markings, verse notes and '
-            'reader preferences. They do not include notebooks, drafts or '
-            'additional private settings. Downloaded study and Bible resources '
-            'are not included in either format.',
+          Text(
+            UiStrings.of(context).text(
+              'Website backups include saved groups, markings, verse notes and reader preferences. They do not include notebooks, drafts or additional private settings. Downloaded study and Bible resources are not included in either format.',
+            ),
           ),
           if (_export != null) ...<Widget>[
             const SizedBox(height: 16),
-            Text('$_exportLabel ready. Save the file to keep this snapshot.'),
+            Text(
+              UiStrings.of(context).text(
+                '{exportLabel} ready. Save the file to keep this snapshot.',
+                {'exportLabel': _exportLabel!},
+              ),
+            ),
             const SizedBox(height: 8),
             TextExportActions(
               text: _export!,
@@ -140,14 +157,14 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
             child: Divider(),
           ),
           Text(
-            'Restore a backup',
+            UiStrings.of(context).text('Restore a backup'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Choose a UTF-8 JSON backup up to 64 MiB. The entire file is checked '
-            'before you confirm. Import merges saved data and keeps unrelated '
-            'records; conflicting notebooks are preserved as separate copies.',
+          Text(
+            UiStrings.of(context).text(
+              'Choose a UTF-8 JSON backup up to 64 MiB. The entire file is checked before you confirm. Import merges saved data and keeps unrelated records; conflicting notebooks are preserved as separate copies.',
+            ),
           ),
           const SizedBox(height: 8),
           Align(
@@ -155,31 +172,44 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
             child: OutlinedButton.icon(
               onPressed: _busy ? null : _pick,
               icon: const Icon(Icons.file_open_outlined),
-              label: const Text('Choose backup file'),
+              label: Text(UiStrings.of(context).text('Choose backup file')),
             ),
           ),
           if (_picking || widget.controller.busy)
-            const LinearProgressIndicator(
-              semanticsLabel: 'Checking or transferring private data',
+            LinearProgressIndicator(
+              semanticsLabel: UiStrings.of(
+                context,
+              ).text('Checking or transferring private data'),
             ),
           if (preview != null) ...<Widget>[
             const SizedBox(height: 16),
             Text(
               preview.isLegacy
-                  ? 'Website backup preview'
-                  : 'Complete private backup preview',
+                  ? UiStrings.of(context).text('Website backup preview')
+                  : UiStrings.of(
+                      context,
+                    ).text('Complete private backup preview'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(
-              '${preview.reader.groups.length} groups, '
-              '${preview.reader.markings.length} markings, '
-              '${preview.reader.notes.length} verse notes, '
-              '${preview.notebooks.length} notebooks, '
-              '${preview.drafts.length} drafts, '
-              '${preview.settings.length} private settings.',
+              UiStrings.of(context).text(
+                '{groups} groups, {markings} markings, {notes} verse notes, {notebooks} notebooks, {drafts} drafts, {settings} private settings.',
+                {
+                  'groups': preview.reader.groups.length,
+                  'markings': preview.reader.markings.length,
+                  'notes': preview.reader.notes.length,
+                  'notebooks': preview.notebooks.length,
+                  'drafts': preview.drafts.length,
+                  'settings': preview.settings.length,
+                },
+              ),
             ),
             if (preview.isLegacy)
-              const Text('This format does not contain notebooks or drafts.'),
+              Text(
+                UiStrings.of(
+                  context,
+                ).text('This format does not contain notebooks or drafts.'),
+              ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -187,11 +217,11 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
               children: <Widget>[
                 FilledButton(
                   onPressed: _busy ? null : widget.controller.confirmImport,
-                  child: const Text('Confirm import'),
+                  child: Text(UiStrings.of(context).text('Confirm import')),
                 ),
                 TextButton(
                   onPressed: _busy ? null : widget.controller.clearImport,
-                  child: const Text('Cancel import'),
+                  child: Text(UiStrings.of(context).text('Cancel import')),
                 ),
               ],
             ),
@@ -202,20 +232,40 @@ class _PortabilityPanelState extends State<PortabilityPanel> {
               child: Semantics(
                 liveRegion: true,
                 child: Text(
-                  'Import complete: ${imported.groupsAdded} groups added, '
-                  '${imported.markingsAdded} markings added, '
-                  '${imported.notesChanged} verse notes updated, '
-                  '${imported.notebooksAdded} notebooks added, '
-                  '${imported.draftsAdded} drafts added, '
-                  '${imported.notebookConflicts} notebook conflicts preserved, '
-                  '${imported.settingsRestored} preferences restored.',
+                  UiStrings.of(context).text(
+                    'Import complete: {groupsAdded} groups added, {markingsAdded} markings added, {notesChanged} verse notes updated, {notebooksAdded} notebooks added, {draftsAdded} drafts added, {notebookConflicts} notebook conflicts preserved, {settingsRestored} preferences restored.',
+                    {
+                      'groupsAdded': imported.groupsAdded,
+                      'markingsAdded': imported.markingsAdded,
+                      'notesChanged': imported.notesChanged,
+                      'notebooksAdded': imported.notebooksAdded,
+                      'draftsAdded': imported.draftsAdded,
+                      'notebookConflicts': imported.notebookConflicts,
+                      'settingsRestored': imported.settingsRestored,
+                    },
+                  ),
                 ),
               ),
             ),
           if (widget.controller.error ?? _status case final String message)
             Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Semantics(liveRegion: true, child: Text(message)),
+              child: Semantics(
+                liveRegion: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.controller.error != null &&
+                        !UiStrings.of(context).containsTemplate(message))
+                      Text(
+                        UiStrings.of(context).text(
+                          'The operation could not be completed. Please try another option.',
+                        ),
+                      ),
+                    Text(UiStrings.of(context).text(message)),
+                  ],
+                ),
+              ),
             ),
         ],
       );

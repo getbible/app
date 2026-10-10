@@ -25,28 +25,58 @@ void main() {
       await tester.enterText(find.byType(TextField), 'intentionally');
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      await tester.scrollUntilVisible(
+        find.text(_longName),
+        80,
+        scrollable: find.descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        ),
+      );
       expect(find.text(_longName), findsOneWidget);
       await tester.ensureVisible(find.text(_longName));
+      await tester.pumpAndSettle();
+      expect(find.text(_longName).hitTestable(), findsOneWidget);
       await tester.tap(find.text(_longName));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(state.preferences.activeMarkingGroupId, _groupId);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -620));
+      await tester.scrollUntilVisible(
+        find.text('Open'),
+        80,
+        scrollable: find.descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
+      expect(find.text('Open').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
       expect(opened.single, _passage.copyWith(verse: 3));
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -48));
+      await tester.ensureVisible(find.text('Remove personal bookmark'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Delete marking'));
+      expect(
+        find.text('Remove personal bookmark').hitTestable(),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Remove personal bookmark'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(state.savedMarkings, hasLength(1));
-      await tester.tap(find.text('Delete marking'));
+      await tester.tap(find.text('Remove personal bookmark'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
       await tester.pumpAndSettle();
       expect(state.savedMarkings, isEmpty);
       expect(
@@ -64,6 +94,9 @@ void main() {
       final AppState state = await _state(tester);
       addTearDown(state.close);
       await _pump(tester, state, (_) {});
+      await tester.ensureVisible(find.text('Manage groups'));
+      await tester.pumpAndSettle();
+      expect(find.text('Manage groups').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Manage groups'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -115,6 +148,57 @@ void main() {
   );
 
   testWidgets(
+    'global-only rows use discovered extended book names without rewriting saved text',
+    (tester) async {
+      final state = await _state(tester);
+      addTearDown(state.close);
+      const storedReference = 'Book 1000000042 7:1';
+      await tester.runAsync(() async {
+        await state.database.saveMarking(
+          Marking(
+            id: 'global-reference',
+            passage: const Passage(
+              translation: 'tst',
+              book: ReaderApiFixture.extendedBook,
+              chapter: 7,
+            ),
+            verse: 1,
+            start: null,
+            end: null,
+            quote: 'Preserved imported quotation',
+            reference: storedReference,
+            groupId: _groupId,
+            createdAt: DateTime.utc(2026),
+            source: const SharedBookmarkSource(topicId: 'faith'),
+          ),
+        );
+        await state.refreshAnnotations();
+      });
+      await _pump(tester, state, (_) {}, initialGroupId: _groupId);
+      await tester.scrollUntilVisible(
+        find.text('Extended Book 7:1'),
+        100,
+        scrollable: find.descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Extended Book 7:1'), findsOneWidget);
+      final saved = state.savedMarkings.singleWhere(
+        (mark) => mark.id == 'global-reference',
+      );
+      expect(saved.reference, storedReference);
+      expect(saved.quote, 'Preserved imported quotation');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'verse-note navigation remains canonical and readable on a short scaled surface',
     (WidgetTester tester) async {
       _setViewport(tester);
@@ -148,6 +232,7 @@ Future<void> _pump(
   AppState state,
   ValueChanged<Passage> onOpen, {
   bool showNotes = false,
+  String? initialGroupId,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -163,6 +248,7 @@ Future<void> _pump(
           state: state,
           onOpenPassage: onOpen,
           showNotes: showNotes,
+          initialGroupId: initialGroupId,
         ),
       ),
     ),

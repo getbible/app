@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../application/dictionary_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/dictionary.dart';
 import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
@@ -32,6 +33,7 @@ final class DictionaryPanel extends StatefulWidget {
 final class _DictionaryPanelState extends State<DictionaryPanel> {
   final TextEditingController _query = TextEditingController();
   int _visibleMatches = 20;
+  int _openingGeneration = 0;
 
   @override
   void initState() {
@@ -54,11 +56,17 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
   void _openContext() {
     _query.text = widget.context.selectedText ?? '';
     _visibleMatches = 20;
-    unawaited(widget.controller.open(widget.context));
+    final generation = ++_openingGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && generation == _openingGeneration) {
+        unawaited(widget.controller.open(widget.context));
+      }
+    });
   }
 
   @override
   void dispose() {
+    _openingGeneration++;
     _query.dispose();
     widget.controller.close();
     super.dispose();
@@ -84,26 +92,79 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            if (lookup.strongs.isNotEmpty) _detail('Strong’s', lookup.strongs),
-            if (lookup.lemmas.isNotEmpty) _detail('Lemma', lookup.lemmas),
+            if (lookup.strongs.isNotEmpty)
+              _detail(UiStrings.of(context).text('Strong’s'), lookup.strongs),
+            if (lookup.lemmas.isNotEmpty)
+              _detail(UiStrings.of(context).text('Lemma'), lookup.lemmas),
             if (lookup.morphology.isNotEmpty)
-              _detail('Morphology', lookup.morphology),
+              _detail(
+                UiStrings.of(context).text('Morphology'),
+                lookup.morphology,
+              ),
             if (lookup.transliterations.isNotEmpty)
-              _detail('Transliteration', lookup.transliterations),
+              _detail(
+                UiStrings.of(context).text('Transliteration'),
+                lookup.transliterations,
+              ),
             const SizedBox(height: 12),
           ],
-          if (state.modules.isNotEmpty)
+          TextField(
+            key: const ValueKey('dictionary-lookup-query'),
+            controller: _query,
+            enabled: state.modules.isNotEmpty,
+            textInputAction: TextInputAction.search,
+            maxLength: 500,
+            decoration: InputDecoration(
+              labelText: UiStrings.of(context).text('Find a dictionary word'),
+              helperText: UiStrings.of(context).text(
+                'Searches published words and aliases, not definition text.',
+              ),
+              helperMaxLines: 3,
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                tooltip: UiStrings.of(context).text('Search dictionaries'),
+                onPressed: () => unawaited(state.searchWords(_query.text)),
+                icon: const Icon(Icons.search),
+              ),
+            ),
+            onSubmitted: (query) => unawaited(state.searchWords(query)),
+            onChanged: state.isBrowsing
+                ? (query) {
+                    setState(() => _visibleMatches = 20);
+                    unawaited(state.searchIndex(query));
+                  }
+                : null,
+          ),
+          const SizedBox(height: 12),
+          if (!state.isBrowsing)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () {
+                  _query.clear();
+                  unawaited(state.searchWords(''));
+                },
+                child: Text(
+                  UiStrings.of(context).text('Browse all dictionaries'),
+                ),
+              ),
+            ),
+          if (state.choices.isNotEmpty)
             DropdownButtonFormField<String>(
               key: ValueKey<String?>(state.selectedModule?.id),
               initialValue: state.selectedModule?.id,
               isExpanded: true,
               itemHeight: null,
-              decoration: const InputDecoration(
-                labelText: 'Dictionary',
+              decoration: InputDecoration(
+                labelText: state.isBrowsing
+                    ? UiStrings.of(context).text('Dictionary')
+                    : UiStrings.of(
+                        context,
+                      ).text('Dictionaries with definitions'),
                 border: OutlineInputBorder(),
               ),
-              hint: const Text('Choose a resource'),
-              items: state.modules
+              hint: Text(UiStrings.of(context).text('Choose a resource')),
+              items: state.choices
                   .map(
                     (DictionaryModule module) => DropdownMenuItem<String>(
                       value: module.id,
@@ -124,34 +185,112 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
           if (state.needsResourceChoice)
             Text(
               state.modules.isEmpty
-                  ? 'No dictionary resources are currently published.'
-                  : 'No compatible default is available for ${widget.context.language}. Choose a resource; its source language will be shown.',
+                  ? UiStrings.of(
+                      context,
+                    ).text('No dictionary resources are currently published.')
+                  : state.choices.isEmpty && !state.isBrowsing
+                  ? ''
+                  : UiStrings.of(context).text(
+                      'Choose a dictionary with a confirmed definition. Its source language is shown.',
+                      const {},
+                    ),
             ),
           if (state.metadata != null) ...<Widget>[
-            Text('Source language: ${state.metadata!.language}'),
+            Text(
+              UiStrings.of(context).text('Source language: {language}', {
+                'language': state.metadata!.language,
+              }),
+            ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _query,
-              decoration: const InputDecoration(
-                labelText: 'Find a dictionary word',
-                helperText:
-                    'Searches published words and aliases, not definition text.',
-                helperMaxLines: 3,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.search),
+          ],
+          if (state.usingInstalledChoices) ...[
+            Text(
+              UiStrings.of(context).text('Searching installed dictionaries.'),
+            ),
+            if (state.onlineChoicesAvailable)
+              TextButton.icon(
+                onPressed: () => unawaited(state.includeOnlineDictionaries()),
+                icon: const Icon(Icons.public),
+                label: Text(
+                  UiStrings.of(context).text('Include online dictionaries'),
+                ),
               ),
-              onChanged: (String query) {
-                setState(() => _visibleMatches = 20);
-                unawaited(state.searchIndex(query));
-              },
+          ],
+          if (state.isDiscovering)
+            Semantics(
+              liveRegion: true,
+              label: UiStrings.of(
+                context,
+              ).text('Checking dictionary definitions'),
+              child: const LinearProgressIndicator(),
+            ),
+          if (state.discoveryResult?.unavailable.isNotEmpty ?? false) ...[
+            const SizedBox(height: 12),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                UiStrings.of(context).text(
+                  '{count} dictionaries could not be checked. Showing confirmed definitions.',
+                  {'count': state.discoveryResult!.unavailable.length},
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: state.isDiscovering
+                  ? null
+                  : () => unawaited(state.retryDiscovery()),
+              icon: const Icon(Icons.refresh),
+              label: Text(
+                UiStrings.of(context).text('Check dictionaries again'),
+              ),
+            ),
+          ],
+          if (state.discoveryResult?.limitReached ?? false)
+            Text(
+              UiStrings.of(context).text(
+                'The lookup limit was reached. Browse an individual dictionary to continue.',
+              ),
+            ),
+          if (!state.isBrowsing &&
+              state.discoveryResult?.complete == true &&
+              state.choices.isEmpty)
+            Text(
+              state.usingInstalledChoices
+                  ? UiStrings.of(context).text(
+                      'No exact definition could be confirmed in the installed dictionaries.',
+                    )
+                  : UiStrings.of(context).text(
+                      'No exact definition could be confirmed for this selection.',
+                    ),
+            ),
+          if (state.discoveryResult?.suggestions.isNotEmpty ?? false) ...[
+            const SizedBox(height: 12),
+            Text(UiStrings.of(context).text('Related entries')),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final suggestion in state.discoveryResult!.suggestions)
+                  OutlinedButton(
+                    onPressed: () {
+                      _query.text = suggestion.entry.key;
+                      unawaited(state.openSuggestion(suggestion));
+                    },
+                    child: Text(
+                      '${suggestion.entry.key} · ${suggestion.module.name}',
+                    ),
+                  ),
+              ],
             ),
           ],
           if (state.isLoading)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(16),
               child: Center(
                 child: CircularProgressIndicator(
-                  semanticsLabel: 'Loading dictionary',
+                  semanticsLabel: UiStrings.of(
+                    context,
+                  ).text('Loading dictionary'),
                 ),
               ),
             ),
@@ -166,13 +305,15 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
               child: TextButton.icon(
                 onPressed: () => unawaited(state.retry()),
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry dictionary'),
+                label: Text(UiStrings.of(context).text('Retry dictionary')),
               ),
             ),
           ],
           if (state.preferenceError != null)
-            const Text(
-              'The resource choice could not be saved on this device. The dictionary remains available.',
+            Text(
+              UiStrings.of(context).text(
+                'The resource choice could not be saved on this device. The dictionary remains available.',
+              ),
             ),
           if (state.metadata != null &&
               !state.isLoading &&
@@ -182,14 +323,24 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 state.query.isEmpty
-                    ? 'Enter a word to search this dictionary’s index.'
-                    : 'No published word or lexical identifier matches this lookup. Try another dictionary or enter a word.',
+                    ? UiStrings.of(
+                        context,
+                      ).text('Enter a word to search this dictionary’s index.')
+                    : UiStrings.of(context).text(
+                        'No published word or lexical identifier matches this lookup. Try another dictionary or enter a word.',
+                      ),
               ),
             ),
           if (state.matches.isNotEmpty) ...<Widget>[
             const SizedBox(height: 12),
             Text(
-              '${state.matches.length} indexed definition${state.matches.length == 1 ? '' : 's'}',
+              state.matches.length == 1
+                  ? UiStrings.of(context).text('{count} indexed definition', {
+                      'count': state.matches.length,
+                    })
+                  : UiStrings.of(context).text('{count} indexed definitions', {
+                      'count': state.matches.length,
+                    }),
             ),
             ...state.matches
                 .take(_visibleMatches)
@@ -199,7 +350,12 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
                     selected: entry?.id == match.id,
                     title: Text(match.key),
                     subtitle: Text(
-                      '${match.id}${match.occurrence > 1 ? ' · definition ${match.occurrence}' : ''}',
+                      match.occurrence > 1
+                          ? UiStrings.of(context).text(
+                              '{id} · definition {count}',
+                              {'id': match.id, 'count': match.occurrence},
+                            )
+                          : match.id,
                     ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => unawaited(state.openEntry(match.id)),
@@ -208,7 +364,9 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
             if (state.matches.length > _visibleMatches)
               TextButton(
                 onPressed: () => setState(() => _visibleMatches += 20),
-                child: const Text('Show more dictionary words'),
+                child: Text(
+                  UiStrings.of(context).text('Show more dictionary words'),
+                ),
               ),
           ],
           if (entry != null) ...<Widget>[
@@ -219,7 +377,9 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
                 child: TextButton.icon(
                   onPressed: state.goBack,
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('Previous dictionary word'),
+                  label: Text(
+                    UiStrings.of(context).text('Previous dictionary word'),
+                  ),
                 ),
               ),
             SelectableText(
@@ -227,25 +387,52 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             Text(
-              '${entry.id} · ${entry.language} · definition ${entry.occurrence}',
+              UiStrings.of(context).text(
+                '{id} · {language} · definition {count}',
+                {
+                  'id': entry.id,
+                  'language': entry.language,
+                  'count': entry.occurrence,
+                },
+              ),
             ),
             const SizedBox(height: 12),
             // SelectableText preserves paragraph breaks and renders source HTML
             // characters literally; definitions never enter an HTML renderer.
-            SelectableText(entry.text),
+            SelectableText(
+              entry.text,
+              key: ValueKey(
+                'dictionary-definition-${entry.dictionary}/${entry.id}',
+              ),
+              textDirection:
+                  {
+                    'ar',
+                    'he',
+                    'fa',
+                    'ur',
+                  }.contains(entry.language.toLowerCase().split('-').first)
+                  ? TextDirection.rtl
+                  : TextDirection.ltr,
+            ),
             if (entry.references.isNotEmpty) ...<Widget>[
               const SizedBox(height: 12),
-              const Text('Scripture citations'),
+              Text(UiStrings.of(context).text('Scripture citations')),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: entry.references
                     .map(
                       (StudyCitation citation) => ActionChip(
+                        materialTapTargetSize: MaterialTapTargetSize.padded,
                         label: Text(citation.reference),
                         tooltip: citation.isScripture
-                            ? citation.osis
-                            : 'Introduction citation unavailable',
+                            ? UiStrings.of(context).text(
+                                'Preview {reference}',
+                                {'reference': citation.reference},
+                              )
+                            : UiStrings.of(
+                                context,
+                              ).text('Introduction citation unavailable'),
                         onPressed: citation.isScripture
                             ? () => unawaited(
                                 widget.onPreviewReference(
@@ -258,15 +445,19 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
                     .toList(growable: false),
               ),
             ],
-            if (entry.seeAlso.isNotEmpty) _links('See also', entry.seeAlso),
+            if (entry.seeAlso.isNotEmpty)
+              _links(UiStrings.of(context).text('See also'), entry.seeAlso),
             if (entry.backlinks.isNotEmpty)
-              _links('Linked from', entry.backlinks),
+              _links(
+                UiStrings.of(context).text('Linked from'),
+                entry.backlinks,
+              ),
           ],
           if (state.metadata != null) ...<Widget>[
             const Divider(height: 24),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
-              title: const Text('Dictionary attribution'),
+              title: Text(UiStrings.of(context).text('Dictionary attribution')),
               children: <Widget>[
                 SelectableText(
                   '${state.metadata!.name}\n${state.metadata!.source}\n${state.metadata!.license}\n${state.metadata!.copyright}\n${state.metadata!.copyrightHolder}\n${state.metadata!.sourceModuleUrl}',
@@ -280,7 +471,12 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
                 if (state.metadata!.about.isNotEmpty)
                   SelectableText(state.metadata!.about),
                 Text(
-                  'Citation provenance: ${state.metadata!.referenceApi} · ${state.metadata!.referenceVersification}',
+                  UiStrings.of(
+                    context,
+                  ).text('Citation provenance: {api} · {versification}', {
+                    'api': state.metadata!.referenceApi,
+                    'versification': state.metadata!.referenceVersification,
+                  }),
                 ),
               ],
             ),
@@ -307,6 +503,7 @@ final class _DictionaryPanelState extends State<DictionaryPanel> {
           children: links
               .map(
                 (DictionaryLink link) => ActionChip(
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
                   label: Text(link.key),
                   onPressed: () =>
                       unawaited(widget.controller.openEntry(link.id)),

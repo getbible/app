@@ -18,3 +18,9 @@ abstract interface class DictionaryRepository {
     RequestCancellation? cancellation,
   });
 }
+
+/// Repositories that pin installed generations reset those pins for a new
+/// cross-resource lookup. Individual entry navigation keeps the chosen snapshot.
+abstract interface class DictionaryLookupSession {
+  void beginLookup();
+}

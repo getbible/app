@@ -18,7 +18,9 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A local-first, cross-platform Flutter Bible reader powered by GetBible API v2.">
+  <meta name="description" content="A local-first, cross-platform Flutter Bible reader powered by GetBible API v3.">
+  <!-- Enabled only by scripts/build_web_shell.py after a complete Web build. -->
+  <meta name="getbible-offline-shell" content="disabled">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -42,5 +44,6 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script src="offline_shell.js" defer></script>
 </body>
 </html>

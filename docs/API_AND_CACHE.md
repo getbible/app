@@ -1,5 +1,39 @@
 # GetBible API and cache workflow
 
+## Offline Web application shell
+
+The compiled Web release has a separate, build-generated service worker for its
+static application files. `scripts/build_web_shell.py` records every compiled
+asset's path, size and SHA-256, derives a content revision and a worker-template
+revision, and enables the release loader. Development builds leave registration
+disabled. Packaging verifies that the shell inventory still matches the files.
+
+Installation downloads at most four assets concurrently, bounds each response
+to its recorded size, checks its digest and uses a 30-second request timeout.
+Build-time limits are 4,096 files, 64 MiB per file and 256 MiB for the complete
+shell. Only a fully populated cache receives its completion marker. Corrupt
+bytes, interrupted requests and quota failures discard the staged generation
+while retaining the previous active cache. Activation removes only older
+GetBible shell caches belonging to the same deployment base path.
+
+Known static assets and friendly passage navigation can then reopen without a
+network connection. A missing cached asset is repaired only with bytes matching
+that active revision; a newer hosted bundle cannot be mixed into an older app.
+The worker never caches API responses, backup/import data or database writes.
+Complete Bible and Study content continues to require deliberate installation
+through the application, independently of these automatically cached app files.
+
+Updates do not force activation or reload open tabs. A new verified generation
+waits until the previous application's tabs close, preserving open private
+editors and consistent assets. Initial activation also leaves already-open pages
+uncontrolled: their HTML may predate a deployment that happened during shell
+installation. The next navigation adopts the complete active generation and
+can work offline. Browser storage eviction, first visits
+without connectivity and blocked service-worker/storage permissions remain real
+limits; online reading continues if shell preparation is unavailable.
+
+## Public Bible API
+
 The Bible root is `https://api.getbible.net/v3`. `ApiConfiguration` permits independent service roots, and `ApiTransport` supplies bounded responses, HTTP cache policy, conditional requests, typed failures and cancellation. The Bible client uses the same transport boundary for the separately hosted daily Scripture resource.
 
 | Resource | Endpoint | Cache behavior |

@@ -241,6 +241,13 @@ extension PrivateDataStore on LocalDatabase {
                     preference.activeMarkingGroupId,
               )
               .toJson();
+        } else if (source.key == 'bookmarks:v1:recent') {
+          value = (value! as List)
+              .cast<String>()
+              .map((id) => readerMerge.importedGroupIds[id] ?? id)
+              .toSet()
+              .take(6)
+              .toList();
         } else if (source.key == 'notebooks:v1:selected') {
           value = notebookIds[value] ?? value;
         } else if (source.isTopicCopy) {
@@ -520,7 +527,7 @@ Future<PrivateBackup> _readPrivateSnapshot(QueryExecutor transaction) async {
 }
 
 const String _portableSettingPredicate =
-    "setting_key IN ('readerPreferences', 'lastReadingPosition', 'notebooks:v1:selected') "
+    "setting_key IN ('readerPreferences', 'lastReadingPosition', 'notebooks:v1:selected', 'bookmarks:v1:recent') "
     "OR substr(setting_key, 1, 20) = 'study:v1:dictionary:' "
     "OR substr(setting_key, 1, 20) = 'study:v1:commentary:' "
     "OR substr(setting_key, 1, 24) = 'study:v1:topic-followed:' "

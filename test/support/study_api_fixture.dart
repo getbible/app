@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'fixture_documents.dart';
 import 'reader_api_fixture.dart';
 
 /// Uses the same contract-validated resources as the focused feature tests.
@@ -26,14 +27,11 @@ final class StudyApiFixture {
     final String resource = url.path.replaceFirst('/v1/', '');
     Object? body;
     if (url.host == 'dictionaries.getbible.net') {
-      final File file = File('test/fixtures/dictionaries_v1/$resource');
-      if (file.existsSync()) body = jsonDecode(file.readAsStringSync());
+      final path = 'dictionaries_v1/$resource';
+      if (fixtureExists(path)) body = jsonDecode(fixtureText(path));
     } else if (url.host == 'commentaries.getbible.net') {
       final Map<String, Object?> fixture =
-          jsonDecode(
-                File('test/fixtures/commentary_v1.json').readAsStringSync(),
-              )
-              as Map<String, Object?>;
+          jsonDecode(fixtureText('commentary_v1.json')) as Map<String, Object?>;
       body =
           fixture[<String, String>{
             'commentaries.json': 'catalogue',
@@ -52,9 +50,7 @@ final class StudyApiFixture {
         'locales/af.json': 'names_af',
       }[resource];
       if (file != null) {
-        body = jsonDecode(
-          File('test/fixtures/public_topic_$file.json').readAsStringSync(),
-        );
+        body = jsonDecode(fixtureText('public_topic_$file.json'));
       }
       if (resource == 'locales/en.json') {
         body = <String, Object?>{
@@ -69,9 +65,7 @@ final class StudyApiFixture {
       }
     } else if (url.host == 'search.getbible.net') {
       final Map<String, Object?> envelopes =
-          jsonDecode(
-                File('test/fixtures/service_envelopes.json').readAsStringSync(),
-              )
+          jsonDecode(fixtureText('service_envelopes.json'))
               as Map<String, Object?>;
       body = envelopes['search'];
     }

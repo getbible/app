@@ -556,6 +556,44 @@ class WebPackager(Packager):
     signing = "not applicable"
     installability = "serve extracted files over HTTPS (HTTP for localhost testing)"
 
+    @staticmethod
+    def verify_offline_shell(bundle: Path) -> None:
+        """Reject a stale/incomplete shell before adding packaging metadata.
+
+        The app-shell inventory covers all compiled files except its own
+        manifest and generated worker. LICENSE/release-metadata are added only
+        after verification; they are not application startup dependencies.
+        """
+        require(bundle / "offline_shell.js")
+        require(bundle / "offline_service_worker.js")
+        document = json.loads(require(bundle / "offline-shell-manifest.json").read_text(encoding="utf-8"))
+        if (not isinstance(document, dict) or document.get("schema_version") != 1
+                or not isinstance(document.get("files"), list)
+                or not isinstance(document.get("worker_revision"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", document["worker_revision"])):
+            raise PackagingError("Invalid offline app-shell manifest")
+        entries = document["files"]
+        revision = hashlib.sha256(json.dumps(entries, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+        if document.get("revision") != revision:
+            raise PackagingError("Offline app-shell inventory revision differs from its contents")
+        names = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise PackagingError("Invalid offline app-shell file record")
+            name = entry.get("path")
+            if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._~+/-]+", name)
+                    or name.startswith("/") or any(part in ("", ".", "..") for part in name.split("/"))):
+                raise PackagingError("Unsafe offline app-shell file path")
+            path = bundle / name
+            if (path.is_symlink() or not path.is_file() or type(entry.get("bytes")) is not int
+                    or path.stat().st_size != entry["bytes"] or sha256(path) != entry.get("sha256")):
+                raise PackagingError(f"Offline app-shell asset is missing or changed: {name}")
+            names.append(name)
+        expected = sorted(path.relative_to(bundle).as_posix() for path in bundle.rglob("*")
+                          if path.is_file() and path.relative_to(bundle).as_posix() not in {"offline-shell-manifest.json", "offline_service_worker.js"})
+        if names != expected:
+            raise PackagingError("Offline app-shell inventory does not cover the complete compiled application")
+
     def build(self) -> None:
         self.arch = "browser"
         base_href = self.context.base_href
@@ -571,6 +609,7 @@ class WebPackager(Packager):
         require(bundle / "sqlite3.wasm")
         require(bundle / "drift_worker.dart.js")
         require(bundle / "offline_bible_worker.dart.js")
+        self.verify_offline_shell(bundle)
         write_json(bundle / "release-metadata.json", {**asdict(self.context.metadata), "base_href": base_href})
         shutil.copy2(require(self.context.repo / "LICENSE"), bundle / "LICENSE")
         archive_zip(bundle, self.output(".zip", "static web application"), self.context.metadata.source_date_epoch, parent=False)

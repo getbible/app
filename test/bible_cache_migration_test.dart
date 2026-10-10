@@ -9,6 +9,24 @@ import 'package:getbible_live/data/database/local_database.dart';
 import 'package:getbible_live/domain/models/cache.dart';
 
 void main() {
+  for (final cleanupFails in [false, true]) {
+    test(
+      'failed database open releases executor (cleanup fails: $cleanupFails)',
+      () async {
+        final failure = StateError('storage cannot open');
+        final executor = _FailedOpenExecutor(
+          failure,
+          cleanupFails: cleanupFails,
+        );
+        await expectLater(
+          LocalDatabase.fromExecutor(executor),
+          throwsA(same(failure)),
+        );
+        expect(executor.closeCount, 1);
+      },
+    );
+  }
+
   test(
     'literal cache prefixes preserve neighbouring numeric IDs and wildcard names',
     () async {
@@ -101,7 +119,8 @@ void main() {
         LocalDatabase.fromExecutor(failed),
         throwsA(isA<Exception>()),
       );
-      await failed.close();
+      // Failed initialization must release the file itself before Retry can
+      // open the same database; callers never receive the failed executor.
       final inspect = NativeDatabase(file);
       await inspect.ensureOpen(_SchemaOneUser());
       addTearDown(inspect.close);
@@ -225,6 +244,25 @@ void main() {
       expect(await database.readSetting('preferences'), '{"textSize":24}');
     },
   );
+}
+
+final class _FailedOpenExecutor implements QueryExecutor {
+  _FailedOpenExecutor(this.failure, {required this.cleanupFails});
+  final Object failure;
+  final bool cleanupFails;
+  int closeCount = 0;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) async => throw failure;
+
+  @override
+  Future<void> close() async {
+    closeCount++;
+    if (cleanupFails) throw StateError('worker cleanup failed');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 final class _SchemaOneUser extends QueryExecutorUser {

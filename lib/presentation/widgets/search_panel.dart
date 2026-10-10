@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../application/online_search_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/bible.dart';
 import '../../domain/models/online_search.dart';
 import '../../domain/models/search.dart';
@@ -57,6 +58,8 @@ class _SearchPanelState extends State<SearchPanel> {
   String? _openError;
   bool _opening = false;
   Timer? _retryTimer;
+  Timer? _searchTimer;
+  int _inputGeneration = 0;
 
   @override
   void initState() {
@@ -100,18 +103,23 @@ class _SearchPanelState extends State<SearchPanel> {
         oldWidget.initialQuery != widget.initialQuery ||
         oldWidget.initialPhrase != widget.initialPhrase) {
       _retryTimer?.cancel();
+      _searchTimer?.cancel();
+      _inputGeneration++;
       widget.controller.clear(notify: false);
       _hasSearched = false;
+      _opening = false;
+      _openError = null;
       _applyInitialQuery();
     }
   }
 
   void _applyInitialQuery() {
+    final generation = ++_inputGeneration;
     _query.text = widget.initialQuery;
     if (widget.initialPhrase) _words = SearchWordMode.phrase;
     if (widget.initialQuery.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _search();
+        if (mounted && generation == _inputGeneration) _search();
       });
     }
   }
@@ -132,14 +140,31 @@ class _SearchPanelState extends State<SearchPanel> {
   }
 
   void _inputChanged() {
+    _searchTimer?.cancel();
+    _inputGeneration++;
     widget.controller.clear();
     setState(() {
       _hasSearched = false;
       _validationError = null;
+      _openError = null;
+      _opening = false;
     });
+    if (_query.text.trim().isNotEmpty) {
+      final generation = _inputGeneration;
+      _searchTimer = Timer(const Duration(milliseconds: 250), () {
+        if (mounted && generation == _inputGeneration) _search();
+      });
+    }
   }
 
   void _search() {
+    _searchTimer?.cancel();
+    _inputGeneration++;
+    if (_query.text.trim().isEmpty) {
+      widget.controller.clear();
+      setState(() => _hasSearched = false);
+      return;
+    }
     OnlineSearchCriteria criteria;
     try {
       criteria = OnlineSearchCriteria(
@@ -166,11 +191,15 @@ class _SearchPanelState extends State<SearchPanel> {
         );
       }
     } on FormatException catch (error) {
-      setState(() => _validationError = error.message);
+      setState(
+        () => _validationError = UiStrings.of(context).text(error.message),
+      );
       return;
     }
     setState(() {
       _hasSearched = true;
+      _opening = false;
+      _openError = null;
       _validationError = null;
     });
     unawaited(
@@ -186,6 +215,7 @@ class _SearchPanelState extends State<SearchPanel> {
 
   Future<void> _open(OnlineSearchHit hit) async {
     if (_opening) return;
+    final generation = _inputGeneration;
     setState(() {
       _opening = true;
       _openError = null;
@@ -193,14 +223,20 @@ class _SearchPanelState extends State<SearchPanel> {
     try {
       await widget.onOpen(hit);
     } catch (error) {
-      if (mounted) setState(() => _openError = error.toString());
+      if (mounted && generation == _inputGeneration) {
+        setState(() => _openError = error.toString());
+      }
     } finally {
-      if (mounted) setState(() => _opening = false);
+      if (mounted && generation == _inputGeneration) {
+        setState(() => _opening = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    _searchTimer?.cancel();
+    _inputGeneration++;
     _retryTimer?.cancel();
     widget.controller.removeListener(_scheduleRetryAvailability);
     widget.controller.cancel(notify: false);
@@ -226,12 +262,14 @@ class _SearchPanelState extends State<SearchPanel> {
             sliver: SliverToBoxAdapter(child: _controls(context)),
           ),
           if (controller.isLoading)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Center(
                   child: CircularProgressIndicator(
-                    semanticsLabel: 'Searching Scripture',
+                    semanticsLabel: UiStrings.of(
+                      context,
+                    ).text('Searching Scripture'),
                   ),
                 ),
               ),
@@ -244,8 +282,14 @@ class _SearchPanelState extends State<SearchPanel> {
                   liveRegion: true,
                   child: Text(
                     controller.kind == SearchResultKind.reference
-                        ? '${hits.length} verses in the resolved reference. Full-text filters do not apply.'
-                        : '${hits.length} of ${controller.total} results loaded.',
+                        ? UiStrings.of(context).text(
+                            '{count} verses in the resolved reference. Full-text filters do not apply.',
+                            {'count': hits.length},
+                          )
+                        : UiStrings.of(context).text(
+                            '{loaded} of {total} results loaded.',
+                            {'loaded': hits.length, 'total': controller.total},
+                          ),
                   ),
                 ),
               ),
@@ -256,8 +300,12 @@ class _SearchPanelState extends State<SearchPanel> {
                 padding: const EdgeInsets.all(24),
                 child: Text(
                   _mode == SearchExecutionMode.online
-                      ? 'Enter words or a Scripture reference. Search uses the selected Bible online.'
-                      : 'Search only the selected installed Bible. No query is sent online.',
+                      ? UiStrings.of(context).text(
+                          'Enter words or a Scripture reference. Search uses the selected Bible online.',
+                        )
+                      : UiStrings.of(context).text(
+                          'Search only the selected installed Bible. No query is sent online.',
+                        ),
                 ),
               ),
             ),
@@ -266,11 +314,13 @@ class _SearchPanelState extends State<SearchPanel> {
               controller.error == null &&
               controller.kind != null &&
               hits.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  '0 results. Try different words or broader filters.',
+                  UiStrings.of(
+                    context,
+                  ).text('0 results. Try different words or broader filters.'),
                 ),
               ),
             ),
@@ -293,7 +343,11 @@ class _SearchPanelState extends State<SearchPanel> {
                               ? null
                               : () => unawaited(_open(hit)),
                           icon: const Icon(Icons.open_in_new),
-                          label: Text('Open ${hit.reference}'),
+                          label: Text(
+                            UiStrings.of(context).text('Open {reference}', {
+                              'reference': hit.reference,
+                            }),
+                          ),
                         ),
                       ),
                       ScriptureVerseText(
@@ -332,10 +386,12 @@ class _SearchPanelState extends State<SearchPanel> {
                       child: Text(controller.error.toString()),
                     ),
                     if (controller.retryAt != null)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
-                          'The service requested a pause before retrying.',
+                          UiStrings.of(context).text(
+                            'The service requested a pause before retrying.',
+                          ),
                         ),
                       ),
                     const SizedBox(height: 8),
@@ -348,8 +404,8 @@ class _SearchPanelState extends State<SearchPanel> {
                         icon: const Icon(Icons.refresh),
                         label: Text(
                           controller.requiresRestart
-                              ? 'Restart search'
-                              : 'Retry',
+                              ? UiStrings.of(context).text('Restart search')
+                              : UiStrings.of(context).text('Retry'),
                         ),
                       ),
                     ),
@@ -365,11 +421,13 @@ class _SearchPanelState extends State<SearchPanel> {
               ),
             ),
           if (controller.offsetLimitReached)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'More matches exist beyond the page offset limit. Narrow the search using books, scope or additional words.',
+                  UiStrings.of(context).text(
+                    'More matches exist beyond the page offset limit. Narrow the search using books, scope or additional words.',
+                  ),
                 ),
               ),
             )
@@ -379,12 +437,16 @@ class _SearchPanelState extends State<SearchPanel> {
                 padding: const EdgeInsets.all(16),
                 child: Center(
                   child: controller.isLoadingMore
-                      ? const CircularProgressIndicator(
-                          semanticsLabel: 'Loading more matches',
+                      ? CircularProgressIndicator(
+                          semanticsLabel: UiStrings.of(
+                            context,
+                          ).text('Loading more matches'),
                         )
                       : OutlinedButton(
                           onPressed: () => unawaited(controller.loadMore()),
-                          child: const Text('Load more results'),
+                          child: Text(
+                            UiStrings.of(context).text('Load more results'),
+                          ),
                         ),
                 ),
               ),
@@ -400,11 +462,15 @@ class _SearchPanelState extends State<SearchPanel> {
     children: <Widget>[
       if (widget.controller.supportsInstalledSearch) ...[
         _dropdown<SearchExecutionMode>(
-          'Search source',
+          UiStrings.of(context).text('Search source'),
           _mode,
-          const {
-            SearchExecutionMode.online: 'Online search',
-            SearchExecutionMode.installed: 'Installed Bible (offline)',
+          {
+            SearchExecutionMode.online: UiStrings.of(
+              context,
+            ).text('Online search'),
+            SearchExecutionMode.installed: UiStrings.of(
+              context,
+            ).text('Installed Bible (offline)'),
           },
           (value) {
             _mode = value;
@@ -420,10 +486,12 @@ class _SearchPanelState extends State<SearchPanel> {
           },
         ),
         if (_mode == SearchExecutionMode.installed)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              'Offline search uses exact diacritics and Bible order. Folding, relevance, proximity and Deuterocanon scope require Online search. Choose individual books to include other offline scopes. Install the selected Bible in Offline resources first.',
+              UiStrings.of(context).text(
+                'Offline search uses exact diacritics and Bible order. Folding, relevance, proximity and Deuterocanon scope require Online search. Choose individual books to include other offline scopes. Install the selected Bible in Offline resources first.',
+              ),
             ),
           ),
       ],
@@ -433,11 +501,15 @@ class _SearchPanelState extends State<SearchPanel> {
         textInputAction: TextInputAction.search,
         maxLength: 500,
         decoration: InputDecoration(
-          labelText: 'Search ${widget.translation.toUpperCase()}',
-          hintText: 'Words, a phrase or a Scripture reference',
+          labelText: UiStrings.of(
+            context,
+          ).text('Search {bible}', {'bible': widget.translation.toUpperCase()}),
+          hintText: UiStrings.of(
+            context,
+          ).text('Words, a phrase or a Scripture reference'),
           errorText: _validationError,
           suffixIcon: IconButton(
-            tooltip: 'Search',
+            tooltip: UiStrings.of(context).text('Search'),
             onPressed: _search,
             icon: const Icon(Icons.search),
           ),
@@ -452,12 +524,12 @@ class _SearchPanelState extends State<SearchPanel> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: <Widget>[
           _dropdown<SearchWordMode>(
-            'Word mode',
+            UiStrings.of(context).text('Word mode'),
             _words,
-            const <SearchWordMode, String>{
-              SearchWordMode.all: 'All words',
-              SearchWordMode.any: 'Any word',
-              SearchWordMode.phrase: 'Exact phrase',
+            <SearchWordMode, String>{
+              SearchWordMode.all: UiStrings.of(context).text('All words'),
+              SearchWordMode.any: UiStrings.of(context).text('Any word'),
+              SearchWordMode.phrase: UiStrings.of(context).text('Exact phrase'),
             },
             (SearchWordMode value) {
               _words = value;
@@ -466,11 +538,13 @@ class _SearchPanelState extends State<SearchPanel> {
             },
           ),
           _dropdown<SearchMatchMode>(
-            'Match mode',
+            UiStrings.of(context).text('Match mode'),
             _match,
-            const <SearchMatchMode, String>{
-              SearchMatchMode.exact: 'Exact word',
-              SearchMatchMode.partial: 'Partial word',
+            <SearchMatchMode, String>{
+              SearchMatchMode.exact: UiStrings.of(context).text('Exact word'),
+              SearchMatchMode.partial: UiStrings.of(
+                context,
+              ).text('Partial word'),
             },
             (SearchMatchMode value) {
               _match = value;
@@ -478,13 +552,21 @@ class _SearchPanelState extends State<SearchPanel> {
             },
           ),
           _dropdown<OnlineSearchScope>(
-            'Search scope',
+            UiStrings.of(context).text('Search scope'),
             _scope,
-            const <OnlineSearchScope, String>{
-              OnlineSearchScope.bible: 'Whole Bible',
-              OnlineSearchScope.oldTestament: 'Old Testament',
-              OnlineSearchScope.newTestament: 'New Testament',
-              OnlineSearchScope.deuterocanon: 'Deuterocanon',
+            <OnlineSearchScope, String>{
+              OnlineSearchScope.bible: UiStrings.of(
+                context,
+              ).text('Whole Bible'),
+              OnlineSearchScope.oldTestament: UiStrings.of(
+                context,
+              ).text('Old Testament'),
+              OnlineSearchScope.newTestament: UiStrings.of(
+                context,
+              ).text('New Testament'),
+              OnlineSearchScope.deuterocanon: UiStrings.of(
+                context,
+              ).text('Deuterocanon'),
             },
             (OnlineSearchScope value) {
               _scope = value;
@@ -492,7 +574,7 @@ class _SearchPanelState extends State<SearchPanel> {
             },
           ),
           FilterChip(
-            label: const Text('Case sensitive'),
+            label: Text(UiStrings.of(context).text('Case sensitive')),
             selected: _caseSensitive,
             onSelected: (bool value) {
               _caseSensitive = value;
@@ -503,7 +585,7 @@ class _SearchPanelState extends State<SearchPanel> {
       ),
       const SizedBox(height: 8),
       ExpansionTile(
-        title: const Text('Advanced filters'),
+        title: Text(UiStrings.of(context).text('Advanced filters')),
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 12),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
@@ -513,11 +595,15 @@ class _SearchPanelState extends State<SearchPanel> {
             runSpacing: 8,
             children: <Widget>[
               _dropdown<SearchDiacritics>(
-                'Diacritics',
+                UiStrings.of(context).text('Diacritics'),
                 _diacritics,
-                const <SearchDiacritics, String>{
-                  SearchDiacritics.fold: 'Fold diacritics',
-                  SearchDiacritics.exact: 'Exact diacritics',
+                <SearchDiacritics, String>{
+                  SearchDiacritics.fold: UiStrings.of(
+                    context,
+                  ).text('Fold diacritics'),
+                  SearchDiacritics.exact: UiStrings.of(
+                    context,
+                  ).text('Exact diacritics'),
                 },
                 (SearchDiacritics value) {
                   _diacritics = value;
@@ -525,11 +611,15 @@ class _SearchPanelState extends State<SearchPanel> {
                 },
               ),
               _dropdown<SearchSort>(
-                'Result order',
+                UiStrings.of(context).text('Result order'),
                 _sort,
-                const <SearchSort, String>{
-                  SearchSort.canonical: 'Bible order',
-                  SearchSort.relevance: 'Relevance order',
+                <SearchSort, String>{
+                  SearchSort.canonical: UiStrings.of(
+                    context,
+                  ).text('Bible order'),
+                  SearchSort.relevance: UiStrings.of(
+                    context,
+                  ).text('Relevance order'),
                 },
                 (SearchSort value) {
                   _sort = value;
@@ -541,8 +631,10 @@ class _SearchPanelState extends State<SearchPanel> {
                 icon: const Icon(Icons.library_books),
                 label: Text(
                   _books.isEmpty
-                      ? 'All discovered books'
-                      : '${_books.length} selected books',
+                      ? UiStrings.of(context).text('All discovered books')
+                      : UiStrings.of(context).text('{count} selected books', {
+                          'count': _books.length,
+                        }),
                 ),
               ),
             ],
@@ -558,7 +650,9 @@ class _SearchPanelState extends State<SearchPanel> {
                               .where((BibleBook book) => book.number == number)
                               .firstOrNull
                               ?.name ??
-                          'Book $number',
+                          UiStrings.of(
+                            context,
+                          ).text('Book {number}', {'number': number}),
                     ),
                     onDeleted: () {
                       _books.remove(number);
@@ -571,10 +665,11 @@ class _SearchPanelState extends State<SearchPanel> {
           TextField(
             controller: _exclusions,
             maxLength: 3231,
-            decoration: const InputDecoration(
-              labelText: 'Exclude words',
-              helperText:
-                  'Comma-separated; at most 32 terms, 100 characters each.',
+            decoration: InputDecoration(
+              labelText: UiStrings.of(context).text('Exclude words'),
+              helperText: UiStrings.of(
+                context,
+              ).text('Comma-separated; at most 32 terms, 100 characters each.'),
             ),
             onChanged: (_) => _inputChanged(),
           ),
@@ -586,9 +681,11 @@ class _SearchPanelState extends State<SearchPanel> {
             inputFormatters: <TextInputFormatter>[
               FilteringTextInputFormatter.digitsOnly,
             ],
-            decoration: const InputDecoration(
-              labelText: 'Proximity (optional)',
-              helperText: '0–100 intervening units; available with All words.',
+            decoration: InputDecoration(
+              labelText: UiStrings.of(context).text('Proximity (optional)'),
+              helperText: UiStrings.of(
+                context,
+              ).text('0–100 intervening units; available with All words.'),
             ),
             onChanged: (_) => _inputChanged(),
           ),
@@ -666,14 +763,16 @@ class _SearchBooksDialogState extends State<_SearchBooksDialog> {
         .toList();
     return AlertDialog(
       scrollable: true,
-      title: const Text('Search selected books'),
+      title: Text(UiStrings.of(context).text('Search selected books')),
       content: SizedBox(
         width: 440,
         height: MediaQuery.sizeOf(context).height * 0.5,
         child: Column(
           children: <Widget>[
             TextField(
-              decoration: const InputDecoration(labelText: 'Find a book'),
+              decoration: InputDecoration(
+                labelText: UiStrings.of(context).text('Find a book'),
+              ),
               onChanged: (String value) => setState(() => _filter = value),
             ),
             Expanded(
@@ -698,22 +797,26 @@ class _SearchBooksDialogState extends State<_SearchBooksDialog> {
                 },
               ),
             ),
-            Text('${_selected.length} of 83 available selections'),
+            Text(
+              UiStrings.of(context).text('{count} of 83 available selections', {
+                'count': _selected.length,
+              }),
+            ),
           ],
         ),
       ),
       actions: <Widget>[
         TextButton(
           onPressed: () => setState(_selected.clear),
-          child: const Text('All books'),
+          child: Text(UiStrings.of(context).text('All books')),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(UiStrings.of(context).text('Cancel')),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_selected.toList()),
-          child: const Text('Apply'),
+          child: Text(UiStrings.of(context).text('Apply')),
         ),
       ],
     );

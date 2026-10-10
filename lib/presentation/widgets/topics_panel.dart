@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../application/topics_controller.dart';
+import '../../application/unified_bookmarks_controller.dart';
+import '../../core/ui_strings.dart';
 import '../../domain/models/public_topic.dart';
 import '../../domain/models/reference.dart';
 import '../../domain/models/service_envelopes.dart';
@@ -19,9 +21,13 @@ final class TopicsPanel extends StatefulWidget {
     required this.onPreviewReference,
     this.onSetUpOffline,
     this.onPrivateCopyCommitted,
+    this.bookmarks,
+    this.onOpenBookmarks,
   });
 
   final TopicsController controller;
+  final UnifiedBookmarksController? bookmarks;
+  final ValueChanged<String?>? onOpenBookmarks;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
   final VoidCallback? onSetUpOffline;
@@ -62,7 +68,10 @@ final class _TopicsPanelState extends State<TopicsPanel> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.controller,
+    animation: Listenable.merge([
+      widget.controller,
+      if (widget.bookmarks != null) widget.bookmarks!,
+    ]),
     builder: (BuildContext context, Widget? child) {
       final TopicsController controller = widget.controller;
       if (controller.loading) {
@@ -114,14 +123,16 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                   onSetUpOffline: widget.onSetUpOffline,
                 ),
                 Text(
-                  'Public topics · ${widget.context.label}',
+                  UiStrings.of(context).text('Public topics · {label}', {
+                    'label': widget.context.label,
+                  }),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _search,
-                  decoration: const InputDecoration(
-                    labelText: 'Find a topic',
+                  decoration: InputDecoration(
+                    labelText: UiStrings.of(context).text('Find a topic'),
                     prefixIcon: Icon(Icons.search),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -132,8 +143,10 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                     key: ValueKey<String>(controller.locale),
                     initialValue: controller.locale,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Topic name language',
+                    decoration: InputDecoration(
+                      labelText: UiStrings.of(
+                        context,
+                      ).text('Topic name language'),
                     ),
                     items: controller.availableLocales
                         .map(
@@ -157,25 +170,33 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                   ),
                 if (controller.loadingNames) const LinearProgressIndicator(),
                 if (controller.restoringPreferences)
-                  const Text('Restoring local topic choices…'),
+                  Text(
+                    UiStrings.of(
+                      context,
+                    ).text('Restoring local topic choices…'),
+                  ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
                   children: <Widget>[
                     FilterChip(
-                      label: Text('Related (${controller.relatedIds.length})'),
+                      label: Text(
+                        UiStrings.of(context).text('Related ({length})', {
+                          'length': controller.relatedIds.length,
+                        }),
+                      ),
                       selected: _onlyRelated,
                       onSelected: (bool value) =>
                           setState(() => _onlyRelated = value),
                     ),
                     FilterChip(
-                      label: const Text('Followed'),
+                      label: Text(UiStrings.of(context).text('Followed')),
                       selected: _onlyFollowed,
                       onSelected: (bool value) =>
                           setState(() => _onlyFollowed = value),
                     ),
                     FilterChip(
-                      label: const Text('Show hidden'),
+                      label: Text(UiStrings.of(context).text('Show hidden')),
                       selected: _showHidden,
                       onSelected: (bool value) =>
                           setState(() => _showHidden = value),
@@ -185,23 +206,36 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                 if (controller.associationError != null)
                   Text('${controller.associationError}'),
                 if (controller.localeError != null)
-                  Text('Using English names. ${controller.localeError}'),
+                  Text(
+                    UiStrings.of(context).text(
+                      'Using English names. {localeError}',
+                      {'localeError': controller.localeError.toString()},
+                    ),
+                  ),
                 if (controller.preferenceError != null)
                   Text(
-                    'Could not save or restore your topic choices. ${controller.preferenceError}',
+                    UiStrings.of(context).text(
+                      'Could not save or restore your topic choices. {preferenceError}',
+                      {
+                        'preferenceError': controller.preferenceError
+                            .toString(),
+                      },
+                    ),
                   ),
               ],
             ),
           ),
         ),
         if (topics.isEmpty)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'No topics match these choices. A verse with no public associations is valid.',
+                  UiStrings.of(context).text(
+                    'No topics match these choices. A verse with no public associations is valid.',
+                  ),
                 ),
               ),
             ),
@@ -218,7 +252,9 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                   children: <Widget>[
                     ListTile(
                       leading: Semantics(
-                        label: 'Topic color ${topic.color}',
+                        label: UiStrings.of(
+                          context,
+                        ).text('Topic color {color}', {'color': topic.color}),
                         child: CircleAvatar(
                           radius: 12,
                           backgroundColor: _color(topic.color),
@@ -226,7 +262,14 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                       ),
                       title: Text(controller.nameOf(topic)),
                       subtitle: Text(
-                        '${topic.verseCount} verse associations${controller.relatedIds.contains(topic.id) ? ' · Related here' : ''}',
+                        UiStrings.of(
+                          context,
+                        ).text('{verseCount} verse associations{here}', {
+                          'verseCount': topic.verseCount,
+                          'here': controller.relatedIds.contains(topic.id)
+                              ? ' · Related here'
+                              : '',
+                        }),
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => unawaited(controller.selectTopic(topic.id)),
@@ -256,8 +299,8 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                             ),
                             label: Text(
                               controller.followed.contains(topic.id)
-                                  ? 'Unfollow'
-                                  : 'Follow',
+                                  ? UiStrings.of(context).text('Unfollow')
+                                  : UiStrings.of(context).text('Follow'),
                             ),
                           ),
                           TextButton.icon(
@@ -280,8 +323,8 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                             ),
                             label: Text(
                               controller.hidden.contains(topic.id)
-                                  ? 'Show topic'
-                                  : 'Hide topic',
+                                  ? UiStrings.of(context).text('Show topic')
+                                  : UiStrings.of(context).text('Hide topic'),
                             ),
                           ),
                         ],
@@ -321,8 +364,35 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                 TextButton.icon(
                   onPressed: controller.closeTopic,
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('All topics'),
+                  label: Text(UiStrings.of(context).text('All topics')),
                 ),
+                if (topic != null && widget.bookmarks != null) ...[
+                  FilledButton.tonalIcon(
+                    onPressed: widget.bookmarks!.busy
+                        ? null
+                        : () => unawaited(
+                            widget.bookmarks!.download(
+                              topicId: topic.id,
+                              translation: widget.context.translation,
+                              locale: controller.locale,
+                            ),
+                          ),
+                    icon: const Icon(Icons.download),
+                    label: Text(
+                      UiStrings.of(context).text('Download global bookmarks'),
+                    ),
+                  ),
+                  if (widget.onOpenBookmarks != null)
+                    TextButton.icon(
+                      onPressed: () => widget.onOpenBookmarks!(topic.id),
+                      icon: const Icon(Icons.bookmarks_outlined),
+                      label: Text(
+                        UiStrings.of(context).text('Open saved topic'),
+                      ),
+                    ),
+                  if (widget.bookmarks!.error != null)
+                    Text(widget.bookmarks!.error.toString()),
+                ],
                 if (topic != null)
                   FilledButton.tonalIcon(
                     onPressed: controller.copying
@@ -330,7 +400,9 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                         : () => unawaited(_copyTopic()),
                     icon: const Icon(Icons.copy_all),
                     label: Text(
-                      controller.copying ? 'Copying…' : 'Copy to my markings',
+                      controller.copying
+                          ? UiStrings.of(context).text('Copying…')
+                          : UiStrings.of(context).text('Copy to my markings'),
                     ),
                   ),
               ],
@@ -362,27 +434,44 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   Text(
-                    '${topic.coordinates.length} canonical verse associations · Public GetBible Bookmarks v1',
+                    UiStrings.of(context).text(
+                      '{length} canonical verse associations · Public GetBible Bookmarks v1',
+                      {'length': topic.coordinates.length},
+                    ),
                   ),
-                  const Text(
-                    'Preview uses your selected Bible. Missing books or verses are reported by the reference preview.',
+                  Text(
+                    UiStrings.of(context).text(
+                      'Preview uses your selected Bible. Missing books or verses are reported by the reference preview.',
+                    ),
                   ),
                   if (controller.copyResult != null)
                     Text(
-                      '${controller.copyResult!.added} new markings copied. Your private group is independent of public updates.',
+                      UiStrings.of(context).text(
+                        '{added} new markings copied. Your private group is independent of public updates.',
+                        {'added': controller.copyResult!.added},
+                      ),
                     ),
                   if (controller.copyError != null)
-                    Text('Copy failed; retry is safe. ${controller.copyError}'),
+                    Text(
+                      UiStrings.of(context).text(
+                        'Copy failed; retry is safe. {copyError}',
+                        {'copyError': controller.copyError.toString()},
+                      ),
+                    ),
                   const SizedBox(height: 8),
                 ],
               ),
             ),
           ),
           if (selections.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
-                child: Text('This topic has no verse associations.'),
+                child: Text(
+                  UiStrings.of(
+                    context,
+                  ).text('This topic has no verse associations.'),
+                ),
               ),
             )
           else
@@ -392,10 +481,16 @@ final class _TopicsPanelState extends State<TopicsPanel> {
                 final ReferenceSelection selection = selections[index];
                 final String bookName = selection.book == widget.context.book
                     ? widget.context.bookName
-                    : 'Book ${selection.book}';
+                    : UiStrings.of(
+                        context,
+                      ).text('Book {book}', {'book': selection.book});
                 return ListTile(
                   title: Text('$bookName ${selection.chapter}'),
-                  subtitle: Text('Verses ${_verseLabel(selection.verses)}'),
+                  subtitle: Text(
+                    UiStrings.of(context).text('Verses {verses}', {
+                      'verses': _verseLabel(selection.verses),
+                    }),
+                  ),
                   trailing: const Icon(Icons.menu_book),
                   onTap: () => unawaited(
                     widget.onPreviewReference(
@@ -432,7 +527,7 @@ final class _TopicsPanelState extends State<TopicsPanel> {
           FilledButton.icon(
             onPressed: () => unawaited(retry()),
             icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
+            label: Text(UiStrings.of(context).text('Retry')),
           ),
         ],
       ),
@@ -448,23 +543,29 @@ final class _TopicsPanelState extends State<TopicsPanel> {
           await showDialog<bool>(
             context: context,
             builder: (BuildContext context) => AlertDialog(
-              title: const Text('Copy public topic to my markings?'),
+              title: Text(
+                UiStrings.of(context).text('Copy public topic to my markings?'),
+              ),
               content: SingleChildScrollView(
                 child: Text(
-                  '${preview.groupName}\n\n${preview.newAssociationCount} new whole-verse markings; ${preview.alreadyPresent} already present.\n\n'
-                  'This creates or adds to your independent private copy. Existing groups, notes and markings stay intact. '
-                  'Only canonical coordinates and the public topic color are copied; Scripture text is not downloaded. '
-                  'Public changes will not edit or delete your copy.',
+                  UiStrings.of(context).text(
+                    '{groupName}\n\n{newAssociationCount} new whole-verse markings; {alreadyPresent} already present.\n\nThis creates or adds to your independent private copy. Existing groups, notes and markings stay intact. Only canonical coordinates and the public topic color are copied; Scripture text is not downloaded. Public changes will not edit or delete your copy.',
+                    {
+                      'groupName': preview.groupName,
+                      'newAssociationCount': preview.newAssociationCount,
+                      'alreadyPresent': preview.alreadyPresent,
+                    },
+                  ),
                 ),
               ),
               actions: <Widget>[
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
+                  child: Text(UiStrings.of(context).text('Cancel')),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Copy markings'),
+                  child: Text(UiStrings.of(context).text('Copy markings')),
                 ),
               ],
             ),
@@ -477,7 +578,13 @@ final class _TopicsPanelState extends State<TopicsPanel> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not prepare the copy. $error')),
+          SnackBar(
+            content: Text(
+              UiStrings.of(
+                context,
+              ).text('Could not prepare the copy. {error}', {'error': error}),
+            ),
+          ),
         );
       }
     }

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 /** Small original-text fixtures: no downloaded Bible corpus or live API needed. */
 export const firstVerse = 'In the beginning God created the heaven and the earth.';
+export const secondVerse = 'And the earth was without form, and void.';
 export const noteText = 'Browser smoke: this private note survives a new page.';
 export const restoredNoteText = 'Browser smoke: this private note was restored from a file.';
 export const unvisitedVerse = 'Thus the heavens and the earth were finished, and all the host of them.';
@@ -18,7 +19,7 @@ const chapter = {
   name: 'Genesis 1',
   verses: [
     { chapter: 1, verse: 1, name: 'Genesis 1:1', text: firstVerse },
-    { chapter: 1, verse: 2, name: 'Genesis 1:2', text: 'And the earth was without form, and void.' },
+    { chapter: 1, verse: 2, name: 'Genesis 1:2', text: secondVerse },
     { chapter: 1, verse: 3, name: 'Genesis 1:3', text: 'And God said, Let there be light: and there was light.' },
   ],
 };

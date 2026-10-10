@@ -21,6 +21,57 @@ const Passage _origin = Passage(
 );
 
 void main() {
+  testWidgets(
+    'compact Study retains its context through reverse animation and can reopen after disposal',
+    (tester) async {
+      _configureView(tester, const Size(390, 844));
+      addTearDown(tester.view.resetViewInsets);
+      final state = await _createReader(tester);
+      await _showReader(tester, state);
+      final launcher = find.byTooltip(state.ui('study'));
+      await tester.tap(launcher);
+      await _settle(tester);
+      final workspace = tester.widget<StudyWorkspace>(
+        find.byType(StudyWorkspace),
+      );
+      final captured = workspace.context;
+
+      await tester.tap(find.byTooltip('Close Study tools'));
+      await tester.pump();
+      // Pop has completed, but the bottom sheet's reverse animation has not.
+      // Native keyboard and annotation notifications can still rebuild it.
+      tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+      await tester.runAsync(state.refreshAnnotations);
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).context,
+        same(captured),
+      );
+      workspace.onClose(); // A repeated close must not pop the reader route.
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(tester.takeException(), isNull);
+      expect(state.passage, _origin);
+
+      tester.view.resetViewInsets();
+      await _settle(tester);
+      expect(find.byType(StudyWorkspace), findsNothing);
+      await tester.tap(launcher);
+      await _settle(tester);
+      expect(find.byType(StudyWorkspace), findsOneWidget);
+      expect(
+        tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).context,
+        isNot(same(captured)),
+      );
+      expect(state.passage, _origin);
+      await tester.tap(find.byTooltip('Close Study tools'));
+      await _settle(tester);
+      expect(find.byType(StudyWorkspace), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final double width in <double>[640, 1250]) {
     testWidgets(
       'nested notebook preview retains a functional insertion dialog at width $width',

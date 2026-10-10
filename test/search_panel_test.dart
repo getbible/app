@@ -15,6 +15,79 @@ import 'package:getbible_live/presentation/widgets/search_panel.dart';
 
 void main() {
   testWidgets(
+    'typing and filter changes debounce 250ms; submit flushes once and close cancels',
+    (tester) async {
+      final repository = _Repository();
+      final controller = OnlineSearchController(repository: repository);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchPanel(
+              controller: controller,
+              translation: 'tst',
+              books: const [],
+              onOpen: (_) async {},
+            ),
+          ),
+        ),
+      );
+      final query = find.byKey(const ValueKey<String>('online-search-query'));
+      await tester.enterText(query, 'fai');
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(repository.requests, isEmpty);
+      await tester.enterText(query, 'faith');
+      await tester.pump(const Duration(milliseconds: 249));
+      expect(repository.requests, isEmpty);
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
+      expect(repository.requests.single.text, 'faith');
+      await tester.enterText(query, 'hope');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      expect(repository.requests.map((request) => request.text), [
+        'faith',
+        'hope',
+      ]);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repository.requests.length, 2);
+      await tester.enterText(query, 'love');
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repository.requests.length, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('blank input cancels debounce without sending an empty search', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final controller = OnlineSearchController(repository: repository);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchPanel(
+            controller: controller,
+            translation: 'tst',
+            books: const [],
+            onOpen: (_) async {},
+          ),
+        ),
+      ),
+    );
+    final query = find.byKey(const ValueKey<String>('online-search-query'));
+    await tester.enterText(query, 'faith');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(query, '   ');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(repository.requests, isEmpty);
+    expect(controller.results, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
     'selected phrase is passed exactly; narrow RTL 200% panel remains native and opens the exact result',
     (WidgetTester tester) async {
       tester.view.physicalSize = const Size(320, 740);

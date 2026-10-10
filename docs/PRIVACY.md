@@ -26,8 +26,11 @@ search field is sent to that service.
 
 Dictionary and commentary browsing retrieves public catalogues, resource
 metadata, a selected dictionary index/entry or commentary coverage/chapter.
-Surface-word and alias filtering occurs against the chosen dictionary's index
-on the device; there is no server definition-text search. Topic browsing
+Surface-word and alias filtering occurs against public dictionary indexes
+on the device; there is no server definition-text search. Confirmed-definition
+discovery can request several published indexes and matching public entries.
+When dictionaries are installed, lookup initially stays within those local
+resources; including online dictionaries is an explicit expansion. Topic browsing
 retrieves public topic summaries, selected topic associations, locale names
 and the contextual book/chapter reverse index. These public reads do not send
 private group names, note/notebook contents, selected-text markings or drafts.
@@ -36,6 +39,19 @@ Dictionary/commentary preferences and topic Follow/Hide choices remain local.
 Copying a public topic requires an explicit preview and confirmation, then
 creates an independent private marking group on the device. The application
 does not write to the public topic service or synchronize that private copy.
+
+The unified bookmark list reconciles published topic metadata with local groups
+on the device. Global membership downloads require an explicit action and retain
+their public origin independently from personal assignments. Removing downloaded
+global memberships does not upload or remove personal assignments. Local recent
+topic choices are not analytics.
+
+Interface translations are bundled with the application. A developer-only,
+opt-in generator may translate public interface templates while preparing a
+release; the running application makes no translation-service requests and never
+sends Scripture, source metadata or private text to that generator. The Web
+offline application cache contains only the static files listed by the build;
+API responses and private data are not captured by its service worker.
 
 Notebook references and quotations are saved locally with their Scripture
 attribution. Previewing or opening a notebook citation sends only its explicitly

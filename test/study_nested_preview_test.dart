@@ -6,6 +6,7 @@ import 'package:getbible_live/domain/models/notebook.dart';
 import 'package:getbible_live/domain/models/passage.dart';
 import 'package:getbible_live/domain/models/preferences.dart';
 import 'package:getbible_live/main.dart';
+import 'package:getbible_live/presentation/widgets/keyboard_inset_padding.dart';
 import 'package:getbible_live/presentation/widgets/notes_panel.dart';
 import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
 import 'package:getbible_live/presentation/widgets/study_workspace.dart';
@@ -35,6 +36,24 @@ void main() {
         find.byType(StudyWorkspace),
       );
       final captured = workspace.context;
+      for (final double inset in <double>[180, -0.25, 0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        final padding = tester.widget<Padding>(
+          find
+              .descendant(
+                of: find.byType(KeyboardInsetPadding),
+                matching: find.byType(Padding),
+              )
+              .first,
+        );
+        expect(padding.padding, EdgeInsets.only(bottom: inset < 0 ? 0 : inset));
+        expect(
+          tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).context,
+          same(captured),
+        );
+      }
 
       await tester.tap(find.byTooltip('Close Study tools'));
       await tester.pump();
@@ -48,6 +67,9 @@ void main() {
         tester.widget<StudyWorkspace>(find.byType(StudyWorkspace)).context,
         same(captured),
       );
+      tester.view.viewInsets = const FakeViewPadding(bottom: -0.25);
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(tester.takeException(), isNull);
       workspace.onClose(); // A repeated close must not pop the reader route.
       await tester.pump(const Duration(milliseconds: 20));
       expect(tester.takeException(), isNull);

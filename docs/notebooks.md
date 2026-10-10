@@ -61,7 +61,7 @@ unpersisted rejected value as saved or truncates an existing suffix.
 
 ## Privacy and backup boundary
 
-Notebook text is never sent to GetBible services. Reference preview sends only
+Notebook text is never sent to getBible services. Reference preview sends only
 the explicitly selected Scripture reference; opening a citation loads only that
 passage. Canonical notes and notebooks remain separate private stores.
 

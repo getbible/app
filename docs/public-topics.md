@@ -1,16 +1,17 @@
 # Unified bookmarks and public topics
 
-**Bookmarks** is one native list for personal topics and published GetBible topics.
+**Bookmarks** is one native list for personal topics and published getBible topics.
 The verse and selected-text bookmark menus use that same list. A group can hold
 both personal memberships and downloaded global memberships at the same verse;
 their origins remain separate in storage. A visible whole-verse row combines
-those origins and prefers the user's saved quotation. Selected-text rows retain
+those origins while displaying resolved Scripture separately from the user's
+saved quotation. Selected-text rows retain
 their translation and exact original UTF-16 range.
 
 ## Catalog metadata and migration
 
 Opening Bookmarks or its contextual assignment menu discovers the public
-[GetBible Bookmarks v1 API](https://getbible.net/api/bookmarks/v1/) catalog and
+[getBible Bookmarks v1 API](https://getbible.net/api/bookmarks/v1/) catalog and
 localized topic-name documents. This is lazy metadata loading: it does not fetch
 verse membership documents, download Scripture, or install an offline corpus.
 Locale requests have a concurrency limit of four. Revision checks surround the
@@ -95,7 +96,7 @@ abbreviation. Display hydration never rewrites a private quote, membership,
 timestamp or selected-text range. Global bookmark downloads still store only
 coordinates; fetching display text is independent of those explicit downloads.
 
-Public origins without a provider field are the historical official GetBible
+Public origins without a provider field are the historical official getBible
 source. Custom providers use the additive `sourceScope` member in source JSON.
 Matching, deduplication and bulk removal respect that scope. Renaming a topic or
 editing its color never removes its source identity or turns personal memberships

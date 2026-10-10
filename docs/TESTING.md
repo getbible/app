@@ -477,3 +477,43 @@ actual Safari, verified HTTPS domain associations, signing credentials and store
 approval are external acceptance evidence. An alpha download may be published
 with these gates explicitly open; it must not be described as a stable,
 store-approved or fully device-certified release.
+
+
+## Identity and reader alignment: alpha.5
+
+Candidate `1.0.0-alpha.5+6` is tracked in
+[pull request #7](https://github.com/getbible/app/pull/7). Its acceptance contract
+is [Reader alignment](READER_ALIGNMENT.md); earlier increment results above do
+not substitute for checks on this PR's final head.
+
+Local validation used the pinned Flutter 3.44.6 / Dart 3.12.2 SDK:
+
+| Check | Evidence |
+|---|---|
+| Complete Flutter unit/widget suite | 467 tests passed |
+| Analyzer and formatting | No issues; no formatting changes |
+| Developer/release tooling | 39 developer tests and 64 release-tool tests passed |
+| Branding, assets and localization | Identity gate, approved-asset checksums, 438-template inventory, 69 locale packs and reference synchronization checked |
+| Release compilation | Linux and web compiled successfully during the increment |
+| Graphical inspection | Actual wide Study and compact bookmark captures with loaded fonts; selector clipping and excess menu height corrected |
+
+The composed reader cases cover direct/additive topics, full Query verse cards,
+return to the captured verse, generic reopening without a stale return target,
+inline verification and exact documentation URLs. Selection cases invoke real
+semantics Copy and preserve UTF-16 source ranges, including reversed emoji
+selection. Dictionary navigation is tested while requests are still in flight;
+per-module Retry restores all definitions after partial failure. A 320px wide
+keyboard layout and a 300px available-height/200% text menu remain operable.
+
+A pre-rename generated Flutter web entry point initially retained the old Dart
+package import. Clearing that generated cache resolved the build; existing
+checkouts should run `flutter clean` and `flutter pub get` as documented in
+[Local development](LOCAL_DEVELOPMENT.md#clean-build-after-the-alpha-identity-reset).
+The local native Linux driver could not start its session bus because this
+execution environment denied socket creation; it is not reported as a local
+runtime pass. Hosted CI supplies native runtime and installer-launch evidence.
+
+The PR workflow builds all supported targets and runs the shared acceptance
+journeys on its supported desktop and mobile hosts. Consult that exact head's
+checks and retained artifacts for completion; unsigned builds are not store
+certification. No app-identity upgrade path is provided for these alpha builds.

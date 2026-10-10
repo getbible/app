@@ -85,3 +85,9 @@ extensions. These choices are visible and preserve existing private data.
 Source comparison, deterministic integration, actual installer execution,
 physical-device accessibility and store review are separate evidence. Generated
 locale coverage establishes available messages, not human linguistic approval.
+
+Compact reference and Study sheets preserve positive keyboard clearance while
+bounding transient negative native insets at zero. The iPad acceptance failure
+exposed this layout boundary; focused keyboard-metrics regressions accompany
+the production correction. Native input, draft retention and exact clipboard
+assertions remain part of the composed target journeys.

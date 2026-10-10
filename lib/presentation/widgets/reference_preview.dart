@@ -9,6 +9,7 @@ import '../../core/ui_strings.dart';
 import '../../domain/models/bible.dart';
 import '../../domain/models/passage.dart';
 import '../../domain/models/reference.dart';
+import 'keyboard_inset_padding.dart';
 import 'scripture_verse_text.dart';
 import 'source_annotations.dart';
 
@@ -538,10 +539,7 @@ Future<void> showAdaptiveReferencePreview({
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
-        builder: (BuildContext routeContext) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(routeContext).bottom,
-          ),
+        builder: (BuildContext routeContext) => KeyboardInsetPadding(
           child: SizedBox(
             height: MediaQuery.sizeOf(routeContext).height * .88,
             child: content(routeContext),

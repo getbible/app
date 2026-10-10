@@ -93,6 +93,18 @@ surface, compact and wide presentation, and focus/scroll preservation on close.
 Route-race regressions delay Open, then dismiss the preview or select another
 citation: completion must not dismiss another route or the newer citation.
 
+Keyboard-metrics regressions exercise positive, transient negative and zero
+bottom insets in compact reference and Study sheets. Hosted iPad CI exposed a
+negative `RenderPadding` assertion during reference-preview keyboard dismissal;
+later focus-tree errors and the Study timeout were consequences of that first
+layout failure. Flutter 3.44.6's iOS `FlutterViewController` assigns its keyboard
+spring curve directly to `physical_view_inset_bottom`, without a lower bound.
+The exact native undershoot was not recorded, so the engine origin remains an
+inference; the negative-input layout failure is reproduced deterministically.
+The application bounds only negative keyboard clearance at zero and retains
+normal positive spacing. The native journey still checks real input, clipboard
+readback and unsaved-draft preservation.
+
 For device/browser QA, open Reference preview from the chapter heading or
 navigation drawer and from a verse context menu. Try a range and multiple
 references; verify the selected translation and original source label. Close

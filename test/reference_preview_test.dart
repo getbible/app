@@ -15,6 +15,82 @@ import 'package:getbible_live/presentation/widgets/reference_preview.dart';
 import 'package:getbible_live/presentation/widgets/scripture_verse_text.dart';
 
 void main() {
+  testWidgets(
+    'preview retains keyboard spacing and draft through inset undershoot',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      final ReferencePreviewController controller = _controller(_Query());
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (BuildContext context) => Scaffold(
+              body: TextButton(
+                onPressed: () => unawaited(
+                  showAdaptiveReferencePreview(
+                    context: context,
+                    controller: controller,
+                    selectedTranslation: 'kjv',
+                    initialRequest: const TextReferenceRequest(
+                      translation: 'kjv',
+                      reference: 'John 3:16',
+                    ),
+                    onOpenInReader: (_) async {},
+                  ),
+                ),
+                child: const Text('Show preview'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Show preview'));
+      await tester.pumpAndSettle();
+      final input = find.byKey(
+        const ValueKey<String>('reference-preview-input'),
+      );
+      await tester.enterText(input, 'John 3:18');
+      for (final double inset in <double>[260, 12, -0.25, 0, 180]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        final Padding sheetPadding = tester.widget<Padding>(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Padding &&
+                widget.child is SizedBox &&
+                (widget.child! as SizedBox).child is ReferencePreview,
+          ),
+        );
+        expect(
+          sheetPadding.padding,
+          EdgeInsets.only(bottom: inset < 0 ? 0 : inset),
+        );
+        expect(tester.widget<TextField>(input).controller!.text, 'John 3:18');
+        expect(tester.testTextInput.isVisible, isTrue);
+        expect(
+          tester
+              .widget<EditableText>(
+                find.descendant(of: input, matching: find.byType(EditableText)),
+              )
+              .focusNode
+              .hasFocus,
+          isTrue,
+        );
+        expect(controller.isVisible, isTrue);
+      }
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.tap(find.byTooltip('Close reference preview'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ReferencePreview), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('completed Open dismisses its own adaptive route', (
     WidgetTester tester,
   ) async {

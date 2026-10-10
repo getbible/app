@@ -120,3 +120,10 @@ No release may be described as feature-equivalent while applicable rows in
 versioned artifacts, native/browser runtime journeys and side-by-side QA are
 separate requirements. External signing/store access does not waive application
 parity or justify describing unsigned validation artifacts as store-ready.
+
+Native keyboard geometry has an additional platform contract: compact reference
+and Study sheets must accept keyboard appearance, dismissal and transient
+negative insets without invalid padding or loss of an active private draft.
+Positive insets retain their full spacing; only negative layout clearance is
+bounded at zero. This native protection does not change website workflows,
+Scripture or stored private data.

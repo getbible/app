@@ -27,6 +27,7 @@ import 'boundary_turn_controller.dart';
 import 'widgets/bookmark_assignment_menu.dart';
 import 'widgets/commentary_panel.dart';
 import 'widgets/dictionary_panel.dart';
+import 'widgets/keyboard_inset_padding.dart';
 import 'widgets/my_annotations_panel.dart';
 import 'widgets/native_scripture_text.dart';
 import 'widgets/notes_panel.dart';
@@ -1050,10 +1051,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         builder: (sheetContext) {
           route = ModalRoute.of<void>(sheetContext);
           _compactStudyRoute = route;
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-            ),
+          return KeyboardInsetPadding(
             child: SizedBox(
               height: MediaQuery.sizeOf(sheetContext).height * .92,
               child: AnimatedBuilder(

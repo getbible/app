@@ -39,6 +39,18 @@ class BrandingTests(unittest.TestCase):
             "README.md", "getBible uses getbible packages and GETBIBLE_ENV."
         ), [])
 
+    def test_native_error_text_keeps_brand_without_renaming_classes(self):
+        self.assertEqual(branding.text_violations(
+            "lib/core/errors.dart", "throw Error('GetBible is unavailable.');"
+        ), ["lib/core/errors.dart:1: display text must use getBible"])
+        self.assertEqual(branding.text_violations(
+            "lib/application/app_state.dart",
+            "final GetBibleApiClient client = GetBibleApiClient();"
+        ), [])
+        self.assertEqual(branding.text_violations(
+            "lib/core/errors.dart", 'throw Error("getBible is unavailable.");'
+        ), [])
+
 
 if __name__ == "__main__":
     unittest.main()

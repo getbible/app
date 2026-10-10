@@ -456,6 +456,19 @@ final class _Installer implements OfflineResourceInstaller {
   )
   action;
   @override
+  Uri get sourceUri => _resource().sourceUri;
+  @override
+  Future<OfflineResourceDescriptor> resolve(
+    OfflineResourceKind kind,
+    String id,
+    RequestCancellation cancellation,
+  ) async => _resource();
+  @override
+  Future<OfflineResourceDescriptor> checkRevision(
+    OfflineResourceDescriptor resource,
+    RequestCancellation cancellation,
+  ) async => resource;
+  @override
   Set<OfflineResourceKind> get supportedKinds => {OfflineResourceKind.bible};
   @override
   Future<List<OfflineResourceDescriptor>> discover(

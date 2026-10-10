@@ -76,6 +76,15 @@ def valid_translation(original, value):
             and all(value.count(term) >= original.count(term) for term in TERMS))
 
 
+def reusable_messages(english, previous_sources, pack, english_fallback_keys):
+    """Reuse unchanged sources without treating pending English as translated."""
+    pending = set(english_fallback_keys)
+    return {key: value for key, value in pack.items()
+            if key not in pending and key in english
+            and previous_sources.get(key) == english[key]
+            and valid_translation(english[key], value)}
+
+
 def restore_translation(original, protected, replacements, candidate):
     for token, original_token in replacements:
         if candidate.count(token) != protected.count(token):
@@ -167,9 +176,9 @@ def main():
                     values[key] = cached
             for code in matching:
                 pack = read_json(DIRECTORY / f'{code}.json', {})
-                values.update({key: value for key, value in pack.items()
-                    if key in english and previous_sources.get(key) == english[key]
-                    and valid_translation(english[key], value)})
+                metadata = prior.get('locales', {}).get(code, {})
+                values.update(reusable_messages(english, previous_sources, pack,
+                    metadata.get('englishFallbackKeys', [])))
             values.update({key: value for key, value in english.items()
                            if value in INVARIANT_MESSAGES})
             missing = [(key, value) for key, value in english.items() if key not in values]

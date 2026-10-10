@@ -14,10 +14,57 @@ import 'bible_index_worker.dart';
 final class BibleResourceInstaller implements OfflineResourceInstaller {
   BibleResourceInstaller(this.transport);
   final ApiTransport transport;
+  @override
   Uri get sourceUri =>
       transport.configuration.endpoint(ApiService.bible).baseUri;
   @override
   Set<OfflineResourceKind> get supportedKinds => {OfflineResourceKind.bible};
+
+  @override
+  Future<OfflineResourceDescriptor> resolve(
+    OfflineResourceKind kind,
+    String id,
+    RequestCancellation cancellation,
+  ) async {
+    _validate(kind, id, sourceUri);
+    final descriptor = (await discover(
+      cancellation,
+    )).where((resource) => resource.id == id).firstOrNull;
+    if (descriptor == null) {
+      throw const FormatException(
+        'This Bible is not in the published catalogue.',
+      );
+    }
+    return checkRevision(descriptor, cancellation);
+  }
+
+  @override
+  Future<OfflineResourceDescriptor> checkRevision(
+    OfflineResourceDescriptor resource,
+    RequestCancellation cancellation,
+  ) async {
+    _validate(resource.kind, resource.id, resource.sourceUri);
+    final revision = await _sha(resource.id, cancellation);
+    return OfflineResourceDescriptor(
+      kind: resource.kind,
+      id: resource.id,
+      title: resource.title,
+      sourceUri: sourceUri,
+      revision: revision,
+      estimatedBytes: resource.estimatedBytes,
+      attribution: resource.attribution,
+    );
+  }
+
+  void _validate(OfflineResourceKind kind, String id, Uri source) {
+    if (kind != OfflineResourceKind.bible ||
+        source != sourceUri ||
+        !RegExp(r'^[a-z0-9][a-z0-9_-]{0,29}$').hasMatch(id)) {
+      throw const FormatException(
+        'The selected Bible belongs to another source.',
+      );
+    }
+  }
 
   @override
   Future<List<OfflineResourceDescriptor>> discover(
@@ -57,13 +104,7 @@ final class BibleResourceInstaller implements OfflineResourceInstaller {
     OfflineInstallSink sink,
     RequestCancellation cancellation,
   ) async {
-    if (resource.kind != OfflineResourceKind.bible ||
-        resource.sourceUri != sourceUri ||
-        !RegExp(r'^[a-z0-9_-]+$').hasMatch(resource.id)) {
-      throw const FormatException(
-        'The selected Bible belongs to another source.',
-      );
-    }
+    _validate(resource.kind, resource.id, resource.sourceUri);
     final before = await _sha(resource.id, cancellation);
     sink.progress(0, null, 'Downloading the complete Bible');
     final response = await transport.get(

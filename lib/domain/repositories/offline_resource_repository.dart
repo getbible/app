@@ -1,10 +1,20 @@
 import '../../core/request_cancellation.dart';
 import '../models/offline_resource.dart';
 
-/// Installation is always an explicit user action. Discovery must only request
-/// small catalogues, never a whole Bible or Study module.
+/// Discovery and revision checks never download a complete resource. Application
+/// policy decides when first use or an explicit refresh schedules installation.
 abstract interface class OfflineResourceInstaller {
   Set<OfflineResourceKind> get supportedKinds;
+  Uri get sourceUri;
+  Future<OfflineResourceDescriptor> resolve(
+    OfflineResourceKind kind,
+    String id,
+    RequestCancellation cancellation,
+  );
+  Future<OfflineResourceDescriptor> checkRevision(
+    OfflineResourceDescriptor resource,
+    RequestCancellation cancellation,
+  );
   Future<List<OfflineResourceDescriptor>> discover(
     RequestCancellation cancellation,
   );
@@ -16,6 +26,41 @@ abstract interface class OfflineResourceInstaller {
     OfflineInstallSink sink,
     RequestCancellation cancellation,
   );
+}
+
+/// A manual force check starts a new source snapshot rather than reusing a
+/// short-lived batch shared by automatic checks of the same public catalogue.
+abstract interface class OfflineRevisionCache {
+  void clearRevisionCache();
+}
+
+/// Public-download bookkeeping is separate from private backups and content.
+/// Only a successful source check advances checkedAt; retries retain that date.
+abstract interface class OfflineFreshnessStore {
+  Future<OfflineFreshness?> read(String resourceKey);
+  Future<void> recordAttempt(
+    String resourceKey,
+    DateTime attemptedAt,
+    DateTime retryAfter,
+  );
+  Future<void> recordSuccess(
+    String resourceKey,
+    String generation,
+    DateTime checkedAt,
+  );
+  Future<void> recordCatalogueSuccess(String catalogueKey, DateTime checkedAt);
+  Future<Set<String>> readExcludedKeys();
+  Future<void> setExcluded(String resourceKey, bool excluded);
+  Future<List<OfflineResourceDescriptor>> readAutomaticResources();
+  Future<void> saveAutomaticResources(
+    OfflineResourceKind kind,
+    Uri sourceUri,
+    List<OfflineResourceDescriptor> resources,
+  );
+  Future<void> remove(String resourceKey);
+
+  /// Clears freshness only; catalogue plans and deliberate exclusions survive.
+  Future<void> clear();
 }
 
 abstract interface class OfflineInstallSink {

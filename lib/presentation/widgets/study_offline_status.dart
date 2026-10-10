@@ -6,11 +6,11 @@ import '../../core/ui_strings.dart';
 final class StudyOfflineStatus extends StatelessWidget {
   const StudyOfflineStatus({
     required this.installed,
-    this.onSetUpOffline,
+    this.onManageDownloads,
     super.key,
   });
   final bool? installed;
-  final VoidCallback? onSetUpOffline;
+  final VoidCallback? onManageDownloads;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -24,16 +24,14 @@ final class StudyOfflineStatus extends StatelessWidget {
                 ? UiStrings.of(
                     context,
                   ).text('Installed on this device · available offline')
-                : UiStrings.of(
-                    context,
-                  ).text('Online resource · not installed on this device'),
+                : UiStrings.of(context).text('Not yet available offline'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
-        if (onSetUpOffline != null)
+        if (onManageDownloads != null)
           TextButton.icon(
-            onPressed: onSetUpOffline,
+            onPressed: onManageDownloads,
             icon: const Icon(Icons.download_outlined),
-            label: Text(UiStrings.of(context).text('Set up offline use')),
+            label: Text(UiStrings.of(context).text('Downloads & storage')),
           ),
       ],
     ),

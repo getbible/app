@@ -90,6 +90,39 @@ async function readerVisible(page) {
   await page.getByRole('group', { name: `Genesis 1:2. ${secondVerse}`, exact: true }).waitFor();
 }
 
+async function openDownloads(page) {
+  await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+  await page.getByRole('button', { name: 'Downloads & storage', exact: true }).press('Enter');
+}
+
+async function clearDownloads(page) {
+  await page.getByRole('button', { name: 'Clear downloads', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Clear downloads', exact: true }).click();
+  await page.getByText('No complete resources saved yet. Automatic downloads will continue when a connection is available.', { exact: true }).waitFor();
+}
+
+const bibleBulkUrl = 'https://api.getbible.net/v3/kjv.json';
+const dictionaryBulkUrl = 'https://dictionaries.getbible.net/v1/strongsgreek.json';
+const commentaryBulkUrl = 'https://commentaries.getbible.net/v1/fixture.json';
+const automaticBulkUrls = new Set([bibleBulkUrl, dictionaryBulkUrl, commentaryBulkUrl]);
+const initialAutomaticChecks = new Set([
+  'https://api.getbible.net/v3/kjv.sha',
+  'https://dictionaries.getbible.net/v1/hashes.json',
+  'https://commentaries.getbible.net/v1/hashes.json',
+]);
+
+function installedBible(page) {
+  return page.getByRole('group', { name: /^King James Version \(English\)\s+Bible[\s\S]*Available offline[\s\S]*Verified source revision:/ });
+}
+
+function installedDictionary(page) {
+  return page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary[\s\S]*Available offline/ });
+}
+
+function installedCommentary(page) {
+  return page.getByRole('group', { name: /^Fixture Commentary · en\s+Commentary[\s\S]*Available offline/ });
+}
+
 /** Cache verification belongs below the chapter heading, outside a dialog. */
 async function inspectVerification(page, { verified }) {
   const badgeName = verified ? 'Verified Scripture' : 'Saved Scripture';
@@ -139,6 +172,10 @@ async function runJourney(browser, { isolated, browserName }) {
   const workers = [];
   const fixtures = new Map([...apiFixtures(), ...studyInstallationFixtures()]);
   let apiOffline = false;
+  let deferAutomaticChecks = true;
+  let releaseAutomaticChecks;
+  const automaticChecksReady = new Promise((resolveChecks) => { releaseAutomaticChecks = resolveChecks; });
+  const pendingFixtureResponses = new Set();
   let networkPhase = 0;
   const setApiOffline = (offline) => { apiOffline = offline; networkPhase++; };
   const consoleDiagnostics = () => classifyNetworkDiagnostics(consoleErrors, injectedDisconnects);
@@ -194,21 +231,29 @@ async function runJourney(browser, { isolated, browserName }) {
       errors.push({ type: 'unexpected-method', message: `${request.method()} ${url}` });
       return route.abort('blockedbyclient');
     }
-    if (apiOffline) {
-      const phase = networkPhase;
-      let pageId;
-      try { pageId = pageIds.get(request.frame().page()); } catch { /* No page provenance: fail closed. */ }
-      await route.abort('internetdisconnected');
-      injectedDisconnects.push({ url, method: request.method(), knownFixture: true,
-        code: 'internetdisconnected', pageId, phase, apiOffline: true });
-      return;
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: fixture.contentType,
-      body: fixture.body,
-      headers: { 'access-control-allow-origin': '*', 'cache-control': 'max-age=600', 'cross-origin-resource-policy': 'cross-origin' },
-    });
+    const respond = (async () => {
+      // Keep the first launch cache-only until the explicit offline phase. Hold
+      // manifest checks before staging begins, so closing the page cannot leave
+      // an abandoned installation lease or a partially activated generation.
+      if (deferAutomaticChecks && initialAutomaticChecks.has(url)) await automaticChecksReady;
+      if (apiOffline) {
+        const phase = networkPhase;
+        let pageId;
+        try { pageId = pageIds.get(request.frame().page()); } catch { /* No page provenance: fail closed. */ }
+        await route.abort('internetdisconnected');
+        injectedDisconnects.push({ url, method: request.method(), knownFixture: true,
+          code: 'internetdisconnected', pageId, phase, apiOffline: true });
+        return;
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: fixture.contentType,
+        body: fixture.body,
+        headers: { 'access-control-allow-origin': '*', 'cache-control': 'max-age=600', 'cross-origin-resource-policy': 'cross-origin' },
+      });
+    })();
+    pendingFixtureResponses.add(respond);
+    try { await respond; } finally { pendingFixtureResponses.delete(respond); }
   });
   try {
     page = await context.newPage();
@@ -233,6 +278,7 @@ async function runJourney(browser, { isolated, browserName }) {
     assert.equal(dictionaryMetrics.entries, 20000);
     assert.ok(dictionaryMetrics.maximumEntryBatch <= 128);
     assert.ok(dictionaryMetrics.uiHeartbeatTicks > 0, 'Dictionary index parsing must leave the UI event loop live');
+    const workersBeforeAutomatic = workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length;
 
     // Verse-number context actions exercise the actual rendered release UI.
     await page.getByText('1', { exact: true }).click();
@@ -248,7 +294,12 @@ async function runJourney(browser, { isolated, browserName }) {
 
     // Preserve coverage for readers that have cached a passage but have not
     // installed a complete Bible. Reopening must retain the note and text.
+    assert.ok(!requests.some((request) => automaticBulkUrls.has(request.url)),
+      'Deferred automatic checks must preserve the cache-only reader phase');
     setApiOffline(true);
+    deferAutomaticChecks = false;
+    releaseAutomaticChecks();
+    await Promise.all([...pendingFixtureResponses]);
     await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(45000);
@@ -259,8 +310,23 @@ async function runJourney(browser, { isolated, browserName }) {
     await inspectVerification(page, { verified: false });
     assert.ok(requests.some((request) => request.apiOffline),
       'Cached chapter path must attempt current-source verification');
-    setApiOffline(false);
     console.log(`${mode}: cached passage and note reopened without public APIs`);
+
+    // Failed background checks intentionally persist their retry backoff. Use
+    // the real clear-downloads control to reset that public state, preserving
+    // the private note, before testing a successful automatic online startup.
+    await openDownloads(page);
+    await clearDownloads(page);
+    await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
+    await page.getByRole('button', { name: noteText }).waitFor();
+    setApiOffline(false);
+    await page.close();
+    page = await context.newPage();
+    page.setDefaultTimeout(45000);
+    await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
+    await enableSemantics(page);
+    await readerVisible(page);
+    await page.getByRole('button', { name: noteText }).waitFor();
 
     // Download the actual private snapshot, then import an edited copy through
     // the system file picker. The preview must precede any merge confirmation.
@@ -293,40 +359,81 @@ async function runJourney(browser, { isolated, browserName }) {
     await page.getByRole('button', { name: restoredNoteText }).waitFor();
     console.log(`${mode}: downloaded and restored private backup`);
 
-    // Install the complete fixture Bible through the real production worker.
-    // Chapter two has never been opened, so a later offline read cannot be
-    // satisfied by the opportunistic chapter cache.
+    // Startup must install every advertised dictionary/commentary plus the
+    // selected Bible without pressing any Install control. Chapter two remains
+    // unvisited, so its later offline read cannot use the chapter cache.
     assert.ok(!requests.some((request) => request.url.endsWith('/1/2.json')));
-    await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
-    await page.getByRole('button', { name: 'Set up offline use', exact: true }).press('Enter');
+    await openDownloads(page);
+    await installedBible(page).waitFor();
+    await installedDictionary(page).waitFor();
+    await installedCommentary(page).waitFor();
+    for (const url of automaticBulkUrls) {
+      assert.ok(requests.some((request) => request.url === url),
+        `Automatic startup must fetch the complete resource: ${url}`);
+    }
+    assert.ok(workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length >= workersBeforeAutomatic + 3,
+      'Bible, dictionary and commentary activation must use the production worker');
+    assert.ok(!requests.some((request) => request.url === 'https://bookmarks.getbible.net/v1/all.json'),
+      'The complete public bookmark dataset must remain an explicit choice');
+    console.log(`${mode}: Bible, dictionary and commentary installed automatically`);
+
+    // Exclusion removes the public copy and survives a new page. Other saved
+    // resources and the user's restored private note must remain available.
+    const dictionaryDownloads = () => requests.filter((request) => request.url === dictionaryBulkUrl).length;
+    const dictionaryBeforeExclusion = dictionaryDownloads();
+    await installedDictionary(page).getByRole('checkbox', { name: /^Keep offline/, checked: true }).click();
+    await installedDictionary(page).waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await page.close();
+    page = await context.newPage();
+    page.setDefaultTimeout(45000);
+    await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
+    await enableSemantics(page);
+    await readerVisible(page);
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await openDownloads(page);
+    await installedBible(page).waitFor();
+    await installedCommentary(page).waitFor();
+    assert.equal(dictionaryDownloads(), dictionaryBeforeExclusion,
+      'An excluded dictionary must not be downloaded again on startup');
+
+    // Clear installed public data through the real manager, then restart. The
+    // default Bible/commentary return while the dictionary exclusion persists.
+    await clearDownloads(page);
+    await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await page.close();
+    page = await context.newPage();
+    page.setDefaultTimeout(45000);
+    await page.goto(origin + basePath, { waitUntil: 'domcontentloaded' });
+    await enableSemantics(page);
+    await readerVisible(page);
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    await openDownloads(page);
+    await installedBible(page).waitFor();
+    await installedCommentary(page).waitFor();
+    assert.equal(dictionaryDownloads(), dictionaryBeforeExclusion,
+      'Clear downloads must preserve per-resource exclusions');
     await page.getByRole('button', { name: 'Browse catalogue', exact: true }).click();
     await page.getByRole('textbox', { name: 'Find a resource', exact: true }).click();
-    await page.locator('input:focus, textarea:focus').fill('King James Version');
-    const resourceCard = page.getByRole('group', { name: /^King James Version \(English\)\s+Bible/ });
-    await resourceCard.waitFor();
-    await resourceCard.scrollIntoViewIfNeeded();
-    await page.getByRole('button', { name: 'Install', exact: true }).first().click();
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Install', exact: true }).click();
-    console.log(`${mode}: resource installation confirmed`);
-    await page.getByRole('group', { name: /^King James Version \(English\)\s+Bible[\s\S]*Installed[\s\S]*Verified source revision:/ }).waitFor();
-    const bibleWorkers = workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length;
-    assert.ok(bibleWorkers > 0, 'Complete installation must execute the bundled web worker');
+    await page.locator('input:focus, textarea:focus').fill('Greek lexicon');
+    const dictionaryChoice = page.getByRole('group', {
+      name: /^Greek lexicon · en\s+Dictionary[\s\S]*https:\/\/dictionaries\.getbible\.net/,
+    });
+    await dictionaryChoice.getByRole('checkbox', { name: /^Keep offline/, checked: false }).waitFor();
+    await dictionaryChoice.getByRole('checkbox', { name: /^Keep offline/, checked: false }).click();
+    await installedDictionary(page).waitFor();
+    assert.ok(dictionaryDownloads() > dictionaryBeforeExclusion,
+      'Restoring Keep offline must reactivate the complete dictionary');
     assert.equal(
       await page.getByRole('textbox', { name: 'Find a resource', exact: true }).inputValue(),
-      'King James Version',
-      'Installing a resource must preserve the visible catalogue filter',
+      'Greek lexicon',
+      'Automatic activation must preserve the visible catalogue filter',
     );
-    await page.getByRole('textbox', { name: 'Find a resource', exact: true }).click();
-    await page.locator('input:focus, textarea:focus').fill('Greek lexicon');
-    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary/ }).waitFor();
-    await page.getByRole('button', { name: 'Install', exact: true }).first().click();
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Install', exact: true }).click();
-    console.log(`${mode}: resource installation confirmed`);
-    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary[\s\S]*Installed/ }).waitFor();
-    assert.ok(workers.filter((url) => url.endsWith('/offline_bible_worker.dart.js')).length > bibleWorkers,
-      'Bible and dictionary installation must both execute the production worker');
     await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
-    console.log(`${mode}: complete Bible and dictionary installed by production worker`);
+    await page.getByRole('button', { name: restoredNoteText }).waitFor();
+    console.log(`${mode}: exclusions, clear downloads and automatic restoration preserved private data`);
 
     // A new page discards all Dart state. It reopens the production browser
     // database, while public APIs fail and local release assets still load.
@@ -341,9 +448,9 @@ async function runJourney(browser, { isolated, browserName }) {
     await page.getByRole('button', { name: restoredNoteText }).waitFor();
     await inspectVerification(page, { verified: true });
     await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
-    await page.getByRole('button', { name: 'Set up offline use', exact: true }).press('Enter');
-    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary/ }).waitFor();
-    await page.getByRole('group', { name: /^Greek lexicon · en\s+Dictionary[\s\S]*Installed/ }).waitFor();
+    await page.getByRole('button', { name: 'Downloads & storage', exact: true }).press('Enter');
+    await installedDictionary(page).waitFor();
+    await installedCommentary(page).waitFor();
     await page.getByRole('button', { name: 'Close offline resources', exact: true }).click();
     const requestsBeforeOfflineRead = requests.length;
     await page.getByRole('button', { name: 'Next chapter', exact: true }).first().click();
@@ -354,8 +461,7 @@ async function runJourney(browser, { isolated, browserName }) {
     // responsive toolbar as well as the desktop installation layout.
     await page.setViewportSize({ width: 700, height: 900 });
     await page.getByRole('button', { name: 'Search this translation', exact: true }).click();
-    await page.getByRole('button', { name: /^Search source\s+Online search/ }).click();
-    await page.getByRole('menuitem', { name: 'Installed Bible (offline)', exact: true }).click();
+    await page.getByRole('button', { name: /^Search source\s+Installed Bible \(offline\)/ }).waitFor();
     await page.getByRole('textbox', { name: /Search KJV/ }).click();
     await page.getByPlaceholder('Words, a phrase or a Scripture reference', { exact: true }).fill('finished');
     const requestsBeforeOfflineSearch = requests.length;
@@ -448,9 +554,11 @@ async function runJourney(browser, { isolated, browserName }) {
     await page.screenshot({ path: join(outputDirectory, `${mode}-application-offline.png`) });
     assert.deepEqual(requests.slice(requestsBeforeInstalledRestart), [],
       'Network-disconnected application startup must not fetch public services');
+    assert.ok(!requests.some((request) => request.url === 'https://bookmarks.getbible.net/v1/all.json'),
+      'Automatic startup, restoration and updates must never fetch bookmark bulk');
     assert.deepEqual([...errors, ...consoleDiagnostics().unexpected], [], 'Release UI produced browser errors');
     assert.deepEqual(missingAssets, [], 'Release UI requested missing assets');
-    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'inline cache verification without a modal', 'private backup download and file restore', 'production worker Bible and dictionary installation', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
+    return { mode, status: 'passed', checks: ['reader startup', 'SQLite write', 'API-offline cached reader', 'inline cache verification without a modal', 'private backup download and file restore', 'automatic Bible, dictionary and commentary activation by production workers', 'persistent resource exclusion and restoration', 'clear downloads preserves private data and exclusions', 'bookmark bulk remains opt-in', 'resource filter survives activation', 'new-page persistence', 'unvisited installed chapter without HTTP', 'installed search without HTTP', 'deep-linked application shell and chapter navigation with all networking disabled', '20,000-verse worker liveness', 'no browser errors'] };
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: join(outputDirectory, `${mode}-failure.png`) }).catch(() => {});
@@ -458,6 +566,9 @@ async function runJourney(browser, { isolated, browserName }) {
     }
     throw error;
   } finally {
+    deferAutomaticChecks = false;
+    releaseAutomaticChecks();
+    await Promise.allSettled([...pendingFixtureResponses]);
     const diagnostics = consoleDiagnostics();
     await writeFile(join(outputDirectory, `${mode}-browser.json`), JSON.stringify({
       errors: [...errors, ...diagnostics.unexpected], expectedDiagnostics: diagnostics.expected,

@@ -98,6 +98,23 @@ final class AppState extends ChangeNotifier {
       installed: installed,
       online: ApiQueryRepository(QueryApiClient(transport: client.transport)),
     );
+    final offline = OfflineController(
+      store: offlineStore,
+      freshness: SqlOfflineFreshnessStore(database),
+      clearPublicCaches: () async {
+        await repository.clearPublicCache();
+        client.transport.clearCache();
+      },
+      installers: [
+        BibleResourceInstaller(client.transport),
+        for (final kind in [
+          OfflineResourceKind.dictionary,
+          OfflineResourceKind.commentary,
+          OfflineResourceKind.bookmarks,
+        ])
+          StudyResourceInstaller(client.transport, kind),
+      ],
+    );
     return AppState._(
       database,
       repository,
@@ -110,6 +127,12 @@ final class AppState extends ChangeNotifier {
       client,
       OnlineSearchController(
         repository: ApiSearchRepository(client.transport),
+        isTranslationInstalled: (translation) => offline.installed.any(
+          (item) =>
+              item.resource.kind == OfflineResourceKind.bible &&
+              item.resource.id == translation.toLowerCase() &&
+              item.resource.sourceUri == installed.sourceUri,
+        ),
         installedRepository: InstalledSearchRepository(
           installed: installed,
           query: query,
@@ -120,19 +143,14 @@ final class AppState extends ChangeNotifier {
         transport: client.transport,
         notebookRepository: notebookRepository,
         offlineStore: offlineStore,
+        captureResourceUse: (kind) {
+          final epoch = offline.contentEpoch;
+          return (id) => unawaited(
+            offline.ensureAvailable(kind, id, expectedEpoch: epoch),
+          );
+        },
       ),
-      OfflineController(
-        store: offlineStore,
-        installers: [
-          BibleResourceInstaller(client.transport),
-          for (final kind in [
-            OfflineResourceKind.dictionary,
-            OfflineResourceKind.commentary,
-            OfflineResourceKind.bookmarks,
-          ])
-            StudyResourceInstaller(client.transport, kind),
-        ],
-      ),
+      offline,
     );
   }
 
@@ -191,6 +209,12 @@ final class AppState extends ChangeNotifier {
   /// The complete temporary daily selection; never stored as private markings.
   List<int> get dailyVerses => _dailyVerses;
   int _passageRequest = 0;
+  int _passageContentEpoch = 0;
+  int _beginPassageRequest() {
+    _passageContentEpoch = offline.contentEpoch;
+    return ++_passageRequest;
+  }
+
   int? _dailyRequest;
   Future<void>? _closeFuture;
   bool _closing = false;
@@ -257,7 +281,8 @@ final class AppState extends ChangeNotifier {
 
   Future<void> initialize({Uri? initialUri}) async {
     try {
-      // Recovery is local-only; opening the reader never starts bulk downloads.
+      // Recover local generations first. The offline coordinator schedules
+      // background Study downloads and due checks without blocking the reader.
       await offline.initialize();
       await _resourceRefresh;
       preferences = await settings.getPreferences();
@@ -297,7 +322,7 @@ final class AppState extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final request = ++_passageRequest;
+    final request = _beginPassageRequest();
     _failedLink = uri;
     loading = true;
     error = null;
@@ -380,7 +405,7 @@ final class AppState extends ChangeNotifier {
   Future<void> openDailyScripture() async {
     if (_closing) return;
     _failedLink = null;
-    final int request = ++_passageRequest;
+    final int request = _beginPassageRequest();
     _dailyRequest = request;
     loading = true;
     error = null;
@@ -428,7 +453,7 @@ final class AppState extends ChangeNotifier {
   Future<void> loadPassage(Passage next, {bool Function()? ownsRequest}) {
     if (_closing) return Future<void>.value();
     _failedLink = null;
-    return _loadPassage(next, ++_passageRequest, ownsRequest: ownsRequest);
+    return _loadPassage(next, _beginPassageRequest(), ownsRequest: ownsRequest);
   }
 
   Future<void> _loadPassage(
@@ -437,6 +462,7 @@ final class AppState extends ChangeNotifier {
     bool Function()? ownsRequest,
     List<int> dailyVerses = const <int>[],
   }) async {
+    final contentEpoch = _passageContentEpoch;
     loading = true;
     error = null;
     notifyListeners();
@@ -508,6 +534,15 @@ final class AppState extends ChangeNotifier {
       notes = nextNotes;
       savedMarkings = nextSavedMarkings;
       savedNotes = nextSavedNotes;
+      // Only an activated reader passage selects a Bible for offline use.
+      // Preview lookups and stale navigation must never download other Bibles.
+      unawaited(
+        offline.ensureAvailable(
+          OfflineResourceKind.bible,
+          next.translation,
+          expectedEpoch: contentEpoch,
+        ),
+      );
       await _savePosition(
         next,
         next.verse ?? chapterResult.data.verses.firstOrNull?.verse ?? 0,
@@ -528,7 +563,7 @@ final class AppState extends ChangeNotifier {
   Future<void> openBook(int book, {bool atEnd = false}) async {
     if (_closing) return;
     _failedLink = null;
-    final int request = ++_passageRequest;
+    final int request = _beginPassageRequest();
     final String translation = passage.translation;
     loading = true;
     error = null;
@@ -851,12 +886,19 @@ final class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Legacy callers share the same online controller as the native Search UI.
+  /// Legacy callers share the native Search UI's installed-first source choice.
   Future<void> search(String query, SearchOptions options) =>
       onlineSearch.search(
         passage.translation,
         query,
-        criteria: OnlineSearchCriteria.fromOptions(options),
+        criteria: OnlineSearchCriteria.fromOptions(
+          options,
+          diacritics:
+              onlineSearch.defaultModeFor(passage.translation) ==
+                  SearchExecutionMode.installed
+              ? SearchDiacritics.exact
+              : SearchDiacritics.fold,
+        ),
         direction: current?.direction ?? currentTranslation?.direction ?? 'LTR',
       );
 

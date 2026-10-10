@@ -44,21 +44,23 @@ final class OnlineSearchCriteria {
     }
   }
 
-  factory OnlineSearchCriteria.fromOptions(SearchOptions options) =>
-      OnlineSearchCriteria(
-        words: options.words,
-        match: options.match,
-        caseSensitive: options.caseSensitive,
-        scope: switch (options.scope.type) {
-          SearchScopeType.oldTestament => OnlineSearchScope.oldTestament,
-          SearchScopeType.newTestament => OnlineSearchScope.newTestament,
-          SearchScopeType.all ||
-          SearchScopeType.book => OnlineSearchScope.bible,
-        },
-        books: options.scope.book == null
-            ? const <int>[]
-            : <int>[options.scope.book!],
-      );
+  factory OnlineSearchCriteria.fromOptions(
+    SearchOptions options, {
+    SearchDiacritics diacritics = SearchDiacritics.fold,
+  }) => OnlineSearchCriteria(
+    words: options.words,
+    match: options.match,
+    caseSensitive: options.caseSensitive,
+    diacritics: diacritics,
+    scope: switch (options.scope.type) {
+      SearchScopeType.oldTestament => OnlineSearchScope.oldTestament,
+      SearchScopeType.newTestament => OnlineSearchScope.newTestament,
+      SearchScopeType.all || SearchScopeType.book => OnlineSearchScope.bible,
+    },
+    books: options.scope.book == null
+        ? const <int>[]
+        : <int>[options.scope.book!],
+  );
 
   final SearchWordMode words;
   final SearchMatchMode match;

@@ -103,10 +103,25 @@ void main() {
             );
             expect(saved!.passage.book, ReaderApiFixture.extendedBook);
           }
+          final backgroundPaths = <String>{
+            '/v1/dictionaries.json',
+            '/v1/commentaries.json',
+            if (requestedVerse == 3) ...{
+              '/v3/translations.json',
+              '/v3/tst.sha',
+            },
+          };
+          final passagePaths = fixture.paths
+              .where((path) => !backgroundPaths.contains(path))
+              .toList();
+          expect(passagePaths, isNotEmpty);
           expect(
-            fixture.paths,
+            passagePaths,
             everyElement('/v3/tst/1/1.sha'),
-            reason: 'Only the requested cached chapter may be verified.',
+            reason:
+                'Only the launch chapter may be verified. Automatic Study '
+                'discovery and preparation of the successfully opened Bible '
+                'must not navigate to the saved position or another Bible.',
           );
           expect(tester.takeException(), isNull);
         } finally {

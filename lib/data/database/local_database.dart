@@ -19,10 +19,11 @@ import '../../domain/repositories/offline_resource_repository.dart';
 import 'database_connection.dart';
 
 part 'offline_resource_store.dart';
+part 'offline_freshness_store.dart';
 part 'private_data_store.dart';
 part 'unified_bookmark_store.dart';
 
-const int localDatabaseSchemaVersion = 5;
+const int localDatabaseSchemaVersion = 6;
 
 final class CacheRecord {
   const CacheRecord({
@@ -715,6 +716,7 @@ final class _DatabaseUser extends QueryExecutorUser {
         if (from < 3) await _migrateVersionThree(executor);
         if (from < 4) await _migrateVersionFour(executor);
         if (from < 5) await createOfflineResourceTables(executor);
+        if (from < 6) await createOfflineFreshnessTable(executor);
         await executor.runCustom(
           'PRAGMA user_version = $localDatabaseSchemaVersion',
         );

@@ -30,7 +30,7 @@ void main() {
           NativeDatabase(file),
         );
         addTearDown(database.close);
-        expect(localDatabaseSchemaVersion, 5);
+        expect(localDatabaseSchemaVersion, 6);
         final note = (await database.getNotes()).single;
         expect(note.id, 'canonical-original');
         expect(note.createdAt.millisecondsSinceEpoch, 111);

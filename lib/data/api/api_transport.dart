@@ -171,7 +171,7 @@ final class ApiResponse {
       return utf8.decode(bytes, allowMalformed: false);
     } on FormatException catch (error) {
       throw ApiFormatException(
-        'The GetBible response is not valid UTF-8.',
+        'The getBible response is not valid UTF-8.',
         error,
       );
     }
@@ -179,17 +179,17 @@ final class ApiResponse {
 
   JsonMap get json {
     try {
-      return requireJsonMap(jsonDecode(text), 'GetBible response');
+      return requireJsonMap(jsonDecode(text), 'getBible response');
     } on FormatException catch (error) {
       throw ApiFormatException(
-        'The GetBible service returned malformed JSON.',
+        'The getBible service returned malformed JSON.',
         error,
       );
     }
   }
 }
 
-/// One bounded, injectable HTTP boundary for all public GetBible services.
+/// One bounded, injectable HTTP boundary for all public getBible services.
 /// Persistent Bible caches and explicit offline installations are owned by
 /// repositories; this small HTTP cache never replaces their saved content.
 final class ApiTransport {
@@ -230,6 +230,7 @@ final class ApiTransport {
   final Future<void> Function(Duration) _delay;
   final Map<String, ApiResponse> _cache = <String, ApiResponse>{};
   int _cachedBytes = 0;
+  int _cacheEpoch = 0;
   bool _closed = false;
 
   Future<JsonMap> getJson(
@@ -297,6 +298,7 @@ final class ApiTransport {
     bool forceRefresh = false,
   }) async {
     if (_closed) throw StateError('The API transport has been closed.');
+    final cacheEpoch = _cacheEpoch;
     if (maxBytes < 1) throw ArgumentError.value(maxBytes, 'maxBytes');
     cancellation?.throwIfCancelled();
     final ApiServiceEndpoint endpoint = configuration.endpoint(service);
@@ -340,7 +342,7 @@ final class ApiTransport {
                 statusCode: 304,
                 uri: uri,
                 message:
-                    'GetBible returned a conditional response without saved content.',
+                    'getBible returned a conditional response without saved content.',
               );
             }
             unconditional304Retry = true;
@@ -365,7 +367,7 @@ final class ApiTransport {
             accept,
             ApiResponseSource.revalidated,
           );
-          _store(key, result);
+          if (cacheEpoch == _cacheEpoch) _store(key, result);
           return result;
         }
         if (raw.statusCode < 200 || raw.statusCode >= 300) {
@@ -398,7 +400,7 @@ final class ApiTransport {
           accept,
           ApiResponseSource.network,
         );
-        _store(key, result);
+        if (cacheEpoch == _cacheEpoch) _store(key, result);
         return result;
       } on RequestTimeoutException {
         if (attempt >= retryPolicy.maxRetries) rethrow;
@@ -407,7 +409,7 @@ final class ApiTransport {
       } on http.ClientException catch (error) {
         cancellation?.throwIfCancelled();
         if (attempt >= retryPolicy.maxRetries) {
-          throw NetworkException('The GetBible service is unavailable.', error);
+          throw NetworkException('The getBible service is unavailable.', error);
         }
         await _wait(retryPolicy.delayFor(attempt), cancellation);
         attempt += 1;
@@ -580,6 +582,9 @@ final class ApiTransport {
   }
 
   void clearCache() {
+    // Requests that started before removal may still answer their callers,
+    // but must not silently restore the content the user just cleared.
+    _cacheEpoch++;
     _cache.clear();
     _cachedBytes = 0;
   }
@@ -623,7 +628,7 @@ HttpStatusException _statusError(
     retryAfter: retryAfter,
     problem: problem,
     message:
-        problem?.detail ?? problem?.title ?? 'GetBible returned HTTP $status.',
+        problem?.detail ?? problem?.title ?? 'getBible returned HTTP $status.',
   ),
 };
 

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getbible/application/app_state.dart';
 import 'package:getbible/core/json.dart';
 import 'package:getbible/data/database/local_database.dart';
+import 'package:getbible/domain/models/offline_resource.dart';
 import 'package:getbible/domain/models/passage.dart';
 import 'package:getbible/domain/models/search.dart';
 import 'package:http/http.dart' as http;
@@ -42,6 +43,9 @@ void main() {
         verse: 3,
       );
       await state.loadPassage(original);
+      // Reader selection owns a separate automatic download. Finish that
+      // fixture attempt before isolating the search request boundary below.
+      await state.offline.ensureAvailable(OfflineResourceKind.bible, 'tst');
       final beforePosition = await state.settings.getLastReadingPosition();
       final beforeNotes = await state.annotations.getNotes();
       final beforeMarkings = await state.annotations.getMarkings();

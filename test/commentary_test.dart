@@ -38,13 +38,16 @@ void main() {
     () async {
       final preferences = _Preferences();
       final repository = _Repository(fixture, secondModule: true);
+      final opened = <String>[];
       final controller = CommentaryController(
         repository: repository,
         preferences: preferences,
+        captureResourceUse: () => opened.add,
       );
       addTearDown(controller.dispose);
       await controller.open(_context());
       await controller.selectModule('second');
+      expect(opened, ['fixture', 'second']);
       expect(preferences.saved['en'], 'second');
       preferences.saved['en'] = 'fixture';
       controller.clearRememberedPreferences();
@@ -447,12 +450,14 @@ void main() {
   test(
     'late module and dismissed requests cannot replace current Study state',
     () async {
+      final opened = <String>[];
       final _Repository repository = _Repository(fixture, secondModule: true);
       final Completer<CommentaryChapter> old = Completer<CommentaryChapter>();
       repository.delayedChapter = old;
       final CommentaryController controller = CommentaryController(
         repository: repository,
         preferences: _Preferences(),
+        captureResourceUse: () => opened.add,
       );
       addTearDown(controller.dispose);
       final Future<void> first = controller.open(_context());
@@ -477,6 +482,9 @@ void main() {
       await pending;
       expect(controller.context, isNull);
       expect(controller.chapter, isNull);
+      expect(opened, [
+        'second',
+      ], reason: 'Stale and dismissed loads cannot schedule resources.');
       expect(controller.isLoading, isFalse);
     },
   );

@@ -13,13 +13,30 @@ import '../api/public_topic_adapter.dart';
 import '../api/service_envelope_adapters.dart';
 import 'bible_index_worker.dart';
 
-/// Downloads complete published modules only after an explicit manager action.
+/// Downloads complete published modules when scheduled by the offline manager.
 /// No per-entry/chapter HTTP crawl is used. The small companion documents and
 /// complete body must match one stable manifest snapshot before activation.
-final class StudyResourceInstaller implements OfflineResourceInstaller {
-  const StudyResourceInstaller(this.transport, this.kind);
+final class StudyResourceInstaller
+    implements OfflineResourceInstaller, OfflineRevisionCache {
+  StudyResourceInstaller(
+    this.transport,
+    this.kind, {
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
   final ApiTransport transport;
   final OfflineResourceKind kind;
+  final DateTime Function() _clock;
+  final Set<String> _knownManifestPaths = {};
+  _Manifest? _manifestCache;
+  DateTime? _manifestCheckedAt;
+  Uri? _manifestSource;
+
+  @override
+  void clearRevisionCache() {
+    _manifestCache = null;
+    _manifestCheckedAt = null;
+    _manifestSource = null;
+  }
 
   @override
   Set<OfflineResourceKind> get supportedKinds => {kind};
@@ -31,7 +48,76 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
       'Use the Bible installer.',
     ),
   };
+  @override
   Uri get sourceUri => transport.configuration.endpoint(_service).baseUri;
+
+  @override
+  Future<OfflineResourceDescriptor> resolve(
+    OfflineResourceKind kind,
+    String id,
+    RequestCancellation cancellation,
+  ) async {
+    _validate(kind, id, sourceUri);
+    final descriptor = (await discover(
+      cancellation,
+    )).where((resource) => resource.id == id).firstOrNull;
+    if (descriptor == null) {
+      throw const FormatException(
+        'This resource is not in the published catalogue.',
+      );
+    }
+    return checkRevision(descriptor, cancellation);
+  }
+
+  @override
+  Future<OfflineResourceDescriptor> checkRevision(
+    OfflineResourceDescriptor resource,
+    RequestCancellation cancellation,
+  ) async {
+    _validate(resource.kind, resource.id, resource.sourceUri);
+    final manifest = await _manifest(_revisionPaths(resource.id), cancellation);
+    return OfflineResourceDescriptor(
+      kind: kind,
+      id: resource.id,
+      title: resource.title,
+      sourceUri: sourceUri,
+      revision: _revision(resource.id, manifest),
+      estimatedBytes: resource.estimatedBytes,
+      attribution: resource.attribution,
+    );
+  }
+
+  void _validate(OfflineResourceKind kind, String id, Uri source) {
+    if (kind != this.kind ||
+        source != sourceUri ||
+        id.isEmpty ||
+        id == '.' ||
+        id == '..' ||
+        id.contains('/') ||
+        id.contains('\\') ||
+        (kind == OfflineResourceKind.bookmarks && id != 'all')) {
+      throw const FormatException(
+        'The installation belongs to another resource or service.',
+      );
+    }
+  }
+
+  List<String> _revisionPaths(String id) =>
+      kind == OfflineResourceKind.bookmarks
+      ? ['index.json', 'all.json']
+      : [
+          '$id.json',
+          '$id/metadata.json',
+          '$id/${kind == OfflineResourceKind.dictionary ? 'index' : 'books'}.json',
+        ];
+
+  /// Global catalogue/build timestamps can change without changing this module.
+  /// Fingerprint only its complete body and metadata/index companions; both
+  /// installation and later checks use this exact ordered tuple.
+  String _revision(String id, _Manifest manifest) =>
+      'sha256:${sha256.convert(utf8.encode(jsonEncode([
+        for (final path in _revisionPaths(id)) [path, manifest.hashes[path]],
+      ])))}';
 
   @override
   Future<List<OfflineResourceDescriptor>> discover(
@@ -52,12 +138,13 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
           sourceUri: sourceUri,
           revision: discovery.checksum,
           attribution:
-              'GetBible public topics; source verse coordinates and translated names',
+              'getBible public topics; source verse coordinates and translated names',
         ),
       ];
     }
     if (kind == OfflineResourceKind.dictionary) {
       final catalogue = ServiceEnvelopeAdapters.dictionaries(response.json);
+      _rememberModulePaths(catalogue.modules.map((module) => module.id));
       return [
         for (final module in catalogue.modules)
           OfflineResourceDescriptor(
@@ -72,6 +159,7 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
       ];
     }
     final catalogue = ServiceEnvelopeAdapters.commentaries(response.json);
+    _rememberModulePaths(catalogue.modules.map((module) => module.id));
     return [
       for (final module in catalogue.modules)
         OfflineResourceDescriptor(
@@ -84,6 +172,16 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
           attribution: module.license,
         ),
     ];
+  }
+
+  void _rememberModulePaths(Iterable<String> ids) {
+    _knownManifestPaths.clear();
+    _knownManifestPaths.add(_cataloguePath);
+    // Discovery may be large or supplied by another configured source. Keep
+    // only a bounded set of small fingerprints, never the complete manifest.
+    for (final id in ids.take(1000)) {
+      _knownManifestPaths.addAll(_revisionPaths(id));
+    }
   }
 
   String get _cataloguePath => switch (kind) {
@@ -101,17 +199,7 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
     OfflineInstallSink sink,
     RequestCancellation cancellation,
   ) async {
-    if (resource.kind != kind ||
-        resource.sourceUri != sourceUri ||
-        resource.id.isEmpty ||
-        resource.id == '.' ||
-        resource.id == '..' ||
-        resource.id.contains('/') ||
-        resource.id.contains('\\')) {
-      throw const FormatException(
-        'The installation belongs to another resource or service.',
-      );
-    }
+    _validate(resource.kind, resource.id, resource.sourceUri);
     final bookmarks = kind == OfflineResourceKind.bookmarks;
     if (bookmarks && resource.id != 'all') {
       throw const FormatException(
@@ -152,13 +240,10 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
       sink.progress(i + 1, paths.length, 'Downloading ${resource.title}');
     }
     final catalogue = docs[_cataloguePath]!.json;
-    late final String verifiedRevision;
+    final verifiedRevision = _revision(resource.id, before);
     var verifiedTitle = resource.title;
     var verifiedAttribution = resource.attribution;
-    if (bookmarks) {
-      verifiedRevision = PublicTopicAdapter.discovery(catalogue).checksum;
-    } else {
-      verifiedRevision = requireString(catalogue, 'generated_at');
+    if (!bookmarks) {
       final available = kind == OfflineResourceKind.dictionary
           ? ServiceEnvelopeAdapters.dictionaries(
               catalogue,
@@ -228,7 +313,7 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
     if (!bookmarks) {
       await sink.writeDocument('catalogue.json', jsonEncode(catalogue));
     }
-    final after = await _manifest(paths, cancellation);
+    final after = await _manifest(paths, cancellation, force: true);
     for (final path in paths) {
       if (before.hashes[path] != after.hashes[path]) {
         throw const FormatException(
@@ -264,8 +349,22 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
 
   Future<_Manifest> _manifest(
     List<String> paths,
-    RequestCancellation cancellation,
-  ) async {
+    RequestCancellation cancellation, {
+    bool force = false,
+  }) async {
+    cancellation.throwIfCancelled();
+    final previous = _manifestCache;
+    final checkedAt = _manifestCheckedAt;
+    final age = checkedAt == null ? null : _clock().difference(checkedAt);
+    if (!force &&
+        previous != null &&
+        _manifestSource == sourceUri &&
+        age != null &&
+        !age.isNegative &&
+        age < const Duration(minutes: 1) &&
+        paths.every(previous.hashes.containsKey)) {
+      return previous;
+    }
     final response = await _get(
       kind == OfflineResourceKind.bookmarks ? 'checksums.json' : 'hashes.json',
       cancellation,
@@ -277,6 +376,7 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
         'kind': 'manifest',
         'bytes': response.bytes,
         'paths': paths,
+        'optionalPaths': _knownManifestPaths.toList(),
         'bookmarks': kind == OfflineResourceKind.bookmarks,
       },
       (batch) async {
@@ -294,6 +394,10 @@ final class StudyResourceInstaller implements OfflineResourceInstaller {
     if (result == null) {
       throw const FormatException('The resource manifest could not be read.');
     }
+    cancellation.throwIfCancelled();
+    _manifestCache = result;
+    _manifestCheckedAt = _clock();
+    _manifestSource = sourceUri;
     return result!;
   }
 

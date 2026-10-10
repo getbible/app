@@ -23,7 +23,7 @@ final class TopicsPanel extends StatefulWidget {
     required this.controller,
     required this.context,
     required this.onPreviewReference,
-    this.onSetUpOffline,
+    this.onManageDownloads,
     this.onPrivateCopyCommitted,
     this.bookmarks,
     this.onOpenBookmarks,
@@ -38,7 +38,7 @@ final class TopicsPanel extends StatefulWidget {
   final ValueChanged<String?>? onOpenBookmarks;
   final StudyContext context;
   final Future<void> Function(ReferenceRequest) onPreviewReference;
-  final VoidCallback? onSetUpOffline;
+  final VoidCallback? onManageDownloads;
   final Future<void> Function()? onPrivateCopyCommitted;
 
   @override
@@ -129,7 +129,7 @@ final class _TopicsPanelState extends State<TopicsPanel> {
               children: <Widget>[
                 StudyOfflineStatus(
                   installed: controller.isInstalled,
-                  onSetUpOffline: widget.onSetUpOffline,
+                  onManageDownloads: widget.onManageDownloads,
                 ),
                 Text(
                   UiStrings.of(context).text('Public topics · {label}', {
@@ -359,7 +359,7 @@ final class _TopicsPanelState extends State<TopicsPanel> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: StudyOfflineStatus(
               installed: controller.isInstalled,
-              onSetUpOffline: widget.onSetUpOffline,
+              onManageDownloads: widget.onManageDownloads,
             ),
           ),
         ),
@@ -562,7 +562,7 @@ final class _TopicsPanelState extends State<TopicsPanel> {
           Text('$error'),
           StudyOfflineStatus(
             installed: null,
-            onSetUpOffline: widget.onSetUpOffline,
+            onManageDownloads: widget.onManageDownloads,
           ),
           const SizedBox(height: 12),
           FilledButton.icon(

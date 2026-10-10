@@ -53,7 +53,7 @@ void main() {
       }))!;
       addTearDown(() async {
         repository.release();
-        await state.close();
+        await tester.runAsync(state.close);
       });
       await _mount(tester, state);
       await tester.tap(find.text(state.ui('study')));
@@ -111,6 +111,7 @@ void main() {
       expect(state.study.commentary.chapter, isNotNull);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+      await _closeWithPumps(tester, state);
     },
   );
 
@@ -143,13 +144,13 @@ void main() {
       }))!;
       addTearDown(() async {
         fixture.release();
-        await state.close();
+        await tester.runAsync(state.close);
       });
       final originalChapter = state.current;
       final originalPassage = state.passage;
       expect(state.translations.map((item) => item.abbreviation), ['fx']);
       await _mount(tester, state);
-      await _openDrawerItem(tester, state, 'Set up offline use');
+      await _openDrawerItem(tester, state, 'Downloads & storage');
       late Future<void> installation;
       await tester.runAsync(() async {
         final next = state.offline.catalog.singleWhere(
@@ -162,7 +163,7 @@ void main() {
       expect(state.offline.installing, isTrue);
       await tester.tap(find.byTooltip('Close offline resources'));
       await _settle(tester);
-      expect(find.text('Offline resources'), findsNothing);
+      expect(find.text('Downloads & storage'), findsNothing);
       expect(state.translations.map((item) => item.abbreviation), ['fx']);
 
       await tester.runAsync(() async {
@@ -188,6 +189,7 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+      await _closeWithPumps(tester, state);
     },
   );
 }
@@ -252,6 +254,18 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() ready) async {
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );
   }
+}
+
+/// Automatic public work starts in the widget binding's scheduling zone. Keep
+/// pumping while shutdown cancels it and drains SQLite before leaving that zone.
+Future<void> _closeWithPumps(WidgetTester tester, AppState state) async {
+  var complete = false;
+  late Future<void> closing;
+  await tester.runAsync(() async {
+    closing = state.close().whenComplete(() => complete = true);
+  });
+  await _pumpUntil(tester, () => complete);
+  await tester.runAsync(() => closing);
 }
 
 /// Hold only the private save used by beforeSnapshot. Everything still reaches

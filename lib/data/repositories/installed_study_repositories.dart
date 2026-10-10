@@ -455,7 +455,10 @@ final class _InstalledReader {
   ) async {
     cancellation?.throwIfCancelled();
     final current = await snapshot(id);
-    if (current == null) return null;
+    if (current == null) {
+      await _verifyUninstalled(id, cancellation);
+      return null;
+    }
     final raw = await store.readDocument(
       current.resource.key,
       path,
@@ -463,8 +466,9 @@ final class _InstalledReader {
     );
     cancellation?.throwIfCancelled();
     if (raw == null) {
+      await _verifyGeneration(current, cancellation);
       throw const StorageException(
-        'The installed Study resource changed or is incomplete. Reopen it or reinstall it from Set up offline use.',
+        'The installed Study resource changed or is incomplete. Reopen it or reinstall it from Downloads & storage.',
       );
     }
     return raw;
@@ -479,7 +483,10 @@ final class _InstalledReader {
     cancellation?.throwIfCancelled();
     if (beginSnapshot) _snapshots[id] = find(id);
     final snapshot = await this.snapshot(id);
-    if (snapshot == null) return null;
+    if (snapshot == null) {
+      await _verifyUninstalled(id, cancellation);
+      return null;
+    }
     return readSnapshot(snapshot, path, cancellation);
   }
 
@@ -497,21 +504,39 @@ final class _InstalledReader {
     );
     cancellation?.throwIfCancelled();
     if (raw == null) {
-      if (allowMissing) {
-        final current = await find(snapshot.resource.id);
-        if (current?.generation == snapshot.generation) return null;
-      }
+      await _verifyGeneration(snapshot, cancellation);
+      if (allowMissing) return null;
       throw const StorageException(
-        'This document is unavailable in the installed resource. Reinstall it from Set up offline use.',
+        'This document is unavailable in the installed resource. Reinstall it from Downloads & storage.',
       );
     }
     try {
       return jsonDecode(raw);
     } on FormatException catch (error) {
       throw StorageException(
-        'The installed resource is damaged. Reinstall it from Set up offline use.',
+        'The installed resource is damaged. Reinstall it from Downloads & storage.',
         error,
       );
+    }
+  }
+
+  Future<void> _verifyUninstalled(
+    String id,
+    RequestCancellation? cancellation,
+  ) async {
+    final current = await find(id);
+    cancellation?.throwIfCancelled();
+    if (current != null) throw InstalledStudyGenerationChanged(id);
+  }
+
+  Future<void> _verifyGeneration(
+    OfflineInstalledResource snapshot,
+    RequestCancellation? cancellation,
+  ) async {
+    final current = await find(snapshot.resource.id);
+    cancellation?.throwIfCancelled();
+    if (current?.generation != snapshot.generation) {
+      throw InstalledStudyGenerationChanged(snapshot.resource.id);
     }
   }
 }

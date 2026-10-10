@@ -270,7 +270,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.text('GetBible could not accept the requested input.'),
+        find.text('getBible could not accept the requested input.'),
         findsOneWidget,
       );
       expect(find.textContaining('Check your connection'), findsNothing);

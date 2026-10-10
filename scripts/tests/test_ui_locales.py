@@ -74,6 +74,19 @@ class UiLocaleToolingTest(unittest.TestCase):
         self.assertEqual(translation.reference_target('enm'), 'en')
         self.assertEqual(translation.reference_target('af'), 'af')
 
+    def test_pending_english_is_not_reused_as_a_completed_translation(self):
+        english = {'translated': 'Keep offline', 'pending': 'Clear downloads?'}
+        pack = {'translated': 'Offline behalten', 'pending': english['pending']}
+        self.assertEqual(
+            translation.reusable_messages(english, english, pack, ['pending']),
+            {'translated': 'Offline behalten'},
+        )
+        changed = dict(english, translated='Keep available offline')
+        self.assertEqual(
+            translation.reusable_messages(changed, english, pack, ['pending']),
+            {},
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

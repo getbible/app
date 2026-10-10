@@ -158,6 +158,17 @@ void main() {
           }
         }
         final metadata = locales[locale]! as Map<String, Object?>;
+        final pending = (metadata['englishFallbackKeys'] as List? ?? [])
+            .cast<String>();
+        expect(pending.toSet(), hasLength(pending.length), reason: locale);
+        for (final key in pending) {
+          expect(english, contains(key), reason: '$locale/$key');
+          expect(translated[key], english[key], reason: '$locale/$key');
+        }
+        if (pending.isNotEmpty) {
+          expect(metadata['status'], contains('English fallback'));
+          expect(metadata['status'], contains('human review pending'));
+        }
         expect(
           metadata['target'] == 'en',
           webUiFallbackLocales.contains(locale),

@@ -19,9 +19,18 @@ enum CommentaryAvailability {
 /// Request ownership is scoped to Study, independent of Scripture navigation.
 /// A changed module/context cancels the old request and never displays its data.
 final class CommentaryController extends ChangeNotifier {
-  CommentaryController({required this.repository, required this.preferences});
+  CommentaryController({
+    required this.repository,
+    required this.preferences,
+    this.captureResourceUse,
+  });
 
   final CommentaryRepository repository;
+
+  /// Captures the composition root's current download intent at action start.
+  /// Only a successfully opened module invokes the captured callback.
+  final ValueChanged<String> Function()? captureResourceUse;
+  ValueChanged<String>? _resourceOpened;
   final StudyPreferencesRepository preferences;
   final RequestOwner _owner = RequestOwner();
   final Map<String, String> _rememberedChoices = <String, String>{};
@@ -116,6 +125,7 @@ final class CommentaryController extends ChangeNotifier {
   Future<void> open(StudyContext context) async {
     _installationStatusGeneration++;
     if (_disposed) return;
+    _resourceOpened = captureResourceUse?.call();
     final RequestCancellation token = _owner.begin();
     final String? previousLanguage = _context?.language;
     _context = context;
@@ -188,6 +198,7 @@ final class CommentaryController extends ChangeNotifier {
       if (module.id == id) selected = module;
     }
     if (selected == null) return;
+    _resourceOpened = captureResourceUse?.call();
     final RequestCancellation token = _owner.begin();
     _selected = selected;
     _beginLoading();
@@ -220,6 +231,17 @@ final class CommentaryController extends ChangeNotifier {
   }
 
   Future<void> _loadSelected(RequestCancellation token) async {
+    try {
+      await _loadSelectedGeneration(token);
+    } on InstalledStudyGenerationChanged {
+      token.throwIfCancelled();
+      // Refresh metadata and coverage together. A second activation must remain
+      // a retryable error rather than producing a mixed-revision chapter.
+      await _loadSelectedGeneration(token);
+    }
+  }
+
+  Future<void> _loadSelectedGeneration(RequestCancellation token) async {
     final CommentaryModule module = _selected!;
     final StudyContext context = _context!;
     final statusGeneration = ++_installationStatusGeneration;
@@ -276,6 +298,7 @@ final class CommentaryController extends ChangeNotifier {
       read(context.chapter),
       if (context.chapter != 0)
         read(0).catchError((Object error) {
+          if (error is InstalledStudyGenerationChanged) throw error;
           if (_owner.owns(token)) _introductionError = error;
           return null;
         }),
@@ -283,6 +306,7 @@ final class CommentaryController extends ChangeNotifier {
     if (!_owner.owns(token)) return;
     _chapter = chapters.first;
     _introduction = context.chapter == 0 ? null : chapters.last;
+    _resourceOpened?.call(module.id);
   }
 
   void _beginLoading() {

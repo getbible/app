@@ -17,6 +17,7 @@ import 'package:getbible/data/repositories/sql_public_topic_copy_repository.dart
 import 'package:getbible/domain/models/annotations.dart';
 import 'package:getbible/domain/models/offline_resource.dart';
 import 'package:getbible/domain/models/passage.dart';
+import 'package:getbible/domain/repositories/installed_study_resource.dart';
 
 import 'support/study_installation_fixture.dart';
 
@@ -396,7 +397,7 @@ void main() {
       await fixture.install(database);
       await expectLater(
         repository.chapter(1, 2),
-        throwsA(isA<StorageException>()),
+        throwsA(isA<InstalledStudyGenerationChanged>()),
       );
       await repository.discovery();
       expect((await repository.chapter(1, 2)).verses, isEmpty);

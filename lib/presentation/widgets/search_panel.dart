@@ -12,7 +12,8 @@ import '../../domain/models/service_envelopes.dart';
 import '../../services/search_match_emphasis.dart';
 import 'scripture_verse_text.dart';
 
-/// Native search content with an explicit online/installed source selection.
+/// Native search content defaults to a complete installed Bible when available.
+/// An explicit online/installed source choice remains under the reader's control.
 /// The injected controller owns requests; widgets only edit typed criteria.
 class SearchPanel extends StatefulWidget {
   const SearchPanel({
@@ -46,6 +47,7 @@ class _SearchPanelState extends State<SearchPanel> {
   final TextEditingController _proximity = TextEditingController();
   final ScrollController _scroll = ScrollController();
   SearchExecutionMode _mode = SearchExecutionMode.online;
+  bool _sourceChosen = false;
   SearchWordMode _words = SearchWordMode.all;
   SearchMatchMode _match = SearchMatchMode.exact;
   OnlineSearchScope _scope = OnlineSearchScope.bible;
@@ -66,11 +68,14 @@ class _SearchPanelState extends State<SearchPanel> {
     super.initState();
     _scroll.addListener(_loadNearEnd);
     widget.controller.addListener(_scheduleRetryAvailability);
+    _useDefaultSource();
     final OnlineSearchRequest? previous = widget.controller.request;
     if (previous != null &&
         previous.translation == widget.translation &&
         widget.initialQuery.isEmpty) {
       _mode = widget.controller.mode;
+      // A restored result set keeps its source and filter semantics.
+      _sourceChosen = true;
       _query.text = previous.text;
       final OnlineSearchCriteria criteria = previous.criteria;
       _words = criteria.words;
@@ -107,10 +112,33 @@ class _SearchPanelState extends State<SearchPanel> {
       _inputGeneration++;
       widget.controller.clear(notify: false);
       _hasSearched = false;
+      if (oldWidget.translation != widget.translation) _sourceChosen = false;
+      _useDefaultSource();
       _opening = false;
       _openError = null;
       _applyInitialQuery();
     }
+    if (!_hasSearched) _useDefaultSource();
+  }
+
+  void _useDefaultSource() {
+    if (_sourceChosen) return;
+    final mode = widget.controller.defaultModeFor(widget.translation);
+    if (_mode == mode) return;
+    _mode = mode;
+    _diacritics = mode == SearchExecutionMode.installed
+        ? SearchDiacritics.exact
+        : SearchDiacritics.fold;
+    if (mode == SearchExecutionMode.installed) _useInstalledCriteria();
+  }
+
+  void _useInstalledCriteria() {
+    _diacritics = SearchDiacritics.exact;
+    _sort = SearchSort.canonical;
+    if (_scope == OnlineSearchScope.deuterocanon) {
+      _scope = OnlineSearchScope.bible;
+    }
+    _proximity.clear();
   }
 
   void _applyInitialQuery() {
@@ -473,14 +501,10 @@ class _SearchPanelState extends State<SearchPanel> {
             ).text('Installed Bible (offline)'),
           },
           (value) {
+            _sourceChosen = true;
             _mode = value;
             if (value == SearchExecutionMode.installed) {
-              _diacritics = SearchDiacritics.exact;
-              _sort = SearchSort.canonical;
-              if (_scope == OnlineSearchScope.deuterocanon) {
-                _scope = OnlineSearchScope.bible;
-              }
-              _proximity.clear();
+              _useInstalledCriteria();
             }
             _inputChanged();
           },

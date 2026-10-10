@@ -43,7 +43,16 @@ void main() {
         await tester.enterText(field, 'KJV');
         await tester.pumpAndSettle();
         expect(find.text('Greek dictionary'), findsNothing);
-        await tester.ensureVisible(find.text('Install'));
+        await tester.scrollUntilVisible(
+          find.text('Install'),
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Install'));
         await tester.pumpAndSettle();
@@ -91,7 +100,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(input().controller.text, 'Greek');
         expect(find.text('Greek dictionary'), findsOneWidget);
-        expect(find.text('Install'), findsOneWidget);
+        expect(find.text('Keep offline'), findsOneWidget);
+        expect(find.text('Install'), findsNothing);
         expect(find.text('No matching resources.'), findsNothing);
       } finally {
         controller.cancel();
@@ -128,7 +138,16 @@ void main() {
       await tester.tap(find.text('Browse catalogue'));
       await tester.pumpAndSettle();
       expect(installer.discoveryRequests, 1);
-      await tester.ensureVisible(find.text('Install'));
+      await tester.scrollUntilVisible(
+        find.text('Install'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Install'));
       await tester.pumpAndSettle();
@@ -138,6 +157,88 @@ void main() {
       expect(installer.installRequests, 1);
       expect(controller.installed, hasLength(1));
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'manager exclusions remove public copies and clear keeps private data and choices',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final database = await LocalDatabase.memory();
+      final installer = _Installer(kind: OfflineResourceKind.dictionary);
+      final freshness = SqlOfflineFreshnessStore(database);
+      final controller = OfflineController(
+        store: SqlOfflineResourceStore(database),
+        freshness: freshness,
+        installers: [installer],
+      );
+      await database.writeSetting('private-note', {'text': 'retain this'});
+      await controller.discover();
+      await tester.runAsync(() => controller.install(installer.resource));
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: OfflineSetupPanel(controller: controller)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final toggle = find.byType(CheckboxListTile).first;
+        await tester.scrollUntilVisible(
+          toggle,
+          150,
+          scrollable: find
+              .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<CheckboxListTile>(toggle).value, isTrue);
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        expect(controller.installed, isEmpty);
+        expect(
+          await freshness.readExcludedKeys(),
+          contains(installer.resource.key),
+        );
+        final clear = find.widgetWithText(TextButton, 'Clear downloads');
+        await tester.scrollUntilVisible(
+          clear,
+          -200,
+          scrollable: find
+              .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(find.text('Clear downloads?'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Clear downloads'));
+        await tester.pumpAndSettle();
+        expect(controller.installed, isEmpty);
+        expect(
+          await database.readSetting('private-note'),
+          contains('retain this'),
+        );
+        expect(
+          await freshness.readExcludedKeys(),
+          contains(installer.resource.key),
+        );
+        expect(installer.installRequests, 1);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await controller.close();
+        controller.dispose();
+        await database.close();
+      }
     },
   );
 
@@ -181,18 +282,33 @@ void main() {
 }
 
 final class _Installer implements OfflineResourceInstaller {
-  final resource = OfflineResourceDescriptor(
-    kind: OfflineResourceKind.bible,
+  _Installer({this.kind = OfflineResourceKind.bible});
+  final OfflineResourceKind kind;
+  late final resource = OfflineResourceDescriptor(
+    kind: kind,
     id: 'test',
     title: 'Test Bible',
     sourceUri: Uri.parse('https://example.test/v3'),
     revision: 'one',
     attribution: 'Public domain',
   );
+  @override
+  Uri get sourceUri => resource.sourceUri;
+  @override
+  Future<OfflineResourceDescriptor> resolve(
+    OfflineResourceKind kind,
+    String id,
+    RequestCancellation cancellation,
+  ) async => resource;
+  @override
+  Future<OfflineResourceDescriptor> checkRevision(
+    OfflineResourceDescriptor value,
+    RequestCancellation cancellation,
+  ) async => resource;
   int discoveryRequests = 0;
   int installRequests = 0;
   @override
-  Set<OfflineResourceKind> get supportedKinds => {OfflineResourceKind.bible};
+  Set<OfflineResourceKind> get supportedKinds => {kind};
   @override
   Future<List<OfflineResourceDescriptor>> discover(
     RequestCancellation cancellation,
@@ -226,9 +342,22 @@ final class _CatalogueInstaller implements OfflineResourceInstaller {
     kind: OfflineResourceKind.dictionary,
     id: 'greek',
     title: 'Greek dictionary',
-    sourceUri: Uri.parse('https://example.test/dictionaries/v1'),
+    sourceUri: Uri.parse('https://example.test/v3'),
     revision: 'one',
   );
+  @override
+  Uri get sourceUri => bible.sourceUri;
+  @override
+  Future<OfflineResourceDescriptor> resolve(
+    OfflineResourceKind kind,
+    String id,
+    RequestCancellation cancellation,
+  ) async => kind == OfflineResourceKind.bible ? bible : dictionary;
+  @override
+  Future<OfflineResourceDescriptor> checkRevision(
+    OfflineResourceDescriptor value,
+    RequestCancellation cancellation,
+  ) => resolve(value.kind, value.id, cancellation);
   @override
   Set<OfflineResourceKind> get supportedKinds => {
     OfflineResourceKind.bible,

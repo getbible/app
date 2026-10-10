@@ -1,6 +1,3 @@
-import 'dart:ui' as ui;
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,23 +77,6 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
       );
       await tester.pumpAndSettle();
       expect(find.text('My private note'), findsOneWidget);
-      if (nativeClipboard && defaultTargetPlatform == TargetPlatform.android) {
-        // Android's resumed lifecycle includes native window input focus.
-        // Widget focus and synthetic taps alone do not grant clipboard access.
-        await _waitForPlatformAction(
-          tester,
-          () =>
-              tester.binding.lifecycleState == AppLifecycleState.resumed ||
-              (tester.binding.lifecycleState == null &&
-                  // The integration binding's TestPlatformDispatcher masks
-                  // the engine's initial state. Use the real initial value
-                  // only until the binding receives its first lifecycle event.
-                  ui.PlatformDispatcher.instance.initialLifecycleState ==
-                      'AppLifecycleState.resumed'),
-          'Android must give the application window input focus before the '
-          'native clipboard journey; inspect runtime-evidence/window.txt.',
-        );
-      }
 
       Future<void> preview() async {
         await tester.tap(find.widgetWithText(TextButton, 'Fixture 1'));
@@ -123,7 +103,18 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
       final ClipboardData? copied = await tester.runAsync<ClipboardData?>(
         () => Clipboard.getData('text/plain'),
       );
-      expect(copied?.text, contains('Verse 70 original.'));
+      // Flutter's Android lifecycle starts with an assumed focused window;
+      // `resumed` alone cannot prove OS clipboard access. The emulator runner
+      // checks native window readiness, and this read must still prove that
+      // the real clipboard contains the text produced by the user's action.
+      expect(
+        copied?.text,
+        contains('Verse 70 original.'),
+        reason:
+            'Copy was acknowledged, but native clipboard readback failed. '
+            'On Android inspect runtime-evidence/window.txt and logcat.txt '
+            'for input focus or a system dialog.',
+      );
       expect(state.passage, original);
       await tester.tap(find.byTooltip('Close reference preview'));
       await tester.pumpAndSettle();

@@ -20,6 +20,14 @@ adb -s "$android_device" shell svc power stayon true
 adb -s "$android_device" shell input keyevent KEYCODE_WAKEUP
 adb -s "$android_device" shell wm dismiss-keyguard
 adb -s "$android_device" shell dumpsys window > build/runtime-evidence/window-before-launch.txt
+# Build first so native readiness is checked immediately before installation
+# and launch, not several minutes before Gradle finishes. Flutter drive reuses
+# this exact integration APK; its assertions and native clipboard stay enabled.
+flutter build apk --debug --target-platform=android-x64 \
+  --target=integration_test/platform_acceptance_test.dart \
+  2>&1 | tee build/runtime-evidence/build.log
+python scripts/testing/prepare_android_emulator.py --device "$android_device"
 flutter drive --driver=test_driver/platform_acceptance.dart \
   --target=integration_test/platform_acceptance_test.dart \
+  --use-application-binary=build/app/outputs/flutter-apk/app-debug.apk \
   -d "$android_device" 2>&1 | tee build/runtime-evidence/driver.log

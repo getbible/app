@@ -44,12 +44,17 @@ identity and screenshot. Timing and process memory are diagnostic measurements,
 not hard performance thresholds or physical-device benchmarks.
 
 The Android runner wakes its dedicated emulator, keeps it awake across the
-build, and dismisses the insecure keyguard. The clipboard journey requires
-Android's focused/resumed lifecycle, waits for the app's completed Copy action,
-and then reads the real OS clipboard. A failure retains window/activity/power
-state and an OS screenshot alongside logcat so a foreground-window failure can
-be distinguished from an application clipboard defect; clipboard assertions
-are never replaced by mocks on installed devices.
+build, and dismisses the insecure keyguard. It builds the integration APK first,
+then checks actual native HOME-window focus immediately before launching that
+same APK. If the resolved Pixel Launcher already has its known boot ANR dialog,
+the runner preserves its screenshot and logcat, force-stops only that launcher
+once, and requires its relaunched HOME window to regain stable input focus.
+Unknown errors and a repeated launcher ANR fail; application ANRs are never
+dismissed. An Android resumed lifecycle alone does not prove native window
+focus. The clipboard journey waits for the app's completed Copy action and
+asserts the real OS clipboard text. A failure retains window/activity/power
+state and an OS screenshot alongside logcat; clipboard assertions are never
+replaced by mocks or retries on installed devices.
 
 `runtime-validation.yml` runs macOS/Windows desktop plus Android phone/tablet
 (API 35, 2 CPU cores, 2 GiB RAM) and iPhone/iPad simulator jobs. The Linux package

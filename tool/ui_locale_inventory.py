@@ -19,7 +19,7 @@ STATIC_CONTROL = re.compile(
     r"(?:\b(?:Text|SelectableText)\(\s*|"
     r"\b(?:tooltip|semanticLabel|labelText|hintText|helperText):\s*)(['\"])"
 )
-UNTRANSLATED_BRANDS = {'GetBible API'}
+UNTRANSLATED_BRANDS = {'getBible', 'getBible API'}
 
 
 def read_literal(source: str, offset: int) -> tuple[str, int]:

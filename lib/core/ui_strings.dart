@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'native_ui_catalog.dart';
+import 'product_identity.dart';
 import 'web_ui_catalog.dart';
 
 /// Explicit UI-only localization contract shared with app.getbible.life.
@@ -87,7 +88,9 @@ final class UiStrings {
     // A malformed translated placeholder must not lose an important count,
     // resource identity or confirmation parameter. Fall back per message.
     final String template =
-        candidate.isNotEmpty && _samePlaceholders(candidate, fallback)
+        candidate.isNotEmpty &&
+            _samePlaceholders(candidate, fallback) &&
+            _sameProductName(candidate, fallback)
         ? candidate
         : fallback;
     return interpolate(template, variables);
@@ -125,6 +128,17 @@ final class UiStrings {
               ..sort())
             .join('|');
     return signature(first) == signature(second);
+  }
+
+  static bool _sameProductName(String translated, String original) {
+    if (!original.contains(ProductIdentity.name)) return true;
+    final names = RegExp(
+      r'get\s*bible(?:\.(?:life|live))?',
+      caseSensitive: false,
+    );
+    final translatedNames = names.allMatches(translated).toList();
+    return translatedNames.length == names.allMatches(original).length &&
+        translatedNames.every((match) => match[0] == ProductIdentity.name);
   }
 
   static Future<UiStrings> load(String? language, {AssetBundle? bundle}) async {

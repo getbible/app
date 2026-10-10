@@ -66,6 +66,7 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Autosaves locally. Ctrl/⌘ + Enter saves immediately.":
       "native.autosavesLocallyCtrlEnterSavesImmediately",
   "Available resources": "native.availableResources",
+  "Back to verse": "native.backToVerse",
   "Backup and restore": "native.backupAndRestore",
   "Baskerville": "native.baskerville",
   "Bible": "native.bible",
@@ -95,8 +96,6 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Checking published integrity manifest":
       "native.checkingPublishedIntegrityManifest",
   "Choose a commentary": "native.chooseACommentary",
-  "Choose a dictionary with a confirmed definition. Its source language is shown.":
-      "native.chooseADictionaryWithAConfirmedDefinitionItsSource",
   "Choose a marking": "native.chooseAMarking",
   "Choose a notebook": "native.chooseANotebook",
   "Choose a resource": "native.chooseAResource",
@@ -127,10 +126,13 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Copy public topic to my markings?": "native.copyPublicTopicToMyMarkings",
   "Copy to my markings": "native.copyToMyMarkings",
   "Copying…": "native.copying",
+  "Could not load this verse. Try again.":
+      "native.couldNotLoadThisVerseTryAgain",
   "Could not prepare the copy. {error}": "native.couldNotPrepareTheCopyError",
   "Could not save or restore your topic choices. {preferenceError}":
       "native.couldNotSaveOrRestoreYourTopicChoicesPreferenceError",
   "Could not update bookmarks. {error}": "native.couldNotUpdateBookmarksError",
+  "{count} bookmarks": "native.countBookmarks",
   "{count} dictionaries could not be checked. Showing confirmed definitions.":
       "native.countDictionariesCouldNotBeCheckedShowingConfirmedDefinitions",
   "{count} indexed definition": "native.countIndexedDefinition",
@@ -151,7 +153,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Delete notebook?": "native.deleteNotebook68e214b1",
   "Deuterocanon": "native.deuterocanon",
   "Diacritics": "native.diacritics",
-  "Dictionaries with definitions": "native.dictionariesWithDefinitions",
+  "Dictionaries with definitions ({count})":
+      "native.dictionariesWithDefinitionsCount",
   "Dictionary": "native.dictionary",
   "Dictionary attribution": "native.dictionaryAttribution",
   "“{displayTitle}” and its blocks will be permanently deleted from this device.":
@@ -190,12 +193,10 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Fold diacritics": "native.foldDiacritics",
   "Follow": "native.follow",
   "Followed": "native.followed",
+  "G": "native.g",
   "Garamond": "native.garamond",
   "getBible": "native.getbible",
-  "getBible — {wordsOfEternalLife}":
-      "native.getbibleWordsOfEternalLife",
-  "Global and personal bookmark": "native.globalAndPersonalBookmark",
-  "Global bookmark": "native.globalBookmark",
+  "getBible — {wordsOfEternalLife}": "native.getbibleWordsOfEternalLife",
   "Global bookmarks": "native.globalBookmarks",
   "Global topics could not be updated. Your saved bookmarks are still available. {error}":
       "native.globalTopicsCouldNotBeUpdatedYourSavedBookmarks",
@@ -236,9 +237,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Keep your own backup of saved Scripture, verse notes, notebooks, drafts and preferences. Backups contain private text. Choose where you save them and who can access them.":
       "native.keepYourOwnBackupOfSavedScriptureVerseNotes",
   "{label} · {bytes} saved": "native.labelBytesSaved",
-  "{label}. Show verification details.": "native.labelShowVerificationDetails",
   "Lemma": "native.lemma",
-  "{length} canonical verse associations · Public GetBible Bookmarks v1":
+  "{length} canonical verse associations · Public getBible Bookmarks v1":
       "native.lengthCanonicalVerseAssociationsPublicGetBibleBookmarksV1",
   "{length} notebook(s)": "native.lengthNotebookS",
   "License and copyright": "native.licenseAndCopyright",
@@ -249,7 +249,9 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Loading dictionary": "native.loadingDictionary",
   "Loading more matches": "native.loadingMoreMatches",
   "Loading reference": "native.loadingReference",
+  "Loading verse…": "native.loadingVerse",
   "Local storage is unavailable": "native.localStorageIsUnavailable",
+  "Look up": "native.lookUp",
   "{lovinglyMaintainedBy} Vast Development Method":
       "native.lovinglymaintainedbyVastDevelopmentMethod",
   "Manage groups": "native.manageGroups",
@@ -276,8 +278,6 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "No marking groups match this search.":
       "native.noMarkingGroupsMatchThisSearch",
   "No matching resources.": "native.noMatchingResources",
-  "No published word or lexical identifier matches this lookup. Try another dictionary or enter a word.":
-      "native.noPublishedWordOrLexicalIdentifierMatchesThisLookup",
   "No topics match these choices. A verse with no public associations is valid.":
       "native.noTopicsMatchTheseChoicesAVerseWithNo",
   "NOTE": "native.note",
@@ -292,14 +292,11 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Online resource · not installed on this device":
       "native.onlineResourceNotInstalledOnThisDevice",
   "Online search": "native.onlineSearch",
-  "Open": "native.open",
   "Open in reader": "native.openInReader",
   "Open {reference}": "native.openReference",
   "Open reference preview": "native.openReferencePreview",
   "Open saved topic": "native.openSavedTopic",
-  "Open topic": "native.openTopic",
   "Opening local data": "native.openingLocalData",
-  "Personal bookmark": "native.personalBookmark",
   "Personal bookmarks, topic names, colors, notes and notebooks will remain saved.":
       "native.personalBookmarksTopicNamesColorsNotesAndNotebooksWill",
   "Personal notebooks": "native.personalNotebooks",
@@ -310,8 +307,6 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "Preview {reference}": "native.previewReference",
   "Preview shortened. The saved file includes the complete notebook.":
       "native.previewShortenedTheSavedFileIncludesTheCompleteNotebook",
-  "Preview uses your selected Bible. Missing books or verses are reported by the reference preview.":
-      "native.previewUsesYourSelectedBibleMissingBooksOrVerses",
   "Previous citation": "native.previousCitation",
   "Previous dictionary word": "native.previousDictionaryWord",
   "Private data": "native.privateData",
@@ -373,30 +368,27 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.saveOrCloseTheVerseNoteBeforeOpeningAnother",
   "Save or retry your notebook draft before exporting.":
       "native.saveOrRetryYourNotebookDraftBeforeExporting",
-  "Saved for offline reading": "native.savedForOfflineReading",
   "Saved legacy Scripture (API v2). Connect to refresh this passage from v3.":
       "native.savedLegacyScriptureAPIV2ConnectToRefreshThis",
   "Saved locally": "native.savedLocally",
   "Saved Scripture": "native.savedScripture",
+  "Saved selection · {translation}": "native.savedSelectionTranslation",
   "Saving…": "native.saving",
   "Saving is unavailable. Copy the text instead.":
       "native.savingIsUnavailableCopyTheTextInstead",
   "Scripture citations": "native.scriptureCitations",
   "Scripture copied": "native.scriptureCopied",
   "Scripture reference": "native.scriptureReference",
-  "Scripture verified": "native.scriptureVerified",
   "Search {bible}": "native.searchBible",
-  "Search dictionaries": "native.searchDictionaries",
   "Search only the selected installed Bible. No query is sent online.":
       "native.searchOnlyTheSelectedInstalledBibleNoQueryIs",
   "Search scope": "native.searchScope",
   "Search selected books": "native.searchSelectedBooks",
   "Search selected phrase": "native.searchSelectedPhrase",
   "Search selected text": "native.searchSelectedText",
+  "Search selection": "native.searchSelection",
   "Search source": "native.searchSource",
   "Search {toUpperCase}": "native.searchToUpperCase",
-  "Searches published words and aliases, not definition text.":
-      "native.searchesPublishedWordsAndAliasesNotDefinitionText",
   "Searching installed dictionaries.": "native.searchingInstalledDictionaries",
   "Searching Scripture": "native.searchingScripture",
   "See also": "native.seeAlso",
@@ -415,20 +407,19 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.showEmphasisProvidedByThisBibleEdition",
   "Show hidden": "native.showHidden",
   "Show more dictionary words": "native.showMoreDictionaryWords",
+  "Show more verses": "native.showMoreVerses",
   "Show topic": "native.showTopic",
   "Showing the first 100 resources. Narrow your search to find more.":
       "native.showingTheFirst100ResourcesNarrowYourSearchTo",
   "Six-digit hex color, for example {example}":
       "native.sixDigitHexColorForExampleExample",
   "Source annotation": "native.sourceAnnotation",
-  "Source language: {language}": "native.sourceLanguageLanguage",
   "Source: {name} · {language}": "native.sourceNameLanguage",
   "Source note": "native.sourceNote",
   "Source text styles": "native.sourceTextStyles",
   "Source type": "native.sourceType",
   "Source variant": "native.sourceVariant",
   "Speaker": "native.speaker",
-  "Strong’s": "native.strongS",
   "Study and sermon notes stay on this device. Verse notes remain inline under Scripture.":
       "native.studyAndSermonNotesStayOnThisDeviceVerse",
   "Study or sermon notes": "native.studyOrSermonNotes",
@@ -481,8 +472,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.theLatestNotebookChangesCouldNotBeSavedReturn",
   "The latest private changes could not be saved. Retry saving before closing.":
       "native.theLatestPrivateChangesCouldNotBeSavedRetry",
-  "The lookup limit was reached. Browse an individual dictionary to continue.":
-      "native.theLookupLimitWasReachedBrowseAnIndividualDictionary",
+  "The lookup limit was reached. Try a more specific word.":
+      "native.theLookupLimitWasReachedTryAMoreSpecific",
   "The note could not be saved. Your draft is kept. {error}":
       "native.theNoteCouldNotBeSavedYourDraftIs",
   "The notebook could not be exported. Your private draft remains available.":
@@ -526,7 +517,7 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.thisBackupContainsBookmarksFromAnotherProviderExportA",
   "This chapter has no commentary covering verse {verse}. Try Whole chapter to read its other material.":
       "native.thisChapterHasNoCommentaryCoveringVerseVerseTry",
-  "This chapter was checked against the hash published by GetBible and matches the current source.":
+  "This chapter was checked against the hash published by getBible and matches the current source.":
       "native.thisChapterWasCheckedAgainstTheHashPublishedBy",
   "This complete backup format is not supported.":
       "native.thisCompleteBackupFormatIsNotSupported",
@@ -564,6 +555,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
       "native.thisTextIsTooLargeForAShareSheet",
   "This topic has no verse associations.":
       "native.thisTopicHasNoVerseAssociations",
+  "This verse is unavailable in the selected Bible.":
+      "native.thisVerseIsUnavailableInTheSelectedBible",
   "Times New Roman": "native.timesNewRoman",
   "Too many drafts.": "native.tooManyDrafts",
   "Too many notebooks.": "native.tooManyNotebooks",
@@ -598,6 +591,8 @@ const Map<String, String> nativeUiKeys = <String, String>{
   "{verseCount} verse associations{here}":
       "native.versecountVerseAssociationsHere",
   "Verses {firstVerse}–{lastVerse}": "native.versesFirstVerseLastVerse",
+  "Verses use your selected Bible. Missing verses are shown as unavailable.":
+      "native.versesUseYourSelectedBibleMissingVersesAreShown",
   "Verses {verses}": "native.versesVerses",
   "Version": "native.version",
   "Version date": "native.versionDate",

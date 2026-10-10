@@ -33,10 +33,13 @@ ALIASES = {'enm': 'en', 'hbo': 'he', 'grc': 'el', 'cu': 'ru', 'cop': 'ar',
            'nn': 'nb', 'sr': 'sr-Cyrl', 'syr': 'ar', 'tl': 'fil', 'tsg': 'fil',
            'tlh': 'tlh-Latn', 'ppk': 'id', 'zh': 'zh-Hans'}
 FALLBACKS = {'ch', 'chr', 'br', 'eo', 'gd', 'gv', 'la', 'pon', 'pot', 'tpi'}
-TERMS = ['getBible', 'GetBible', 'getBible', 'CrossWire', 'SWORD',
+TERMS = ['getBible', 'CrossWire', 'SWORD',
          'Markdown', 'SHA-256', 'SHA-1', 'SHA', 'UTF-8', 'JSON', 'MiB', 'KiB',
          'Ctrl', 'Strong’s', 'Strong\'s', '.md']
 PLACEHOLDERS = re.compile(r'\{([a-zA-Z][a-zA-Z0-9]*)\}')
+# Compact global-bookmark marker. Its separately localized semantic label
+# describes the action; the visual origin marker follows the reference UI.
+INVARIANT_MESSAGES = {'G'}
 
 
 def reference_target(locale):
@@ -66,7 +69,9 @@ def protect(value):
 
 
 def valid_translation(original, value):
-    return (bool(value) and placeholders(value) == placeholders(original)
+    return (bool(value)
+            and (original not in INVARIANT_MESSAGES or value == original)
+            and placeholders(value) == placeholders(original)
             and not re.search(r'GB\s*PH\s*\d+\s*GB|@\s*@\s*GB\s*\d+', value, re.I)
             and all(value.count(term) >= original.count(term) for term in TERMS))
 
@@ -165,6 +170,8 @@ def main():
                 values.update({key: value for key, value in pack.items()
                     if key in english and previous_sources.get(key) == english[key]
                     and valid_translation(english[key], value)})
+            values.update({key: value for key, value in english.items()
+                           if value in INVARIANT_MESSAGES})
             missing = [(key, value) for key, value in english.items() if key not in values]
             client = PublicTranslator() if missing else None
             chunks = []
@@ -250,7 +257,9 @@ def main():
         'referencePolicy': 'getbible/app.getbible.life/scripts/generate-ui-locales.mjs',
         'provider': URL,
         'review': 'Machine-generated public UI only; no claim of human linguistic review.',
+        'translationUpdates': prior.get('translationUpdates', []),
         'protectedTerms': TERMS,
+        'invariantMessages': sorted(INVARIANT_MESSAGES),
         'sourceMessages': english,
         'locales': prior_status,
     })

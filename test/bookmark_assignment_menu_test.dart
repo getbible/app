@@ -94,8 +94,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Global and personal bookmark'), findsOneWidget);
-      final personal = find.text('Remove personal bookmark');
+      expect(
+        find.bySemanticsLabel('Global and personal bookmark'),
+        findsOneWidget,
+      );
+      expect(find.byType(TextField), findsNothing);
+      await tester.tap(find.text('Add another topic'));
+      await tester.pumpAndSettle();
+      final personal = find.byTooltip('Remove personal bookmark');
       await tester.ensureVisible(personal);
       await tester.tap(personal);
       await tester.runAsync(() async {
@@ -106,8 +112,8 @@ void main() {
         expect((await state.database.getMarkings()).single.id, 'global');
       });
       await tester.pumpAndSettle();
-      expect(find.text('Remove personal bookmark'), findsNothing);
-      expect(find.text('Global bookmark'), findsOneWidget);
+      expect(find.byTooltip('Remove personal bookmark'), findsNothing);
+      expect(find.bySemanticsLabel('Global bookmark'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus,
         isTrue,

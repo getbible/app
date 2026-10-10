@@ -69,6 +69,32 @@ use**. The contextual menu separately offers **Remove personal bookmark** and
 Selecting another topic adds a personal membership without deleting other topics.
 The six most recently selected topics are persisted and shown first in the picker.
 
+The per-verse bookmark action opens a compact membership menu. Topic names open
+their saved topic directly; global and personal removals remain separate actions.
+**Add another topic** reveals the searchable list without replacing existing
+memberships. Its options scroll independently, and **Create or manage topics**
+stays in the footer. The topic view offers **All topics** and, when opened from a
+verse, **Back to verse** to restore the originating reader position and focus.
+
+## Scripture in topic lists
+
+Saved topic detail and public Study topic detail show actual verse text in the
+selected Bible. `TopicVerseLoader` uses the same `GroupedReferenceLookup` as
+reference previews, including installed-Bible resolution, validated Query v3
+responses and the existing HTTP cache. It reveals eight entries at a time with
+at most three concurrent exact-verse requests. **Show more verses** reveals the
+next page; opening a topic never downloads its entire Scripture collection.
+Each row can fail and retry independently. Closing the view or changing its
+translation cancels queued work and rejects late responses. A bounded in-memory
+cache is keyed by translation and exact coordinate.
+
+Cards include the reference, Bible abbreviation, global provenance where present
+and native selectable Scripture with reader font, source styles and direction.
+Saved text selections additionally show the original quotation and its Bible
+abbreviation. Display hydration never rewrites a private quote, membership,
+timestamp or selected-text range. Global bookmark downloads still store only
+coordinates; fetching display text is independent of those explicit downloads.
+
 Public origins without a provider field are the historical official GetBible
 source. Custom providers use the additive `sourceScope` member in source JSON.
 Matching, deduplication and bulk removal respect that scope. Renaming a topic or
@@ -125,5 +151,9 @@ malformed batches, request cancellation and unchanged notebook/draft data.
 `test/bookmark_assignment_menu_test.dart` exercises independent origin removal
 and a narrow contextual surface at 200% text. Existing preservation, public-topic,
 private-backup and installed-Study suites cover their respective boundaries.
+`test/topic_verse_loader_test.dart` covers lazy bounded requests, per-verse retry,
+translation-specific caching and cancellation. `test/topic_verse_list_test.dart`
+checks full Scripture, retained private selections, reader typography at 200%
+text and explicit next-page loading.
 Test execution results are recorded in [TESTING.md](TESTING.md); physical-device
 selection and accessibility acceptance remain separate from automated coverage.

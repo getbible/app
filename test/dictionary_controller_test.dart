@@ -13,6 +13,268 @@ import 'support/dictionary_fixture.dart';
 
 void main() {
   test(
+    'Retry completes every confirmed definition after a later entry read fails',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = _ControlledDictionaryRepository(fixture.repository)
+        ..before = (kind, module, id, count) async {
+          if (kind == 'entry' && id == 'G3056--2' && count == 2) {
+            throw const FormatException('Temporary second-definition failure');
+          }
+        };
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      expect(controller.error, isNotNull);
+      expect(controller.definitions.map((entry) => entry.id), ['G3056']);
+      await controller.retry();
+      expect(controller.error, isNull);
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+      expect(controller.query, 'Word');
+    },
+  );
+
+  test(
+    'Back restores the previous lookup while a linked definition is pending',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository);
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      repository.delayEntry = 'G4487';
+      final linked = controller.followLink('G4487');
+      await repository.entryStarted.future;
+      expect(controller.canGoBack, isTrue);
+      controller.goBack();
+      expect(controller.query, 'Word');
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+      repository.entryPending.complete(
+        await fixture.repository.entry('strongsgreek', 'G4487'),
+      );
+      await linked;
+      expect(controller.query, 'Word');
+      expect(controller.canGoBack, isFalse);
+      expect(controller.isDiscovering, isFalse);
+    },
+  );
+
+  test(
+    'nested progressive links retain each prior word before discovery completes',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = _ControlledDictionaryRepository(fixture.repository);
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      // Invalidate only discovery's index cache so one unrelated index remains
+      // pending across both navigations, while the selected definitions arrive.
+      await controller.refreshInstallationStatus();
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      repository.before = (kind, module, id, count) async {
+        if (kind == 'index' && module == 'oddgreek') {
+          if (!entered.isCompleted) entered.complete();
+          await release.future;
+        }
+      };
+      final first = controller.followLink('G4487');
+      await entered.future;
+      await _waitForEntry(controller, 'G4487');
+      expect(controller.isDiscovering, isTrue);
+      expect(controller.historyLength, 1);
+      final second = controller.followLink('G3056');
+      await _waitForEntry(controller, 'G3056');
+      expect(controller.isDiscovering, isTrue);
+      expect(controller.historyLength, 2);
+      controller.goBack();
+      expect(controller.query, 'ῥῆμα');
+      expect(controller.definitions.single.id, 'G4487');
+      controller.goBack();
+      expect(controller.query, 'Word');
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+      release.complete();
+      await Future.wait([first, second]);
+      expect(controller.query, 'Word');
+      expect(controller.canGoBack, isFalse);
+    },
+  );
+
+  test(
+    'an unavailable linked word retains Back without fabricating a definition',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = _ControlledDictionaryRepository(fixture.repository);
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      repository.before = (kind, module, id, count) async {
+        if (kind == 'entry' && id == 'G4487') {
+          throw const FormatException('Temporary failure');
+        }
+      };
+      await controller.followLink('G4487');
+      expect(controller.choices, isEmpty);
+      expect(controller.definitions, isEmpty);
+      expect(controller.canGoBack, isTrue);
+      controller.goBack();
+      expect(controller.query, 'Word');
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+    },
+  );
+
+  test(
+    'a newer word cancels a related lookup without restoring stale history',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository);
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      repository.delayEntry = 'G4487';
+      final older = controller.followLink('G4487');
+      await repository.entryStarted.future;
+      await controller.searchWords('Kadesh');
+      repository.entryPending.complete(
+        await fixture.repository.entry('strongsgreek', 'G4487'),
+      );
+      await older;
+      expect(controller.query, 'Kadesh');
+      expect(controller.selectedModule!.id, 'easton');
+      expect(controller.definitions.first.id, 'kadesh');
+      expect(controller.canGoBack, isFalse);
+      expect(controller.isBrowsing, isFalse);
+    },
+  );
+
+  test(
+    'contextual suggestions and links keep confirmed choices and restore history',
+    () async {
+      final fixture = DictionaryFixture();
+      final controller = DictionaryController(
+        repository: fixture.repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      await controller.open(dictionaryContext(strongs: ['G3056']));
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+      await controller.followLink('G4487');
+      expect(controller.query, 'ῥῆμα');
+      expect(controller.isBrowsing, isFalse);
+      expect(controller.choices.map((module) => module.id), ['strongsgreek']);
+      expect(controller.definitions.single.text, 'A saying.');
+      controller.goBack();
+      expect(controller.query, 'Word');
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+      expect(
+        controller.choices.map((module) => module.id),
+        isNot(contains('oddgreek')),
+      );
+      await controller.searchWords('Kad');
+      expect(controller.choices, isEmpty);
+      final suggestion = controller.discoveryResult!.suggestions.first;
+      await controller.openSuggestion(suggestion);
+      expect(controller.isBrowsing, isFalse);
+      expect(controller.selectedModule!.id, 'easton');
+      expect(controller.choices.map((module) => module.id), ['easton']);
+      expect(controller.definitions, isNotEmpty);
+      await controller.searchWords('');
+      expect(controller.isBrowsing, isFalse);
+      expect(controller.query, 'Word');
+      expect(
+        controller.choices.map((module) => module.id),
+        isNot(contains('oddgreek')),
+      );
+    },
+  );
+
+  test(
+    'a confirmed definition appears while an unrelated dictionary is pending',
+    () async {
+      final fixture = DictionaryFixture();
+      final repository = DelayedDictionaryRepository(fixture.repository)
+        ..delayModule = 'oddgreek';
+      final controller = DictionaryController(
+        repository: repository,
+        preferences: MemoryStudyPreferences(),
+      );
+      addTearDown(() {
+        controller.dispose();
+        fixture.close();
+      });
+      final lookup = controller.open(dictionaryContext(strongs: ['G3056']));
+      await repository.started.future;
+      for (
+        var attempt = 0;
+        attempt < 100 && controller.definitions.isEmpty;
+        attempt++
+      ) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(controller.isDiscovering, isTrue);
+      expect(controller.definitions, isNotEmpty);
+      repository.pending.complete(await fixture.repository.index('oddgreek'));
+      await lookup;
+      expect(controller.selectedModule!.id, 'strongsgreek');
+      expect(controller.definitions.map((entry) => entry.id), [
+        'G3056',
+        'G3056--2',
+      ]);
+    },
+  );
+
+  test(
     'installation status refresh preserves the current dictionary entry and history',
     () async {
       final fixture = DictionaryFixture();
@@ -150,6 +412,13 @@ void main() {
       });
       await controller.open(dictionaryContext(strongs: <String>['G3056']));
       await controller.selectModule('oddgreek');
+      expect(
+        controller.selectedModule!.id,
+        'strongsgreek',
+        reason: 'A contextual lookup cannot select an unconfirmed module.',
+      );
+      await controller.open(_browserContext());
+      await controller.selectModule('oddgreek');
       expect(controller.matches, isEmpty);
       expect(controller.entry, isNull);
       expect(
@@ -208,6 +477,7 @@ void main() {
         fixture.close();
       });
       await controller.open(dictionaryContext(strongs: <String>['G3056']));
+      await controller.open(_browserContext());
       repository.delayModule = 'oddgreek';
       final Future<void> old = controller.selectModule('oddgreek');
       await repository.started.future;
@@ -439,6 +709,61 @@ void main() {
   });
 }
 
+Future<void> _waitForEntry(DictionaryController controller, String id) async {
+  for (
+    var attempt = 0;
+    attempt < 100 && controller.entry?.id != id;
+    attempt++
+  ) {
+    await Future<void>.delayed(Duration.zero);
+  }
+  expect(controller.entry?.id, id);
+}
+
+final class _ControlledDictionaryRepository implements DictionaryRepository {
+  _ControlledDictionaryRepository(this.delegate);
+  final DictionaryRepository delegate;
+  Future<void> Function(String kind, String module, String? id, int count)?
+  before;
+  final Map<String, int> _counts = {};
+  Future<void> _read(String kind, String module, [String? id]) async {
+    final key = '$kind/$module/$id';
+    final count = _counts.update(key, (value) => value + 1, ifAbsent: () => 1);
+    await before?.call(kind, module, id, count);
+  }
+
+  @override
+  Future<DictionaryCatalogue> catalogue({RequestCancellation? cancellation}) =>
+      delegate.catalogue(cancellation: cancellation);
+  @override
+  Future<DictionaryMetadata> metadata(
+    String module, {
+    RequestCancellation? cancellation,
+  }) async {
+    await _read('metadata', module);
+    return delegate.metadata(module, cancellation: cancellation);
+  }
+
+  @override
+  Future<DictionaryIndex> index(
+    String module, {
+    RequestCancellation? cancellation,
+  }) async {
+    await _read('index', module);
+    return delegate.index(module, cancellation: cancellation);
+  }
+
+  @override
+  Future<DictionaryEntry> entry(
+    String module,
+    String id, {
+    RequestCancellation? cancellation,
+  }) async {
+    await _read('entry', module, id);
+    return delegate.entry(module, id, cancellation: cancellation);
+  }
+}
+
 final class DelayedDictionaryRepository
     implements DictionaryRepository, InstalledStudyResource {
   DelayedDictionaryRepository(this.delegate);
@@ -488,4 +813,14 @@ final class DelayedDictionaryRepository
     }
     return delegate.entry(module, id, cancellation: cancellation);
   }
+}
+
+StudyContext _browserContext() {
+  final source = dictionaryContext();
+  return StudyContext(
+    passage: source.passage,
+    bookName: source.bookName,
+    language: source.language,
+    verse: source.verse,
+  );
 }

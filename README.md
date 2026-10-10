@@ -4,7 +4,7 @@ Cross-platform Flutter implementation of [getBible](https://app.getbible.life), 
 
 The React application at [`getbible/app.getbible.life`](https://github.com/getbible/app.getbible.life) and its live deployment are the product source of truth. Flutter must reproduce the same reader behavior and data contracts natively. See the [web-to-Flutter parity contract](docs/WEB_FLUTTER_PARITY.md).
 
-> Development status: the alpha reader includes Bible v3, Search and Query, contextual Study, unified personal/global bookmarks, private notebooks, complete backups and explicitly installed public resources. Integrated parity and automated platform acceptance are implemented in this candidate; actual run evidence and remaining device, language-review and store gates are recorded in [testing](docs/TESTING.md) and [feature parity](docs/FEATURE_PARITY.md). Downloadable development packages are not store-approved releases.
+> Development status: the alpha reader includes Bible v3, Search and Query, contextual Study, unified personal/global bookmarks, private notebooks, complete backups and offline public resources. Automatic downloads and reader alignment are part of this candidate; actual run evidence and remaining device, language-review and store gates are recorded in [testing](docs/TESTING.md) and [feature parity](docs/FEATURE_PARITY.md). Downloadable development packages are not store-approved releases.
 
 ## Supported targets
 
@@ -142,17 +142,34 @@ and displays a preview before confirmation. The additive transaction preserves
 conflicting private work with deterministic identities. Backups contain private
 text in readable JSON; choose their destination deliberately.
 
-Open **Set up offline use** to browse public resource catalogues and explicitly
-install a complete Bible, dictionary, commentary or the public-topic collection.
-The manager shows attribution, known size, progress, cancellation, retry and
-installed revision. Each download is verified and indexed before activation; an
-unsuccessful update leaves the previous installation usable. Removing public
-resources preserves private notes, notebooks and independent topic copies.
-Interrupted downloads restart on retry; byte-range resume is not assumed.
+The reader prepares the selected Bible for offline use in the background and
+automatically downloads all dictionaries and commentaries discovered in their
+catalogues. It does not download every Bible translation. Reading uses an
+available verified installation immediately while public acquisition runs through
+one queue. **Downloads & storage** shows progress, attribution, storage usage,
+retry and per-resource **Keep offline** controls. Turning that control
+off removes its local copy and persists an exclusion for that dictionary or
+commentary until it is enabled again.
+
+Successful source checks are remembered for 30 days. Startup, resume or use
+checks resources whose interval has elapsed; unchanged hashes avoid another
+bulk download. Changed content is fully verified and indexed before atomic
+activation, and failures leave the previous installation readable. **Check for
+updates** bypasses the interval. Downloads run while the app is active;
+interrupted downloads restart on retry rather than resuming byte ranges.
+
+**Clear downloads** removes public offline content while retaining private
+notes, notebooks, memberships, preferences and automatic-download exclusions.
+Default resources are acquired again on the next startup/use. The complete
+Bookmarks v1 dataset is a separate manual download and stays removed until
+requested again. Topic choices use API metadata or its saved copy, never a
+hardcoded list; downloading public content does not assign topics to verses.
 
 Installed Bibles serve the reader and supported reference previews locally.
-Search remains **Online** by default; choose **Installed** for local full-text
-search, whose supported filters are stated in the search panel. Installed Study
+Search prefers **Installed** when the selected Bible is fully available locally;
+its supported filters are stated in the search panel. An explicit source choice
+is retained, and **Online** remains available for service-only capabilities.
+Unsupported local filters never silently send the query online. Installed Study
 resources use the same native panels and citations. Public caches and downloaded
 corpora are excluded from private backups; reinstall public resources on a new
 device. Release Web packages also cache their application files after the first
@@ -228,7 +245,7 @@ The code is divided into domain models/contracts, data adapters, application sta
 ```text
 lib/
   application/       reader lifecycle and independently owned Study controllers
-  core/              errors, JSON validation, starter groups
+  core/              errors, JSON validation, product identity, localization
   data/api/          shared transport and service-specific typed adapters
   data/database/     local SQLite schema and platform executors
   data/repositories/ cache and persistence implementations

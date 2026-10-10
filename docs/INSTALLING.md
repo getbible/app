@@ -111,8 +111,10 @@ simple file server has no SPA fallback: begin the local test at `/flutter/` and
 wait for shell preparation before testing passage reloads.
 
 After the initial online visit finishes preparing application files, this shell
-can reopen from the same origin with the network unavailable. Install the
-desired Bible/Study resources separately for complete offline content. Browser
+can reopen from the same origin with the network unavailable. Let automatic
+selected-Bible and dictionary/commentary downloads finish for complete offline
+content; check their status and exclusions in **Downloads & storage**. The full
+bookmarks corpus remains an optional manual download. Browser
 storage eviction or explicitly clearing site data can remove the app shell or
 private data; export private backups. Application updates prepare a new verified
 cache while existing tabs retain their current app version. Close all tabs for

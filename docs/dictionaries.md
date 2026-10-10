@@ -122,12 +122,17 @@ source context. Additional regressions are in `dictionary_discovery_test.dart`,
 
 ## Complete offline dictionaries
 
-**Set up offline use** lists the dynamically discovered dictionaries, source
-language, license and advertised whole-module size. An explicit installation
+**Downloads & storage** lists dynamically discovered dictionaries, source
+language, license and advertised whole-module size. All catalogue modules are
+queued automatically by default. Turning off a module's **Keep offline**
+control removes its local copy and persists the exclusion. Acquisition
 fetches the current SHA-256 manifest, catalogue, module metadata, index and
 `{dictionary}.json`. It hashes the exact downloaded bytes, validates identities,
 counts and every nested entry against the published index, and checks the same
-manifest paths again before activation. Repeated display keys remain separate
+manifest paths again before activation. A successful source check is retained
+for 30 days; startup, resume or use checks due modules, and **Check for updates**
+bypasses the interval. Unchanged hashes retain the installed generation without
+another bulk download. Repeated display keys remain separate
 exact IDs; aliases, lexical IDs, links, citations and attribution survive.
 
 The complete module is decoded, verified and indexed in a native isolate or the
@@ -140,8 +145,9 @@ readable. Installation/removal never writes private annotations.
 `InstalledDictionaryRepository` supplies the same typed controller boundary.
 Installed metadata, index and entries are read locally after restart, with an
 **Installed on this device** status. Saved discovery retains online-only choices
-without delaying installed lookup for an HTTP timeout; **Set up offline use →
-Browse catalogue / Check for updates** obtains new discovery. Online-only choices retain
+without delaying installed lookup for an HTTP timeout; background discovery and
+**Downloads & storage → Check for updates** obtain current catalogue metadata.
+Online-only choices retain
 an explicit status and use the existing API. An entry missing from an installed
 snapshot is a repairable storage error, never a fetch from another revision.
 Source roots are isolated and a module reading session pins its generation.

@@ -61,7 +61,7 @@ Typed failures retain HTTP status and Retry-After. Cache policy accounts for
 Cache-Control, validators, Date/Age and Expires; no-store bodies are not retained,
 no-cache responses are revalidated, and 304 requires an eligible saved body.
 Missing browser-exposed headers imply conservative freshness. This bounded
-HTTP cache is separate from SQLite's saved Scripture and explicit
+HTTP cache is separate from SQLite's saved Scripture and complete
 installations. Cancellation is request-scoped: dismissing one surface never
 closes another service's shared client.
 
@@ -237,17 +237,21 @@ legacy readers must not be presented with notebook data they cannot interpret.
 Imports must validate the complete bounded document before a transactional
 merge and preserve distinct conflicting work and its references.
 
-Explicit offline installations own public resource generations and their
+Complete offline installations own public resource generations and their
 derived indexes. Downloading, validation and indexing happen in a staged
 generation; only a fully validated generation may replace the active one.
-Cancellation, process interruption, storage failure and resource removal must
-never remove private records or invalidate the last usable installation.
+Cancellation, process interruption and storage failure must never invalidate
+the last usable installation. Deliberate public resource removal must preserve
+private records and automatic-download exclusions.
 Transient cache eviction and installation removal are separate operations.
 
 Bible, dictionary, commentary and topic adapters supply source-specific
 discovery and indexing behind a shared installation contract. Reader, Query,
 Search and Study consume typed installed adapters through their existing
-repositories. Normal online use starts no bulk download. Offline Search must
+repositories. Automatic acquisition now prepares the selected Bible and all
+non-excluded dictionary/commentary catalogue entries; complete bookmark content
+remains manual opt-in. This supersedes the earlier deliberate-install-only
+policy without changing generation or private-data ownership. Offline Search must
 identify its supported filters and source explicitly. Large parsing/indexing
 requires native workers and a browser-worker or bounded cooperative strategy;
 Flutter Web compute alone does not provide background execution.
@@ -265,8 +269,10 @@ typed import previews, progress and export actions. The complete backup contract
 is versioned independently of website v2 so an older importer cannot mistake a
 partial restore for full notebook support.
 
-`OfflineResourceStore` owns schema-5 installation generations, documents, search
-rows and interruption leases. Source-specific installers fetch published bulk
+`OfflineResourceStore` owns installation generations, documents, search rows and
+interruption leases introduced in schema 5. Schema 6 adds `OfflineFreshnessStore`
+for persisted source checks, retry scheduling, catalogue plans and per-module
+exclusions. Source-specific installers fetch published bulk
 files, validate exact bytes and publication consistency, and stream bounded
 index batches from a native isolate or the bundled browser worker. Only the
 activation transaction changes the visible generation. Installed adapters pin a
@@ -275,8 +281,34 @@ generation and reject changed snapshots; they do not splice different revisions.
 Closing the app drains private portability and offline work before closing
 SQLite. Failure to journal a private edit leaves the database and controllers
 available for Retry. Closing an offline panel alone does not cancel a requested
-installation. Ordinary startup reads installed metadata locally and makes no
-catalogue or bulk-download request.
+installation. Startup opens installed metadata locally, then schedules public
+acquisition independently of the reading path.
+
+## Automatic offline acquisition
+
+The selected Bible and all dictionaries/commentaries from the configured
+catalogues enter one owned background queue. Bible selection never queues every
+translation. Persistent exclusions control automatic acquisition per dictionary
+or commentary. Disabling automatic downloads removes its local copy; online
+reading remains available without re-enabling automatic storage.
+Topic metadata remains API-driven, while the full public bookmarks corpus is
+downloaded only on explicit request and never recreated merely because it was
+removed. Downloading that corpus does not create saved verse memberships.
+
+Startup, resume and resource use check the persisted successful-check timestamp.
+After 30 days, a manifest/hash check determines whether a verified generation
+needs replacement; a failed check does not advance the timestamp. A forced check
+bypasses this interval. Unchanged content is retained without another bulk
+download. Changed content uses the existing worker, staging and atomic
+activation boundaries, keeping the previous generation readable on failure.
+No closed-app operating-system background scheduler is assumed.
+
+Clearing public downloads invalidates queued/in-flight acquisition before
+removing public copies and applicable cached representations. Private records
+and automatic-download exclusions survive. Defaults may be acquired on the next
+startup/use; the full bookmarks corpus remains manual. Widgets expose queue,
+availability and error states through **Downloads & storage**, without owning
+HTTP, hash decisions or installation transactions.
 
 ## Decision record ADR-003: integrated reader and artifact promotion
 

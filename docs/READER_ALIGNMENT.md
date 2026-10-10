@@ -47,6 +47,23 @@ endpoints. Product-owned links must share one explicit configuration contract.
 - All topics and Back to verse preserve the originating passage and position.
 - Layout, text scaling, keyboard focus, RTL and themes remain native Flutter.
 
+## Automatic offline defaults
+
+The selected Bible is prepared in the background; other translations are not
+downloaded automatically. All catalogue-discovered dictionaries/commentaries
+are acquired by default through one queue. **Downloads & storage → Keep
+offline** persists a per-module choice; disabling it removes the local copy and
+keeps automatic acquisition off. Public topic choices come from Bookmarks v1
+metadata or its saved copy, never hardcoded topic lists. The complete bookmarks
+dataset is manual opt-in and stays removed until explicitly requested again.
+
+Startup, resume and resource use check persisted successful source checks after
+30 days. Unchanged hashes avoid bulk redownload; changed content activates only
+after complete validation, with the last good generation retained on failure.
+**Check for updates** bypasses the interval. **Clear downloads** retains private
+data and exclusions, while default resources can return on the next startup/use.
+These operations run while the app is active and do not imply closed-app OS jobs.
+
 ## Acceptance evidence
 
 Implemented in [pull request #7](https://github.com/getbible/app/pull/7) for

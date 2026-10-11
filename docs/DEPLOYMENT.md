@@ -63,6 +63,17 @@ is installed and no application is rebuilt by promotion. A source run whose
 artifacts have expired cannot be recovered by this workflow; start a new Flutter
 CI run on the appropriate main commit/version instead.
 
+If a main build retained all packages but a runtime job failed or timed out,
+repair the reported problem and rerun only that job from its Actions page. A
+successful rerun triggers automatic publication using the same run ID and the
+original package archives. There is no need to increase the application version
+or rebuild successful packages merely to recover an unpublished release. The
+run must still finish successfully; a failed or cancelled acceptance job cannot
+be bypassed to publish its artifacts. See the [alpha 5 iPad incident](BUILD_INCIDENT_2026-10.md#10-october-ipad-runtime-timeout-blocked-alpha-5-publication).
+Do not rerun the old skipped publication event: it still describes the original
+unsuccessful CI completion. Wait for the new successful completion event, or use
+the manual publication workflow with the now-successful source run ID.
+
 PR runs, fork runs, failed runs and unrelated workflows cannot be promoted. The
 publisher verifies repository and workflow identities, successful completion,
 main ancestry, the source commit's `pubspec.yaml` and timestamp, the exact package

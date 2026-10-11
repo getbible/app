@@ -79,7 +79,10 @@ assertion ran or failed in these jobs. Increasing the discovery timeout alone
 does not address a service announcement missed by the live log listener.
 
 Flutter 3.44.6 provides `drive --use-existing-app=<URL>` to attach directly to an
-already-running application. The repair must discover the authenticated service
-URL from retained unified logs scoped to the current launch, then use this
-supported connection path while preserving all six acceptance tests and their
-failure semantics. The already-published alpha 5 assets remain unchanged.
+already-running application. The launcher now installs and launches the built
+APP paused, obtains its process ID, and discovers the authenticated service URL
+from retained unified logs scoped to that process, executable and launch time.
+It uses the supported explicit connection path to run the same six acceptance
+tests. Install, launch and discovery share one three-minute startup budget;
+driver attachment and test failures never enter the reboot path. The published
+alpha 5 assets remain unchanged.

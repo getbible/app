@@ -440,20 +440,30 @@ window/activity/power state, all-buffer logcat and a native screenshot. Syntheti
 widget focus alone does not establish Android clipboard permission.
 
 The iOS acceptance launcher builds the integration APP once and reuses it for
-bounded launch attempts. It permits one simulator reboot only for an observed
-install/launch/VM-service stall before the host test driver starts; reported
-errors, failed tests and post-start timeouts are never retried. Build, boot,
-attachment and test phases have separate limits inside a 38-minute session,
-followed by a bounded cleanup reserve. Attempt logs go directly to disk, with
-flushed stage events and simulator diagnostics. This prevents a silent launch
-from consuming the whole 50-minute job and losing its evidence.
+bounded launch attempts. It installs and launches the APP paused through
+`simctl`, obtains the launched process ID, and discovers its authenticated Dart
+VM-service URL from retained unified logs. Discovery checks the current process
+and launch time; an old application instance cannot satisfy it. The URL must be
+local to the simulator host. `flutter drive --use-existing-app` then connects
+the same host driver and resumes the paused integration journey. VM-service
+authentication remains enabled. This avoids depending on a live log listener
+being ready when the app announces its service.
+
+One simulator reboot is permitted only for a bounded startup timeout before
+driver attachment. Reported command errors, driver connection failures, failed
+tests and post-start timeouts are never retried. Build, boot, attachment and test
+phases have separate limits inside a 38-minute session, followed by a bounded
+cleanup reserve. Attempt logs go directly to disk, with flushed stage events
+and simulator diagnostics. This prevents a silent launch from consuming the
+whole 50-minute job and losing its evidence.
 Initial device discovery receives the same three-minute startup allowance as
 boot: its first `simctl` invocation also initializes CoreSimulator on a cold host.
 `scripts/tests/test_ios_simulator.py` covers timeout boundaries, child-process
 termination, partial output, split/large log markers, one-time recovery and
 failure preservation. These Python checks complement actual iPhone/iPad CI
 execution; they do not establish native runtime acceptance by themselves. See
-the [alpha 5 incident](BUILD_INCIDENT_2026-10.md#10-october-ipad-runtime-timeout-blocked-alpha-5-publication).
+the [alpha 5 incident](BUILD_INCIDENT_2026-10.md#10-october-ipad-runtime-timeout-blocked-alpha-5-publication)
+and the [post-merge discovery evidence](BUILD_INCIDENT_2026-10.md#11-october-retained-evidence-identifies-missed-vm-service-discovery).
 
 The production Web build uses bundled rendering resources, generated static
 shell inventory and Chromium, Firefox and WebKit runtime journeys under plain

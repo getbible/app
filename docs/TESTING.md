@@ -414,6 +414,13 @@ loaded source metadata, scrolls its lazy list, and checks the visible,
 hit-testable source-language label before opening the definition; native IME
 transitions must not be mistaken for missing resource data.
 
+Notebook editing waits for bounded keyboard/editor geometry stability before
+revealing the complete form field. Native IME metrics can arrive after
+`pumpAndSettle` has returned. The helper retains the focused editor and observes
+geometry independently of the subsequent hit-test assertion; it never retries
+a failed journey. Regressions cover delayed metrics, zero-inset hardware
+keyboards and a diagnostic timeout for continuously changing geometry.
+
 ```bash
 python scripts/testing/embed_fixtures.py --check
 flutter drive --driver=test_driver/platform_acceptance.dart \
@@ -440,6 +447,8 @@ attachment and test phases have separate limits inside a 38-minute session,
 followed by a bounded cleanup reserve. Attempt logs go directly to disk, with
 flushed stage events and simulator diagnostics. This prevents a silent launch
 from consuming the whole 50-minute job and losing its evidence.
+Initial device discovery receives the same three-minute startup allowance as
+boot: its first `simctl` invocation also initializes CoreSimulator on a cold host.
 `scripts/tests/test_ios_simulator.py` covers timeout boundaries, child-process
 termination, partial output, split/large log markers, one-time recovery and
 failure preservation. These Python checks complement actual iPhone/iPad CI

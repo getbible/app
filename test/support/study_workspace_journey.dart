@@ -15,6 +15,7 @@ import 'package:getbible/presentation/widgets/study_workspace.dart';
 import 'package:getbible/presentation/widgets/topics_panel.dart';
 import 'package:provider/provider.dart';
 
+import 'focused_editor.dart';
 import 'study_api_fixture.dart';
 
 /// Exercises public resources and private editing through the production reader.
@@ -308,10 +309,9 @@ void studyWorkspaceJourney({
       await tester.pumpAndSettle();
       expect(bodyState.mounted, isTrue);
       expect(bodyState.widget.focusNode.hasFocus, isTrue);
-      // A title caret-reveal already queued by the IME can still move the
-      // viewport. Reveal this same retained editor using the settled geometry.
-      await Scrollable.ensureVisible(bodyState.context);
-      await tester.pumpAndSettle();
+      // Native keyboard metrics can arrive after pumpAndSettle returns. Retain
+      // focus, wait for geometry, then reveal the form boundary we assert below.
+      await revealFocusedEditor(tester, field: block, editor: bodyState);
       expect(block.hitTestable(), findsOneWidget);
       expect(
         tester

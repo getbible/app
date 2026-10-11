@@ -95,3 +95,21 @@ explicitly requests Flutter's application/device cleanup. A denied group signal
 is recorded as a warning only when the command has already exited; it cannot
 replace a completed command's result. Denied signals for running commands remain
 errors, and the final simulator shutdown is still attempted.
+
+The same [verification run
+38153311245](https://github.com/getbible/app/actions/runs/38153311245) retained a
+different iPad failure: installation and boot completed, but both `simctl launch`
+attempts timed out without a process ID, Runner log or VM-service announcement.
+The simulator screenshots show an unlocked home screen and the installed app.
+This establishes a failure before application execution; it does not identify
+the underlying CoreSimulator cause.
+
+Review also found that the runner sent TERM/KILL to every command's process
+group after normal exit, including simulator discovery, boot and installation.
+Normal command completion does not authorize terminating persistent platform
+services initialized by that command. The runner now reaps naturally completed
+commands without signalling their groups, regardless of exit code. Bounded
+group termination still runs after timeouts or interruptions. Regression tests
+cover both natural completion and aborted-command cleanup. Native CI is needed
+to determine whether this lifecycle correction also resolves the iPad launch
+stall; the recorded iPad evidence alone cannot prove that causal connection.

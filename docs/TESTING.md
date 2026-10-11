@@ -432,6 +432,20 @@ clipboard. The dedicated emulator is kept awake; failure artifacts include
 window/activity/power state, all-buffer logcat and a native screenshot. Synthetic
 widget focus alone does not establish Android clipboard permission.
 
+The iOS acceptance launcher builds the integration APP once and reuses it for
+bounded launch attempts. It permits one simulator reboot only for an observed
+install/launch/VM-service stall before the host test driver starts; reported
+errors, failed tests and post-start timeouts are never retried. Build, boot,
+attachment and test phases have separate limits inside a 38-minute session,
+followed by a bounded cleanup reserve. Attempt logs go directly to disk, with
+flushed stage events and simulator diagnostics. This prevents a silent launch
+from consuming the whole 50-minute job and losing its evidence.
+`scripts/tests/test_ios_simulator.py` covers timeout boundaries, child-process
+termination, partial output, split/large log markers, one-time recovery and
+failure preservation. These Python checks complement actual iPhone/iPad CI
+execution; they do not establish native runtime acceptance by themselves. See
+the [alpha 5 incident](BUILD_INCIDENT_2026-10.md#10-october-ipad-runtime-timeout-blocked-alpha-5-publication).
+
 The production Web build uses bundled rendering resources, generated static
 shell inventory and Chromium, Firefox and WebKit runtime journeys under plain
 and COOP/COEP-isolated hosting. The journey exercises real browser SQLite,

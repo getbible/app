@@ -22,3 +22,43 @@ and persistence coverage, platform-host build jobs, versioned packaging and
 checksums. Testable unsigned outputs must remain distinguishable from signed
 store submissions. See `LOCAL_DEVELOPMENT.md` and `DEPLOYMENT.md` for the final
 commands and signing boundaries.
+
+## 10 October: iPad runtime timeout blocked alpha 5 publication
+
+[Main CI run 38078120633](https://github.com/getbible/app/actions/runs/38078120633)
+successfully built and retained all seven platform package archives for
+`1.0.0-alpha.5+6`. All other required checks passed. Its iPad runtime job completed
+the Xcode build at 19:14 UTC, then emitted no driver connection or test-start
+message before the 50-minute job timeout at 19:54 UTC. This was a simulator
+launch/attachment stall after compilation; the available log does not identify
+the underlying CoreSimulator failure. It does not establish an application test
+assertion failure.
+
+The acceptance launcher had no timeout around the Flutter child process or its
+simulator commands. It also buffered its evidence file: the retained
+`runtime-iPad` artifact contained a zero-byte `driver.log`, even though command
+output had reached the Actions console. Cancellation at the outer job deadline
+prevented useful final simulator diagnostics. The unsuccessful CI conclusion
+correctly prevented automatic release promotion.
+
+Recover an otherwise successful main run by rerunning only its failed/cancelled
+runtime job. A successful new attempt triggers **Publish tested packages** and
+promotes the original versioned archives, with commit/checksum validation and no
+rebuild. Successful checks must remain required; do not publish a failed run or
+replace its conclusion with a manual override. The promotion inventory accepts
+original-attempt package archives and ignores repeated runtime diagnostics.
+
+The revised launcher builds the integration APP once, then reuses that exact
+bundle for bounded simulator attempts. It limits build, boot, attachment and
+test phases independently, with a 38-minute overall execution budget and a
+separate 90-second cleanup reserve. Child output is written directly to disk;
+per-stage JSON events, simulator screenshots and console diagnostics survive a
+timeout. Owned child process groups are terminated, and cleanup reserves time
+for shutdown even if diagnostic commands stall.
+
+One reboot/relaunch is allowed only after an observed simulator install, launch
+or VM-service wait times out before the host test driver begins, without a
+reported error. Build failures, nonzero driver exits, test failures and timeouts
+after the driver begins remain failures. Recovery does not rebuild the APP or
+retry failed assertions. The exact underlying failure in the original silent
+launch remains unknown; new verbose attempt evidence makes recurrence diagnosable.

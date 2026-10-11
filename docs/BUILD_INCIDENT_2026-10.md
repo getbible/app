@@ -62,3 +62,24 @@ reported error. Build failures, nonzero driver exits, test failures and timeouts
 after the driver begins remain failures. Recovery does not rebuild the APP or
 retry failed assertions. The exact underlying failure in the original silent
 launch remains unknown; new verbose attempt evidence makes recurrence diagnosable.
+
+## 11 October: retained evidence identifies missed VM-service discovery
+
+The complete PR verification passed, but the subsequent [main run
+38142017784](https://github.com/getbible/app/actions/runs/38142017784) failed both
+iOS runtime jobs. All seven package builds and the other platform checks passed.
+The new watchdog retained evidence and stopped each unsuccessful launch attempt
+after three minutes; it did not resolve the underlying connection problem.
+
+On the first attempt, both apps actually started. The iPhone unified log records
+the Dart VM service at 13:19:29 UTC; the iPad records it at 13:18:46 UTC. Flutter
+continued waiting for that service in both cases and never invoked the host test
+driver. The second attempts stalled inside `simctl launch`. No application test
+assertion ran or failed in these jobs. Increasing the discovery timeout alone
+does not address a service announcement missed by the live log listener.
+
+Flutter 3.44.6 provides `drive --use-existing-app=<URL>` to attach directly to an
+already-running application. The repair must discover the authenticated service
+URL from retained unified logs scoped to the current launch, then use this
+supported connection path while preserving all six acceptance tests and their
+failure semantics. The already-published alpha 5 assets remain unchanged.

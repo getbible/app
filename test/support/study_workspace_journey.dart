@@ -311,7 +311,7 @@ void studyWorkspaceJourney({
       expect(bodyState.widget.focusNode.hasFocus, isTrue);
       // Native keyboard metrics can arrive after pumpAndSettle returns. Retain
       // focus, wait for geometry, then reveal the form boundary we assert below.
-      await revealFocusedEditor(tester, field: block, editor: bodyState);
+      await revealFocusedEditor(tester, editor: bodyState);
       expect(block.hitTestable(), findsOneWidget);
       expect(
         tester

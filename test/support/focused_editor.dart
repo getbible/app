@@ -10,12 +10,24 @@ import 'package:flutter_test/flutter_test.dart';
 /// focus and editability independently after this bounded synchronization.
 Future<void> revealFocusedEditor(
   WidgetTester tester, {
-  required Finder field,
   required EditableTextState editor,
   Duration quietPeriod = const Duration(milliseconds: 500),
   Duration timeout = const Duration(seconds: 5),
 }) async {
-  final BuildContext fieldContext = tester.element(field);
+  if (!editor.mounted) {
+    throw TestFailure(
+      'The focused editor was disposed before keyboard layout.',
+    );
+  }
+  // A lazy list can retain its focused editor outside the painted viewport.
+  // Normal finders skip those children; use the retained editor's ancestry
+  // until the containing form field has actually been revealed.
+  final FormFieldState<String>? formField = editor.context
+      .findAncestorStateOfType<FormFieldState<String>>();
+  if (formField == null) {
+    throw TestFailure('The focused editor has no containing text form field.');
+  }
+  final BuildContext fieldContext = formField.context;
   final DateTime deadline = tester.binding.clock.fromNowBy(timeout);
 
   Future<void> waitForGeometry() async {
@@ -30,6 +42,7 @@ Future<void> revealFocusedEditor(
       final ScrollPosition position = Scrollable.of(fieldContext).position;
       final RenderBox editableBox =
           editor.context.findRenderObject()! as RenderBox;
+      final RenderBox fieldBox = fieldContext.findRenderObject()! as RenderBox;
       final geometry = (
         physicalSize: tester.view.physicalSize,
         devicePixelRatio: tester.view.devicePixelRatio,
@@ -39,7 +52,7 @@ Future<void> revealFocusedEditor(
           tester.view.viewInsets.right,
           tester.view.viewInsets.bottom,
         ),
-        field: tester.getRect(field),
+        field: fieldBox.localToGlobal(Offset.zero) & fieldBox.size,
         editable: editableBox.localToGlobal(Offset.zero) & editableBox.size,
         scrollOffset: position.pixels,
         viewport: position.viewportDimension,

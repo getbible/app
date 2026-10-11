@@ -125,3 +125,25 @@ Log discovery now uses the remaining shared budget, just like install and
 launch. The overall three-minute startup bound is unchanged. Regressions cover
 a log query taking more than 30 seconds, shared-deadline exhaustion and the
 shorter overall session deadline.
+
+## 11 October: isolate the remaining native simulator launch stall
+
+[PR 9 verification](https://github.com/getbible/app/actions/runs/38155966677)
+passed both iOS families on their first attempt. The iPad log query took 43.73
+seconds, directly exercising the corrected shared timeout. The subsequent
+[main run](https://github.com/getbible/app/actions/runs/38157448974) passed iPhone
+and every other platform, but iPad again stalled before application execution.
+Both `simctl launch` attempts timed out without a process ID or test driver.
+Rebooting the same image-provided device did not recover it. Initial device
+discovery also took 163.71 seconds on that host; the evidence does not establish
+a single underlying CoreSimulator cause.
+
+The next correction isolates acceptance from image-provided device state.
+Flutter 3.44.6's `dev/devicelab/lib/framework/ios.dart` provides the reference
+lifecycle: create a simulator for the test, boot it, then shut down and delete
+that simulator during teardown. The selected iOS runtime and device type must
+remain unchanged. Only a validated, newly created device ID may establish
+ownership; pre-existing devices must never become cleanup targets. Application
+code, package versions and failed-test retry restrictions remain unchanged.
+Native PR and post-merge verification are still required before this remaining
+launch failure can be considered resolved.

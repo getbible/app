@@ -197,6 +197,7 @@ class ProcessRunner:
         self.event(stage=stage, status='started', command=command,
                    timeout_seconds=min(timeout, self.deadline - started))
         process = None
+        completed = False
         try:
             with path.open('wb', buffering=0) as destination, path.open('rb') as source:
                 process = self.popen(command, stdout=destination,
@@ -215,6 +216,7 @@ class ProcessRunner:
                     if code is not None and not chunk:
                         self.event(stage=stage, status='exited', returncode=code,
                                    elapsed_seconds=round(self.clock() - started, 2))
+                        completed = True
                         return code
                     if progress is not None and progress.driver_started_at is not None:
                         stage_deadline = progress.driver_started_at + TEST_SECONDS
@@ -231,7 +233,11 @@ class ProcessRunner:
                        }))
             raise
         finally:
-            if process is not None:
+            # A completed simctl command can leave persistent CoreSimulator
+            # services in its process group. Normal exit is not permission to
+            # terminate those services. Only aborts require forced cleanup;
+            # Flutter's --no-keep-app-running owns its normal driver shutdown.
+            if process is not None and not completed:
                 self.stop(process)
 
 

@@ -449,6 +449,13 @@ the same host driver and resumes the paused integration journey. VM-service
 authentication remains enabled. This avoids depending on a live log listener
 being ready when the app announces its service.
 
+The existing-app driver explicitly uses `--no-keep-app-running`, so Flutter
+stops the application and disposes its device log readers after the journey.
+If macOS refuses a process-group cleanup signal after the command has already
+exited, the runner records that cleanup warning and preserves the command's
+result. A signal failure while the command is still running remains fatal.
+Simulator shutdown still runs within the separate cleanup reserve.
+
 One simulator reboot is permitted only for a bounded startup timeout before
 driver attachment. Reported command errors, driver connection failures, failed
 tests and post-start timeouts are never retried. Build, boot, attachment and test

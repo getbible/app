@@ -86,3 +86,12 @@ It uses the supported explicit connection path to run the same six acceptance
 tests. Install, launch and discovery share one three-minute startup budget;
 driver attachment and test failures never enter the reboot path. The published
 alpha 5 assets remain unchanged.
+
+Native verification of this connection path succeeded on iPhone on its first
+attempt: retained-log discovery took 9.29 seconds and all six tests passed. It
+also exposed a separate post-exit cleanup error: macOS rejected a process-group
+signal after the driver had exited successfully. The existing-app command now
+explicitly requests Flutter's application/device cleanup. A denied group signal
+is recorded as a warning only when the command has already exited; it cannot
+replace a completed command's result. Denied signals for running commands remain
+errors, and the final simulator shutdown is still attempted.

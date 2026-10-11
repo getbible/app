@@ -157,10 +157,8 @@ class ProcessRunner:
         # Signal the group even if its leader exited: xcrun/Dart may leave a
         # descendant holding resources. Never kill unrelated runner processes.
         for sig, seconds in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
-            try:
-                self.kill_group(process.pid, sig)
-            except ProcessLookupError:
-                pass
+            if not self.signal_group(process, sig):
+                return
             try:
                 process.wait(timeout=seconds)
             except subprocess.TimeoutExpired:
@@ -168,11 +166,26 @@ class ProcessRunner:
             # A dead leader does not prove its descendants exited. SIGKILL the
             # remaining group after graceful shutdown without an unbounded wait.
             if sig == signal.SIGTERM:
-                try:
-                    self.kill_group(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                self.signal_group(process, signal.SIGKILL)
             return
+
+    def signal_group(self, process, sig):
+        try:
+            self.kill_group(process.pid, sig)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            code = process.poll()
+            if code is None:
+                # An owned command that is still running must remain a failure.
+                raise
+            # macOS may retain protected simulator descendants after the owned
+            # command exits. Record the denied cleanup without replacing that
+            # command's known result, and never escalate the denied signal.
+            self.event(stage='process-cleanup', status='permission_denied_after_exit',
+                       pid=process.pid, returncode=code, signal=sig.name)
+            return False
+        return True
 
     def run(self, command, stage, timeout, *, progress=None):
         started = self.clock()
@@ -363,7 +376,7 @@ class SimulatorAcceptance:
                 # attachment or the test journey is eligible for a new attempt.
                 progress = DriverProgress(self.runner.clock)
                 code = self.runner.run([
-                    'flutter', 'drive', '--verbose', '--no-pub',
+                    'flutter', 'drive', '--verbose', '--no-pub', '--no-keep-app-running',
                     f'--driver={DRIVER}', f'--target={TARGET}',
                     f'--use-existing-app={uri}', '-d', self.identifier,
                 ], f'attempt-{attempt}/driver', ATTACH_SECONDS, progress=progress)

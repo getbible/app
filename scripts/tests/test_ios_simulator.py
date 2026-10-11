@@ -130,6 +130,46 @@ class ProcessRunnerTests(unittest.TestCase):
         runner = self.runner(end=0, code=17)
         self.assertEqual(runner.run(['command'], 'failed-test', 2), 17)
 
+    def test_denied_cleanup_after_exit_retains_success_or_failure_without_escalation(self):
+        for code in (0, 17):
+            for denied_signal in (signal.SIGTERM, signal.SIGKILL):
+                with self.subTest(code=code, denied_signal=denied_signal):
+                    runner = self.runner(end=0, code=code)
+                    signals = []
+
+                    def signal_group(pid, sig):
+                        signals.append(sig)
+                        if sig == denied_signal:
+                            raise PermissionError('protected simulator descendant')
+
+                    runner.kill_group = signal_group
+                    self.assertEqual(runner.run(['command'], 'completed', 2), code)
+                    expected = ([signal.SIGTERM] if denied_signal == signal.SIGTERM
+                                else [signal.SIGTERM, signal.SIGKILL])
+                    self.assertEqual(signals, expected)
+                    event = json.loads((self.output / 'stages.jsonl').read_text().splitlines()[-1])
+                    self.assertEqual(event['status'], 'permission_denied_after_exit')
+                    self.assertEqual(event['pid'], self.child.pid)
+                    self.assertEqual(event['returncode'], code)
+                    self.assertEqual(event['signal'], denied_signal.name)
+
+    def test_denied_cleanup_of_running_command_remains_fatal(self):
+        for denied_signal in (signal.SIGTERM, signal.SIGKILL):
+            with self.subTest(denied_signal=denied_signal):
+                runner = self.runner(ignore_term=True)
+
+                def denied(pid, sig):
+                    if sig == denied_signal:
+                        raise PermissionError('running process cannot be terminated')
+                    self.child.kill_group(pid, sig)
+
+                runner.kill_group = denied
+                with self.assertRaisesRegex(PermissionError, 'running process'):
+                    runner.run(['command'], 'running', 1)
+                self.assertIsNone(self.child.poll())
+                self.assertNotIn('permission_denied_after_exit',
+                                 (self.output / 'stages.jsonl').read_text())
+
     def test_driver_start_changes_to_test_budget_without_resetting_on_each_line(self):
         runner = self.runner(events=[(0, DRIVER_START.encode()), (10, b'still working\n')])
         progress = ios.DriverProgress(self.clock)
@@ -260,6 +300,7 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         drive = commands['attempt-1/driver']
         self.assertIn(f'--use-existing-app={VM_URI}', drive)
         self.assertIn('--no-pub', drive)
+        self.assertIn('--no-keep-app-running', drive)
         self.assertFalse(any(arg.startswith('--use-application-binary') for arg in drive))
         self.assertEqual(drive[-1], 'tablet')
         self.assertEqual(json.loads((runner.output / 'device.json').read_text())['udid'], 'tablet')

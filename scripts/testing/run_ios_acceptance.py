@@ -32,7 +32,6 @@ BUILD_SECONDS = 15 * 60
 BOOT_SECONDS = 3 * 60
 ATTACH_SECONDS = 3 * 60
 TEST_SECONDS = 12 * 60
-LOG_QUERY_SECONDS = 30
 
 
 class CommandFailure(RuntimeError):
@@ -265,11 +264,11 @@ class SimulatorAcceptance:
         prefix = f'attempt-{self.attempt}'
         deadline = min(self.runner.clock() + ATTACH_SECONDS, self.runner.deadline)
 
-        def startup(command, stage, limit=ATTACH_SECONDS):
+        def startup(command, stage):
             remaining = deadline - self.runner.clock()
             if remaining <= 0:
                 raise StageTimeout(stage, session_expired=self.runner.clock() >= self.runner.deadline)
-            self.required(command, stage, min(limit, remaining))
+            self.required(command, stage, remaining)
 
         startup(['xcrun', 'simctl', 'install', self.identifier, str(self.application)],
                 f'{prefix}/install')
@@ -293,7 +292,7 @@ class SimulatorAcceptance:
             startup(['xcrun', 'simctl', 'spawn', self.identifier, 'log', 'show',
                      '--last', '5m',
                      '--style', 'json', '--predicate', f'process == "{executable}"'],
-                    stage, LOG_QUERY_SECONDS)
+                    stage)
             uri = discovery.find((self.runner.output / f'{stage}.log').read_text())
             if uri is not None:
                 self.runner.event(stage=f'{prefix}/discovery', status='ready', pid=discovery.pid)

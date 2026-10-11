@@ -4,11 +4,13 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import signal
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SOURCE = Path(__file__).resolve().parents[1] / 'testing/run_ios_acceptance.py'
@@ -64,6 +66,8 @@ class FakeChild:
         return self.returncode
 
 
+@unittest.skipUnless(hasattr(os, 'killpg') and hasattr(signal, 'SIGKILL'),
+                     'Process-group termination requires POSIX signals')
 class ProcessRunnerTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -289,6 +293,21 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ios.SimulatorAcceptance(runner).run('watch')
         self.assertEqual(runner.calls, [])
+
+
+class PortabilityTests(unittest.TestCase):
+    def test_import_without_killpg_preserves_pure_checks_and_rejects_native_execution(self):
+        spec = importlib.util.spec_from_file_location('ios_acceptance_without_posix', SOURCE)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(os.__dict__):
+            os.__dict__.pop('killpg', None)
+            spec.loader.exec_module(module)
+            progress = module.DriverProgress()
+            progress.observe(VM_WAIT)
+            self.assertTrue(progress.retryable)
+            with tempfile.TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(RuntimeError, 'POSIX host with Xcode'):
+                    module.ProcessRunner(Path(directory))
 
 
 class DriverProgressTests(unittest.TestCase):

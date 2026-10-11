@@ -233,8 +233,10 @@ class SimulatorAcceptance:
     def run(self, family):
         if family not in ('iPhone', 'iPad'):
             raise ValueError('SIMULATOR_FAMILY must be iPhone or iPad.')
+        # First discovery starts CoreSimulator on a cold hosted runner; allow
+        # its boot budget rather than treating it as a warmed-up metadata read.
         self.required(['xcrun', 'simctl', 'list', 'devices', 'available', '--json'],
-                      'available-devices', 30)
+                      'available-devices', BOOT_SECONDS)
         listing = json.loads((self.runner.output / 'available-devices.log').read_text())
         available = [(runtime, device) for runtime, devices in listing['devices'].items()
                      for device in devices if '.iOS-' in runtime

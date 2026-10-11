@@ -377,8 +377,43 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         self.assertNotIn('attempt-1/driver', runner.stages)
         queries = [call for call in runner.calls if '/vm-service/' in call[1]]
         self.assertTrue(queries)
-        self.assertLessEqual(max(call[2] for call in queries), ios.LOG_QUERY_SECONDS)
+        self.assertEqual(queries[0][2], 60)
+        self.assertLessEqual(max(call[2] for call in queries), 60)
         self.assertEqual(queries[-1][2], 1)
+
+    def test_slow_log_query_uses_remaining_startup_budget_without_unnecessary_reboot(self):
+        runner = self.runner(delays={'attempt-1/install': 24, 'attempt-1/launch': 31,
+                                     'attempt-1/vm-service/001': 45})
+        self.assertEqual(self.acceptance(runner).run('iPhone'), 0)
+        query = next(call for call in runner.calls if call[1] == 'attempt-1/vm-service/001')
+        self.assertEqual(query[2], ios.ATTACH_SECONDS - 24 - 31)
+        self.assertEqual(runner.clock(), 100)
+        self.assertNotIn('recovery/shutdown', runner.stages)
+        self.assertIn('attempt-1/driver', runner.stages)
+
+    def test_slow_log_query_cannot_exceed_remaining_startup_budget(self):
+        runner = self.runner(delays={
+            f'attempt-{attempt}/{stage}': delay
+            for attempt in (1, 2)
+            for stage, delay in (('install', 60), ('launch', 60), ('vm-service/001', 70))})
+        with self.assertRaises(ios.StageTimeout):
+            self.acceptance(runner).run('iPad')
+        self.assertEqual(runner.clock(), 2 * ios.ATTACH_SECONDS)
+        queries = [call for call in runner.calls if '/vm-service/' in call[1]]
+        self.assertEqual([call[2] for call in queries], [60, 60])
+        self.assertNotIn('attempt-1/driver', runner.stages)
+        self.assertNotIn('attempt-2/driver', runner.stages)
+
+    def test_slow_log_query_cannot_exceed_global_deadline_or_start_recovery(self):
+        runner = self.runner(delays={'attempt-1/vm-service/001': 20})
+        runner.deadline = 10
+        with self.assertRaises(ios.StageTimeout) as caught:
+            self.acceptance(runner).run('iPad')
+        self.assertTrue(caught.exception.session_expired)
+        self.assertEqual(runner.clock(), 10)
+        query = next(call for call in runner.calls if '/vm-service/' in call[1])
+        self.assertEqual(query[2], 10)
+        self.assertNotIn('recovery/shutdown', runner.stages)
 
     def test_discovery_polling_respects_global_budget(self):
         runner = self.runner(query_records=[])

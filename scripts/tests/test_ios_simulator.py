@@ -22,6 +22,14 @@ SPEC.loader.exec_module(ios)
 VM_URI = 'http://127.0.0.1:50145/xHtX2JUvNj8=/'
 STARTED = datetime(2026, 10, 11, 13, 18, 0, tzinfo=timezone.utc)
 BUNDLE = 'life.getbible.acceptance'
+PHONE_UUID = 'A1111111-1111-4111-8111-111111111111'
+TABLET_UUID = 'B2222222-2222-4222-8222-222222222222'
+UNAVAILABLE_UUID = 'D3333333-3333-4333-8333-333333333333'
+OWNED_UUID = 'F4444444-4444-4444-8444-444444444444'
+REPLACEMENT_UUID = 'E5555555-5555-4555-8555-555555555555'
+RUNTIME = 'com.apple.CoreSimulator.SimRuntime.iOS-26-2'
+PHONE_TYPE = 'com.apple.CoreSimulator.SimDeviceType.iPhone-17'
+TABLET_TYPE = 'com.apple.CoreSimulator.SimDeviceType.iPad-mini-A17-Pro'
 
 
 def vm_record(**changes):
@@ -238,17 +246,26 @@ class FakeRunner:
 
     def run(self, command, stage, timeout, *, progress=None):
         self.calls.append((command, stage, timeout, self.deadline))
+        if self.clock() >= self.deadline:
+            raise ios.StageTimeout(stage, session_expired=True)
         path = self.output / f'{stage}.log'
         path.parent.mkdir(parents=True, exist_ok=True)
         message = ''
         if stage == 'available-devices':
             message = json.dumps({'devices': {
                 'com.apple.CoreSimulator.SimRuntime.iOS-18-5': [
-                    {'name': 'iPad Pro', 'udid': 'old', 'state': 'Shutdown', 'isAvailable': True}],
-                'com.apple.CoreSimulator.SimRuntime.iOS-26-2': [
-                    {'name': 'iPhone 17', 'udid': 'phone', 'state': 'Shutdown', 'isAvailable': True},
-                    {'name': 'iPad mini (A17 Pro)', 'udid': 'tablet', 'state': 'Shutdown', 'isAvailable': True},
+                    {'name': 'iPad Pro', 'udid': 'C6666666-6666-4666-8666-666666666666',
+                     'state': 'Shutdown', 'isAvailable': True, 'deviceTypeIdentifier': TABLET_TYPE}],
+                RUNTIME: [
+                    {'name': 'iPhone 17', 'udid': PHONE_UUID, 'state': 'Shutdown',
+                     'isAvailable': True, 'deviceTypeIdentifier': PHONE_TYPE},
+                    {'name': 'iPad mini (A17 Pro)', 'udid': TABLET_UUID, 'state': 'Booted',
+                     'isAvailable': True, 'deviceTypeIdentifier': TABLET_TYPE},
+                    {'name': 'iPad unavailable', 'udid': UNAVAILABLE_UUID, 'state': 'Shutdown',
+                     'isAvailable': False, 'deviceTypeIdentifier': TABLET_TYPE},
                 ]}})
+        elif stage.endswith('/create-device'):
+            message = (OWNED_UUID if stage.startswith('attempt-1/') else REPLACEMENT_UUID) + '\n'
         elif stage.endswith('/launch'):
             message = f'{BUNDLE}: 10439\n'
         elif '/vm-service/' in stage:
@@ -263,8 +280,9 @@ class FakeRunner:
         if progress is not None:
             progress.observe(message)
         delay = self.delays.get(stage, 0)
-        self.pause(min(delay, timeout))
-        if delay >= timeout:
+        limit = min(timeout, self.deadline - self.clock())
+        self.pause(min(delay, limit))
+        if delay >= limit:
             raise ios.StageTimeout(stage, session_expired=self.clock() >= self.deadline)
         if isinstance(action, BaseException):
             raise action
@@ -298,9 +316,9 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         commands = {stage: command for command, stage, _, _ in runner.calls}
         self.assertNotIn('--no-pub', commands['build'])
         self.assertEqual(commands['attempt-1/install'],
-                         ['xcrun', 'simctl', 'install', 'tablet', str(runner.application)])
+                         ['xcrun', 'simctl', 'install', OWNED_UUID, str(runner.application)])
         launch = commands['attempt-1/launch']
-        self.assertEqual(launch[:5], ['xcrun', 'simctl', 'launch', 'tablet', BUNDLE])
+        self.assertEqual(launch[:5], ['xcrun', 'simctl', 'launch', OWNED_UUID, BUNDLE])
         for flag in ('--start-paused', '--disable-vm-service-publication',
                      '--enable-checked-mode', '--verify-entry-points'):
             self.assertIn(flag, launch)
@@ -314,21 +332,146 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         self.assertIn('--no-pub', drive)
         self.assertIn('--no-keep-app-running', drive)
         self.assertFalse(any(arg.startswith('--use-application-binary') for arg in drive))
-        self.assertEqual(drive[-1], 'tablet')
-        self.assertEqual(json.loads((runner.output / 'device.json').read_text())['udid'], 'tablet')
-        self.assertEqual(runner.stages[-1], 'cleanup/shutdown')
+        self.assertEqual(drive[-1], OWNED_UUID)
+        self.assertEqual(json.loads((runner.output / 'device.json').read_text())['udid'], OWNED_UUID)
+        self.assertEqual(runner.stages[-1], 'cleanup/delete')
 
-    def test_pre_driver_startup_stall_reboots_once_and_reuses_build(self):
+    def test_owned_device_preserves_family_runtime_and_type_without_using_image_device(self):
+        for family, template_uuid, device_type in (
+                ('iPhone', PHONE_UUID, PHONE_TYPE), ('iPad', TABLET_UUID, TABLET_TYPE)):
+            with self.subTest(family=family):
+                runner = self.runner()
+                self.assertEqual(self.acceptance(runner).run(family), 0)
+                commands = {stage: command for command, stage, _, _ in runner.calls}
+                create = commands['attempt-1/create-device']
+                self.assertEqual(create[:3], ['xcrun', 'simctl', 'create'])
+                self.assertTrue(create[3].startswith(f'getBible-acceptance-{family}-'))
+                self.assertEqual(create[-2:], [device_type, RUNTIME])
+                self.assertLess(runner.stages.index('build'),
+                                runner.stages.index('attempt-1/create-device'))
+                self.assertEqual(commands['attempt-1/boot'][-1], OWNED_UUID)
+                self.assertEqual(commands['cleanup/shutdown'][-1], OWNED_UUID)
+                self.assertEqual(commands['cleanup/delete'], ['xcrun', 'simctl', 'delete', OWNED_UUID])
+                for command in commands.values():
+                    self.assertNotIn(template_uuid, command)
+                    self.assertNotIn('erase', command)
+                self.assertNotIn('available', commands['available-devices'])
+                metadata = json.loads((runner.output / 'device.json').read_text())
+                self.assertTrue(metadata['owned'])
+                self.assertEqual(metadata['template_udid'], template_uuid)
+                self.assertEqual(metadata['deviceTypeIdentifier'], device_type)
+                self.assertNotIn('attempt-1/host-console', runner.stages)
+
+    def test_build_or_creation_failure_never_cleans_an_image_device(self):
+        for stage, failure in (('build', 7), ('attempt-1/create-device', 8),
+                               ('attempt-1/create-device', ios.StageTimeout('create-device'))):
+            with self.subTest(stage=stage, failure=failure):
+                runner = self.runner({stage: failure})
+                with self.assertRaises((ios.CommandFailure, ios.StageTimeout)):
+                    self.acceptance(runner).run('iPad')
+                self.assertNotIn('attempt-1/boot', runner.stages)
+                self.assertNotIn('cleanup/shutdown', runner.stages)
+                self.assertNotIn('cleanup/delete', runner.stages)
+                if stage == 'build':
+                    self.assertNotIn('attempt-1/create-device', runner.stages)
+
+    def test_creating_another_device_cannot_overwrite_existing_ownership(self):
+        runner = self.runner()
+        acceptance = self.acceptance(runner)
+        acceptance.attempt = 1
+        template = {'udid': TABLET_UUID, 'deviceTypeIdentifier': TABLET_TYPE}
+        reserved = {TABLET_UUID}
+        acceptance.create_device('iPad', RUNTIME, template, reserved)
+        initial_calls = list(runner.calls)
+        acceptance.attempt = 2
+        with self.assertRaisesRegex(RuntimeError, 'Delete the current owned simulator'):
+            acceptance.create_device('iPad', RUNTIME, template, reserved)
+        self.assertEqual(runner.calls, initial_calls)
+        self.assertEqual(acceptance.identifier, OWNED_UUID)
+        self.assertEqual(reserved, {TABLET_UUID, OWNED_UUID})
+
+    def test_malformed_or_preexisting_uuid_never_establishes_ownership(self):
+        for value in ('', 'not-a-uuid', OWNED_UUID.replace('-', ''),
+                      OWNED_UUID + '\n' + REPLACEMENT_UUID,
+                      PHONE_UUID, TABLET_UUID.lower(), UNAVAILABLE_UUID):
+            with self.subTest(value=value):
+                runner = self.runner({'attempt-1/create-device': (value, 0)})
+                with self.assertRaises(ValueError):
+                    self.acceptance(runner).run('iPad')
+                self.assertNotIn('attempt-1/boot', runner.stages)
+                self.assertFalse(any(stage.startswith('cleanup/') for stage in runner.stages))
+                self.assertFalse((runner.output / 'device.json').exists())
+
+    def test_pre_driver_startup_stall_replaces_owned_device_once_and_reuses_build(self):
         for failed_stage in ('install', 'launch', 'vm-service/001'):
             with self.subTest(stage=failed_stage):
                 runner = self.runner({f'attempt-1/{failed_stage}': ios.StageTimeout(failed_stage)})
                 self.assertEqual(self.acceptance(runner).run('iPad'), 0)
                 self.assertEqual(runner.stages.count('build'), 1)
                 self.assertEqual(runner.stages.count('recovery/shutdown'), 1)
+                self.assertEqual(runner.stages.count('recovery/delete'), 1)
                 self.assertLess(runner.stages.index('attempt-1/screenshot'),
                                 runner.stages.index('recovery/shutdown'))
                 self.assertNotIn('attempt-1/driver', runner.stages)
                 self.assertIn('attempt-2/driver', runner.stages)
+                self.assertLess(runner.stages.index('recovery/delete'),
+                                runner.stages.index('attempt-2/create-device'))
+                commands = {stage: command for command, stage, _, _ in runner.calls}
+                self.assertEqual(commands['recovery/delete'][-1], OWNED_UUID)
+                self.assertEqual(commands['attempt-2/boot'][-1], REPLACEMENT_UUID)
+                self.assertEqual(commands['attempt-2/driver'][-1], REPLACEMENT_UUID)
+                self.assertEqual(commands['cleanup/delete'][-1], REPLACEMENT_UUID)
+                self.assertEqual(commands['attempt-1/create-device'][-2:],
+                                 commands['attempt-2/create-device'][-2:])
+
+    def test_replacement_requires_confirmed_deletion_and_a_new_identifier(self):
+        for outcomes in ({'recovery/delete': 9},
+                         {'attempt-2/create-device': (OWNED_UUID, 0)}):
+            with self.subTest(outcomes=outcomes):
+                runner = self.runner({'attempt-1/launch': ios.StageTimeout('launch'), **outcomes})
+                with self.assertRaises((ios.CommandFailure, ValueError)):
+                    self.acceptance(runner).run('iPad')
+                self.assertNotIn('attempt-2/boot', runner.stages)
+                if 'recovery/delete' in outcomes:
+                    self.assertNotIn('attempt-2/create-device', runner.stages)
+                else:
+                    self.assertNotIn('cleanup/delete', runner.stages)
+
+    def test_failed_recovery_shutdown_still_deletes_owned_device_before_replacement(self):
+        runner = self.runner({'attempt-1/launch': ios.StageTimeout('launch'),
+                              'recovery/shutdown': OSError('shutdown failed')})
+        self.assertEqual(self.acceptance(runner).run('iPad'), 0)
+        self.assertLess(runner.stages.index('recovery/delete'),
+                        runner.stages.index('attempt-2/create-device'))
+
+    def test_cleanup_reserves_deletion_budget_despite_stalled_diagnostics_and_shutdown(self):
+        runner = self.runner({'attempt-1/driver': 9}, delays={
+            'attempt-1/host-console': 100, 'attempt-1/screenshot': 100,
+            'attempt-1/simulator-console': 100, 'attempt-1/devices': 100,
+            'cleanup/shutdown': 100, 'cleanup/delete': 100})
+        with self.assertRaises(ios.CommandFailure) as caught:
+            self.acceptance(runner).run('iPad')
+        self.assertEqual(caught.exception.returncode, 9)
+        self.assertEqual(runner.clock(), ios.CLEANUP_SECONDS)
+        calls = {stage: (command, timeout, deadline)
+                 for command, stage, timeout, deadline in runner.calls}
+        self.assertEqual(calls['attempt-1/host-console'][0][0], '/usr/bin/log')
+        self.assertEqual(calls['attempt-1/host-console'][1], 10)
+        self.assertEqual(calls['attempt-1/host-console'][2], 30)
+        self.assertEqual(calls['cleanup/shutdown'][2], 60)
+        self.assertEqual(calls['cleanup/delete'][2], 90)
+        self.assertEqual(calls['cleanup/delete'][0][-1], OWNED_UUID)
+
+    def test_host_diagnostic_failure_preserves_failure_and_owned_deletion(self):
+        for failure in (OSError('host logging unavailable'), ios.StageTimeout('host-console'), 7):
+            with self.subTest(failure=failure):
+                runner = self.runner({'attempt-1/driver': 9, 'attempt-1/host-console': failure})
+                with self.assertRaises(ios.CommandFailure) as caught:
+                    self.acceptance(runner).run('iPad')
+                self.assertEqual(caught.exception.returncode, 9)
+                self.assertEqual(runner.stages[-1], 'cleanup/delete')
+                self.assertLess(runner.stages.index('attempt-1/host-console'),
+                                runner.stages.index('attempt-1/simulator-console'))
 
     def test_second_startup_stall_fails_and_cleanup_still_runs(self):
         runner = self.runner({f'attempt-{number}/launch': ios.StageTimeout('launch')
@@ -337,10 +480,10 @@ class SimulatorAcceptanceTests(unittest.TestCase):
             self.acceptance(runner).run('iPhone')
         self.assertEqual(runner.stages.count('recovery/shutdown'), 1)
         self.assertNotIn('attempt-3/driver', runner.stages)
-        self.assertEqual(runner.stages[-1], 'cleanup/shutdown')
+        self.assertEqual(runner.stages[-1], 'cleanup/delete')
 
     def test_nonzero_stage_failures_are_never_retried(self):
-        for stage in ('build', 'attempt-1/boot', 'attempt-1/bootstatus',
+        for stage in ('build', 'attempt-1/create-device', 'attempt-1/boot', 'attempt-1/bootstatus',
                       'attempt-1/install', 'attempt-1/launch',
                       'attempt-1/vm-service/001', 'attempt-1/driver'):
             with self.subTest(stage=stage):
@@ -349,7 +492,11 @@ class SimulatorAcceptanceTests(unittest.TestCase):
                     self.acceptance(runner).run('iPad')
                 self.assertEqual(caught.exception.returncode, 7)
                 self.assertNotIn('recovery/shutdown', runner.stages)
-                self.assertEqual(runner.stages[-1], 'cleanup/shutdown')
+                if stage in ('build', 'attempt-1/create-device'):
+                    self.assertNotIn('cleanup/shutdown', runner.stages)
+                    self.assertNotIn('cleanup/delete', runner.stages)
+                else:
+                    self.assertEqual(runner.stages[-1], 'cleanup/delete')
 
     def test_driver_timeout_is_never_retried_even_before_host_driver_output(self):
         for message in (DRIVER_START, '', 'Unhandled exception: crash', '00:01 +0: test started'):
@@ -358,22 +505,22 @@ class SimulatorAcceptanceTests(unittest.TestCase):
                 with self.assertRaises(ios.StageTimeout):
                     self.acceptance(runner).run('iPad')
                 self.assertNotIn('recovery/shutdown', runner.stages)
-                self.assertEqual(runner.stages[-1], 'cleanup/shutdown')
+                self.assertEqual(runner.stages[-1], 'cleanup/delete')
 
     def test_session_budget_expiry_never_starts_recovery(self):
         runner = self.runner({'attempt-1/launch': ios.StageTimeout('launch', session_expired=True)})
         with self.assertRaises(ios.StageTimeout):
             self.acceptance(runner).run('iPad')
         self.assertNotIn('recovery/shutdown', runner.stages)
-        self.assertEqual(runner.stages[-1], 'cleanup/shutdown')
+        self.assertEqual(runner.stages[-1], 'cleanup/delete')
 
     def test_discovery_polling_shares_startup_budget_and_never_resets_deadline(self):
         runner = self.runner(query_records=[], delays={
-            'attempt-1/install': 60, 'attempt-1/launch': 60,
-            'attempt-2/install': 60, 'attempt-2/launch': 60})
+            'attempt-1/install': 120, 'attempt-1/launch': 120,
+            'attempt-2/install': 120, 'attempt-2/launch': 120})
         with self.assertRaisesRegex(ios.StageTimeout, 'discovery'):
             self.acceptance(runner).run('iPad')
-        self.assertEqual(runner.clock(), 2 * ios.ATTACH_SECONDS)
+        self.assertEqual(runner.clock(), 2 * ios.STARTUP_SECONDS)
         self.assertNotIn('attempt-1/driver', runner.stages)
         queries = [call for call in runner.calls if '/vm-service/' in call[1]]
         self.assertTrue(queries)
@@ -381,24 +528,37 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         self.assertLessEqual(max(call[2] for call in queries), 60)
         self.assertEqual(queries[-1][2], 1)
 
-    def test_slow_log_query_uses_remaining_startup_budget_without_unnecessary_reboot(self):
+    def test_slow_log_query_uses_remaining_startup_budget_without_unnecessary_replacement(self):
         runner = self.runner(delays={'attempt-1/install': 24, 'attempt-1/launch': 31,
                                      'attempt-1/vm-service/001': 45})
         self.assertEqual(self.acceptance(runner).run('iPhone'), 0)
         query = next(call for call in runner.calls if call[1] == 'attempt-1/vm-service/001')
-        self.assertEqual(query[2], ios.ATTACH_SECONDS - 24 - 31)
+        self.assertEqual(query[2], ios.STARTUP_SECONDS - 24 - 31)
         self.assertEqual(runner.clock(), 100)
         self.assertNotIn('recovery/shutdown', runner.stages)
         self.assertIn('attempt-1/driver', runner.stages)
+
+    def test_observed_cold_host_stage_costs_fit_shared_startup_budget(self):
+        runner = self.runner(delays={'attempt-1/install': 123, 'attempt-1/launch': 89.5,
+                                     'attempt-1/vm-service/001': 43.7})
+        self.assertEqual(self.acceptance(runner).run('iPad'), 0)
+        self.assertAlmostEqual(runner.clock(), 256.2)
+        self.assertNotIn('recovery/shutdown', runner.stages)
+        self.assertNotIn('attempt-2/create-device', runner.stages)
+        calls = {stage: timeout for _, stage, timeout, _ in runner.calls}
+        self.assertEqual(calls['attempt-1/install'], 300)
+        self.assertEqual(calls['attempt-1/launch'], 177)
+        self.assertEqual(calls['attempt-1/vm-service/001'], 87.5)
+        self.assertEqual(calls['attempt-1/driver'], 180)
 
     def test_slow_log_query_cannot_exceed_remaining_startup_budget(self):
         runner = self.runner(delays={
             f'attempt-{attempt}/{stage}': delay
             for attempt in (1, 2)
-            for stage, delay in (('install', 60), ('launch', 60), ('vm-service/001', 70))})
+            for stage, delay in (('install', 120), ('launch', 120), ('vm-service/001', 70))})
         with self.assertRaises(ios.StageTimeout):
             self.acceptance(runner).run('iPad')
-        self.assertEqual(runner.clock(), 2 * ios.ATTACH_SECONDS)
+        self.assertEqual(runner.clock(), 2 * ios.STARTUP_SECONDS)
         queries = [call for call in runner.calls if '/vm-service/' in call[1]]
         self.assertEqual([call[2] for call in queries], [60, 60])
         self.assertNotIn('attempt-1/driver', runner.stages)
@@ -449,7 +609,7 @@ class SimulatorAcceptanceTests(unittest.TestCase):
         with self.assertRaises(ios.CommandFailure) as caught:
             self.acceptance(runner).run('iPad')
         self.assertEqual(caught.exception.returncode, 9)
-        self.assertEqual(runner.stages[-1], 'cleanup/shutdown')
+        self.assertEqual(runner.stages[-1], 'cleanup/delete')
         self.assertEqual(len([event for event in runner.events
                               if event['status'] == 'diagnostic_failed']), 3)
         screenshot = next(call for call in runner.calls if call[1].endswith('/screenshot'))

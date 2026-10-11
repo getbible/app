@@ -4,7 +4,7 @@
 Flutter's live simulator log stream can miss the VM service announcement.
 Install and launch the built app paused, discover its authenticated VM URI from
 the durable system log, then attach the unchanged Flutter test driver. Only a
-pre-driver startup timeout may receive one reboot; failed tests are not retried.
+pre-driver startup timeout may receive one fresh device; failed tests are not retried.
 """
 
 import codecs
@@ -19,6 +19,7 @@ import subprocess
 import sys
 import time
 from urllib.parse import urlsplit
+from uuid import UUID, uuid4
 
 
 OUTPUT = Path('build/runtime-evidence')
@@ -30,6 +31,7 @@ SESSION_SECONDS = 38 * 60
 CLEANUP_SECONDS = 90
 BUILD_SECONDS = 15 * 60
 BOOT_SECONDS = 3 * 60
+STARTUP_SECONDS = 5 * 60
 ATTACH_SECONDS = 3 * 60
 TEST_SECONDS = 12 * 60
 
@@ -249,6 +251,44 @@ class SimulatorAcceptance:
         self.identifier = None
         self.attempt = 0
 
+    def create_device(self, family, runtime, template, reserved_identifiers):
+        """Create an owned device with the selected image device's OS and type.
+
+        The image-provided device is only a profile reference. Never adopt an
+        identifier from the initial inventory, including unavailable devices,
+        or a previous attempt. Never guess ownership after an ambiguous create.
+        """
+        if self.identifier is not None:
+            raise RuntimeError('Delete the current owned simulator before creating another.')
+        device_type = template.get('deviceTypeIdentifier')
+        if (not isinstance(device_type, str)
+                or not device_type.startswith('com.apple.CoreSimulator.SimDeviceType.')):
+            raise ValueError('Selected simulator does not identify its device type.')
+        name = f'getBible-acceptance-{family}-{uuid4().hex}'
+        stage = f'attempt-{self.attempt}/create-device'
+        self.required(['xcrun', 'simctl', 'create', name, device_type, runtime],
+                      stage, BOOT_SECONDS)
+        returned = (self.runner.output / f'{stage}.log').read_text().strip()
+        try:
+            identifier = str(UUID(returned))
+        except ValueError as error:
+            raise ValueError('Simulator creation did not return one canonical UUID.') from error
+        if returned.lower() != identifier:
+            raise ValueError('Simulator creation did not return one canonical UUID.')
+        if identifier in {value.lower() for value in reserved_identifiers}:
+            raise ValueError('Simulator creation returned an existing device; refusing ownership.')
+        # Ownership is recorded only after successful creation and validation.
+        self.identifier = identifier.upper()
+        reserved_identifiers.add(self.identifier)
+        metadata = json.dumps({
+            'name': name, 'udid': self.identifier, 'runtime': runtime,
+            'deviceTypeIdentifier': device_type, 'owned': True,
+            'template_udid': template['udid'],
+        }, indent=2) + '\n'
+        (self.runner.output / 'device.json').write_text(metadata)
+        (self.runner.output / f'attempt-{self.attempt}/device.json').write_text(metadata)
+        self.runner.event(stage=stage, status='owned', udid=self.identifier)
+
     def application_identity(self):
         with (self.application / 'Info.plist').open('rb') as source:
             metadata = plistlib.load(source)
@@ -262,7 +302,7 @@ class SimulatorAcceptance:
 
     def start_application(self, bundle, executable):
         prefix = f'attempt-{self.attempt}'
-        deadline = min(self.runner.clock() + ATTACH_SECONDS, self.runner.deadline)
+        deadline = min(self.runner.clock() + STARTUP_SECONDS, self.runner.deadline)
 
         def startup(command, stage):
             remaining = deadline - self.runner.clock()
@@ -309,23 +349,57 @@ class SimulatorAcceptance:
             raise CommandFailure(stage, code)
 
     def best_effort(self, arguments, stage, timeout):
+        self.diagnostic(['xcrun', 'simctl', *arguments], stage, timeout)
+
+    def diagnostic(self, command, stage, timeout):
         try:
-            code = self.runner.run(['xcrun', 'simctl', *arguments], stage, timeout)
+            code = self.runner.run(command, stage, timeout)
             if code:
                 self.runner.event(stage=stage, status='diagnostic_failed', returncode=code)
         except (OSError, RuntimeError) as error:
             self.runner.event(stage=stage, status='diagnostic_failed', reason=str(error))
 
-    def capture(self):
+    def capture(self, *, failed=False):
         prefix = f'attempt-{self.attempt}'
-        self.best_effort(['io', self.identifier, 'screenshot',
-                          str(self.runner.output / prefix / 'simulator.png')],
-                         f'{prefix}/screenshot', 15)
-        self.best_effort(['spawn', self.identifier, 'log', 'show', '--last', '5m',
-                          '--style', 'compact', '--predicate',
-                          'process == "Runner" OR process == "SpringBoard"'],
-                         f'{prefix}/simulator-console', 30)
-        self.best_effort(['list', 'devices', '--json'], f'{prefix}/devices', 10)
+        previous_deadline = self.runner.deadline
+        self.runner.deadline = min(previous_deadline, self.runner.clock() + 30)
+        try:
+            if failed:
+                # Device logs cannot explain a host CoreSimulator IPC stall.
+                # This failure-only query shares the diagnostic budget and
+                # cannot delay the reserved shutdown and deletion phases.
+                self.diagnostic(['/usr/bin/log', 'show', '--last', '5m', '--style',
+                                 'compact', '--predicate',
+                                 'process CONTAINS "CoreSimulator" OR process == "simctl"'],
+                                f'{prefix}/host-console', 10)
+            self.best_effort(['io', self.identifier, 'screenshot',
+                              str(self.runner.output / prefix / 'simulator.png')],
+                             f'{prefix}/screenshot', 15)
+            self.best_effort(['spawn', self.identifier, 'log', 'show', '--last', '5m',
+                              '--style', 'compact', '--predicate',
+                              'process == "Runner" OR process == "SpringBoard"'],
+                             f'{prefix}/simulator-console', 30)
+            self.best_effort(['list', 'devices', '--json'], f'{prefix}/devices', 10)
+        finally:
+            self.runner.deadline = previous_deadline
+
+    def cleanup(self, *, failed):
+        if self.identifier is None:
+            return
+        # Keep the existing 90-second reserve, assigning each phase 30 seconds.
+        # An expired diagnostic or failed shutdown cannot consume deletion's
+        # reserved phase. Every destructive command targets only our owned UUID.
+        cleanup_deadline = self.runner.clock() + CLEANUP_SECONDS
+        self.runner.deadline = cleanup_deadline - 60
+        try:
+            self.capture(failed=failed)
+        finally:
+            self.runner.deadline = cleanup_deadline - 30
+            try:
+                self.best_effort(['shutdown', self.identifier], 'cleanup/shutdown', 30)
+            finally:
+                self.runner.deadline = cleanup_deadline
+                self.best_effort(['delete', self.identifier], 'cleanup/delete', 30)
 
     def boot(self):
         self.required(['xcrun', 'simctl', 'boot', self.identifier],
@@ -341,7 +415,7 @@ class SimulatorAcceptance:
             raise ValueError('SIMULATOR_FAMILY must be iPhone or iPad.')
         # First discovery starts CoreSimulator on a cold hosted runner; allow
         # its boot budget rather than treating it as a warmed-up metadata read.
-        self.required(['xcrun', 'simctl', 'list', 'devices', 'available', '--json'],
+        self.required(['xcrun', 'simctl', 'list', 'devices', '--json'],
                       'available-devices', BOOT_SECONDS)
         listing = json.loads((self.runner.output / 'available-devices.log').read_text())
         available = [(runtime, device) for runtime, devices in listing['devices'].items()
@@ -351,9 +425,11 @@ class SimulatorAcceptance:
             raise RuntimeError(f'No available {family} simulator installed by this Xcode')
         runtime, device = max(available, key=lambda item: (
             tuple(map(int, re.findall(r'\d+', item[0]))), item[1]['name']))
-        self.identifier = device['udid']
-        (self.runner.output / 'device.json').write_text(
+        existing_identifiers = {item['udid'] for devices in listing['devices'].values()
+                                for item in devices}
+        (self.runner.output / 'device-template.json').write_text(
             json.dumps({'runtime': runtime, **device}, indent=2) + '\n')
+        accepted = False
         try:
             # Normal pub/native tooling regeneration is needed when switching to
             # the integration target. Drive then reuses exactly this built APP.
@@ -362,20 +438,22 @@ class SimulatorAcceptance:
             bundle, executable = self.application_identity()
             for attempt in (1, 2):
                 self.attempt = attempt
-                if attempt == 1 and device['state'] == 'Booted':
-                    self.ready()
-                else:
-                    self.boot()
+                self.create_device(family, runtime, device, existing_identifiers)
+                self.boot()
                 try:
                     uri = self.start_application(bundle, executable)
                 except StageTimeout as error:
                     if attempt != 1 or error.session_expired:
                         raise
-                    self.runner.event(stage='recovery', status='rebooting',
+                    self.runner.event(stage='recovery', status='replacing_device',
                                       reason='Simulator install/launch/VM wait expired before test driver started')
-                    self.capture()
-                    self.required(['xcrun', 'simctl', 'shutdown', self.identifier],
-                                  'recovery/shutdown', 30)
+                    self.capture(failed=True)
+                    self.best_effort(['shutdown', self.identifier], 'recovery/shutdown', 30)
+                    # Do not create another device while a previous owned one
+                    # remains. A failed deletion is a failure, not another retry.
+                    self.required(['xcrun', 'simctl', 'delete', self.identifier],
+                                  'recovery/delete', 30)
+                    self.identifier = None
                     continue
                 # This command may resume the paused app: no exception from
                 # attachment or the test journey is eligible for a new attempt.
@@ -389,18 +467,11 @@ class SimulatorAcceptance:
                     raise CommandFailure(f'attempt-{attempt}/driver', code)
                 if progress.driver_started_at is None:
                     raise RuntimeError('Flutter exited without evidence of a test driver.')
+                accepted = True
                 return 0
             raise RuntimeError('Simulator attempts exhausted.')
         finally:
-            # Separate bounded cleanup reserve, including failure during boot or
-            # build. No simulator command can starve the workflow's artifact step.
-            cleanup_deadline = self.runner.clock() + CLEANUP_SECONDS
-            self.runner.deadline = cleanup_deadline - 45
-            try:
-                self.capture()
-            finally:
-                self.runner.deadline = cleanup_deadline
-                self.best_effort(['shutdown', self.identifier], 'cleanup/shutdown', 30)
+            self.cleanup(failed=not accepted)
 
 
 def main():

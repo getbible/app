@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """Build once and run iOS acceptance with bounded, diagnosable simulator waits.
 
-Flutter 3.44.6 waits without a deadline for the simulator's VM service. Its
-``drive --timeout`` starts only after launch, so it cannot cover that wait.
-Only an observed pre-driver install/launch/VM wait may receive one reboot. Build
-failures, driver failures and started test journeys are never retried.
+Flutter's live simulator log stream can miss the VM service announcement.
+Install and launch the built app paused, discover its authenticated VM URI from
+the durable system log, then attach the unchanged Flutter test driver. Only a
+pre-driver startup timeout may receive one reboot; failed tests are not retried.
 """
 
 import codecs
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import plistlib
 import re
 import signal
 import subprocess
 import sys
 import time
+from urllib.parse import urlsplit
 
 
 OUTPUT = Path('build/runtime-evidence')
@@ -29,6 +32,7 @@ BUILD_SECONDS = 15 * 60
 BOOT_SECONDS = 3 * 60
 ATTACH_SECONDS = 3 * 60
 TEST_SECONDS = 12 * 60
+LOG_QUERY_SECONDS = 30
 
 
 class CommandFailure(RuntimeError):
@@ -44,27 +48,15 @@ class StageTimeout(RuntimeError):
 
 
 class DriverProgress:
-    """Conservative recovery boundary tied to the pinned Flutter SDK's output.
-
-    Drive starts paused. Once its host driver is invoked it can resume the app;
-    treat even its *connecting* message as started and never retry after it.
-    Keep a small rolling tail so markers split across OS writes are recognized.
-    """
+    """Recognize the host driver, including markers split across output writes."""
 
     def __init__(self, clock=time.monotonic):
         self.clock = clock
-        self.launch_observed = False
         self.driver_started_at = None
-        self.saw_failure = False
         self.tail = ''
 
     def observe(self, text):
         observed = self.tail + text
-        self.launch_observed |= (
-            'Waiting for VM Service port to be available' in observed
-            or bool(re.search(r'executing: [^\n]*\bxcrun\b[^\n]*\bsimctl '
-                              r'(?:install|launch) ', observed))
-        )
         started = (
             'Connecting to Flutter application at' in observed
             or 'Attempting to resume isolate' in observed
@@ -75,19 +67,60 @@ class DriverProgress:
         )
         if started and self.driver_started_at is None:
             self.driver_started_at = self.clock()
-        self.saw_failure |= bool(re.search(
-            r'Unhandled exception|EXCEPTION CAUGHT|\[E\]|Some tests failed|'
-            r'Error waiting for a debug connection|Application failed to start|'
-            r'EXC_BAD_ACCESS|EXC_CRASH|Fatal signal|Lost connection to device|'
-            r'Unable to (?:install|launch)|ProcessException|\b(?:Error|Exception):',
-            observed,
-        ))
         self.tail = observed[-8192:]
 
-    @property
-    def retryable(self):
-        return (self.launch_observed and self.driver_started_at is None
-                and not self.saw_failure)
+
+class VmServiceDiscovery:
+    """Read only this launch's authenticated loopback endpoint from Apple logs.
+
+    Persisted logs avoid the race between app startup and ``log stream`` becoming
+    ready. PID, executable and launch time prevent attaching to an earlier app.
+    Authentication remains enabled, and the URL may never leave this host.
+    """
+
+    def __init__(self, pid, executable, started):
+        self.pid, self.executable, self.started = pid, executable, started
+
+    def find(self, text):
+        # simctl can emit a getpwuid_r warning on stderr before the JSON array.
+        # Keep that evidence, but parse the complete structured stdout payload.
+        beginning = re.search(r'^\s*\[', text, flags=re.MULTILINE)
+        if beginning is None:
+            raise ValueError('Simulator log query did not return a JSON array.')
+        records = json.loads(text[beginning.start():])
+        if not isinstance(records, list):
+            raise ValueError('Simulator log query must return an array.')
+        for record in reversed(records):
+            if (not isinstance(record, dict) or record.get('processID') != self.pid
+                    or not isinstance(record.get('processImagePath'), str)
+                    or Path(record['processImagePath']).name != self.executable):
+                continue
+            try:
+                timestamp = datetime.fromisoformat(record.get('timestamp', ''))
+            except (TypeError, ValueError):
+                continue
+            if timestamp.tzinfo is None or timestamp < self.started:
+                continue
+            message = record.get('eventMessage', '')
+            if not isinstance(message, str):
+                continue
+            match = re.search(r'The Dart VM service is listening on (\S+)', message)
+            if match is None:
+                continue
+            uri = match[1]
+            try:
+                parsed = urlsplit(uri)
+                valid = (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', '::1')
+                         and parsed.port is not None and 0 < parsed.port < 65536
+                         and parsed.username is None and parsed.password is None
+                         and not parsed.query and not parsed.fragment
+                         and re.fullmatch(r'/[A-Za-z0-9_=-]+/', parsed.path))
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError('Simulator announced an invalid authenticated loopback VM URI.')
+            return uri
+        return None
 
 
 class ProcessRunner:
@@ -181,9 +214,7 @@ class ProcessRunner:
             self.event(stage=stage, status='failed', reason=str(error),
                        elapsed_seconds=round(self.clock() - started, 2),
                        **({} if progress is None else {
-                           'launch_observed': progress.launch_observed,
                            'driver_started': progress.driver_started_at is not None,
-                           'failure_observed': progress.saw_failure,
                        }))
             raise
         finally:
@@ -192,10 +223,67 @@ class ProcessRunner:
 
 
 class SimulatorAcceptance:
-    def __init__(self, runner):
+    def __init__(self, runner, *, application=APPLICATION,
+                 utc_now=lambda: datetime.now(timezone.utc)):
         self.runner = runner
+        self.application = Path(application)
+        self.utc_now = utc_now
         self.identifier = None
         self.attempt = 0
+
+    def application_identity(self):
+        with (self.application / 'Info.plist').open('rb') as source:
+            metadata = plistlib.load(source)
+        bundle = metadata.get('CFBundleIdentifier')
+        executable = metadata.get('CFBundleExecutable')
+        if (not isinstance(bundle, str) or not re.fullmatch(r'[A-Za-z0-9.-]+', bundle)
+                or not isinstance(executable, str)
+                or not re.fullmatch(r'[A-Za-z0-9_.-]+', executable)):
+            raise ValueError('Built iOS app has an invalid bundle identifier or executable.')
+        return bundle, executable
+
+    def start_application(self, bundle, executable):
+        prefix = f'attempt-{self.attempt}'
+        deadline = min(self.runner.clock() + ATTACH_SECONDS, self.runner.deadline)
+
+        def startup(command, stage, limit=ATTACH_SECONDS):
+            remaining = deadline - self.runner.clock()
+            if remaining <= 0:
+                raise StageTimeout(stage, session_expired=self.runner.clock() >= self.runner.deadline)
+            self.required(command, stage, min(limit, remaining))
+
+        startup(['xcrun', 'simctl', 'install', self.identifier, str(self.application)],
+                f'{prefix}/install')
+        # Apple log dates have subsecond precision. Filter the retained records
+        # at this second boundary and the exact PID returned by this launch.
+        started = self.utc_now().replace(microsecond=0)
+        startup(['xcrun', 'simctl', 'launch', self.identifier, bundle,
+                 '--enable-dart-profiling', '--disable-vm-service-publication',
+                 '--start-paused', '--enable-checked-mode', '--verify-entry-points'],
+                f'{prefix}/launch')
+        output = (self.runner.output / f'{prefix}/launch.log').read_text()
+        match = re.search(r'^' + re.escape(bundle) + r': ([1-9][0-9]*)\s*$', output, re.MULTILINE)
+        if match is None:
+            raise ValueError('simctl launch did not identify the started application process.')
+        discovery = VmServiceDiscovery(int(match[1]), executable, started)
+        query = 0
+        self.runner.event(stage=f'{prefix}/discovery', status='started', pid=discovery.pid)
+        while self.runner.clock() < deadline:
+            query += 1
+            stage = f'{prefix}/vm-service/{query:03d}'
+            startup(['xcrun', 'simctl', 'spawn', self.identifier, 'log', 'show',
+                     '--last', '5m',
+                     '--style', 'json', '--predicate', f'process == "{executable}"'],
+                    stage, LOG_QUERY_SECONDS)
+            uri = discovery.find((self.runner.output / f'{stage}.log').read_text())
+            if uri is not None:
+                self.runner.event(stage=f'{prefix}/discovery', status='ready', pid=discovery.pid)
+                return uri
+            remaining = deadline - self.runner.clock()
+            if remaining > 0:
+                self.runner.pause(min(1, remaining))
+        raise StageTimeout(f'{prefix}/discovery',
+                           session_expired=self.runner.clock() >= self.runner.deadline)
 
     def required(self, command, stage, timeout):
         code = self.runner.run(command, stage, timeout)
@@ -253,32 +341,37 @@ class SimulatorAcceptance:
             # the integration target. Drive then reuses exactly this built APP.
             self.required(['flutter', 'build', 'ios', '--simulator', '--debug',
                            f'--target={TARGET}'], 'build', BUILD_SECONDS)
+            bundle, executable = self.application_identity()
             for attempt in (1, 2):
                 self.attempt = attempt
                 if attempt == 1 and device['state'] == 'Booted':
                     self.ready()
                 else:
                     self.boot()
-                progress = DriverProgress(self.runner.clock)
                 try:
-                    code = self.runner.run([
-                        'flutter', 'drive', '--verbose', '--no-pub', '--start-paused',
-                        f'--driver={DRIVER}', f'--target={TARGET}',
-                        f'--use-application-binary={APPLICATION}', '-d', self.identifier,
-                    ], f'attempt-{attempt}/driver', ATTACH_SECONDS, progress=progress)
-                    if code:
-                        raise CommandFailure(f'attempt-{attempt}/driver', code)
-                    if progress.driver_started_at is None:
-                        raise RuntimeError('Flutter exited without evidence of a test driver.')
-                    return 0
+                    uri = self.start_application(bundle, executable)
                 except StageTimeout as error:
-                    if attempt != 1 or error.session_expired or not progress.retryable:
+                    if attempt != 1 or error.session_expired:
                         raise
                     self.runner.event(stage='recovery', status='rebooting',
                                       reason='Simulator install/launch/VM wait expired before test driver started')
                     self.capture()
                     self.required(['xcrun', 'simctl', 'shutdown', self.identifier],
                                   'recovery/shutdown', 30)
+                    continue
+                # This command may resume the paused app: no exception from
+                # attachment or the test journey is eligible for a new attempt.
+                progress = DriverProgress(self.runner.clock)
+                code = self.runner.run([
+                    'flutter', 'drive', '--verbose', '--no-pub',
+                    f'--driver={DRIVER}', f'--target={TARGET}',
+                    f'--use-existing-app={uri}', '-d', self.identifier,
+                ], f'attempt-{attempt}/driver', ATTACH_SECONDS, progress=progress)
+                if code:
+                    raise CommandFailure(f'attempt-{attempt}/driver', code)
+                if progress.driver_started_at is None:
+                    raise RuntimeError('Flutter exited without evidence of a test driver.')
+                return 0
             raise RuntimeError('Simulator attempts exhausted.')
         finally:
             # Separate bounded cleanup reserve, including failure during boot or

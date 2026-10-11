@@ -448,6 +448,8 @@ local to the simulator host. `flutter drive --use-existing-app` then connects
 the same host driver and resumes the paused integration journey. VM-service
 authentication remains enabled. This avoids depending on a live log listener
 being ready when the app announces its service.
+Log reads share the remaining install/launch/discovery budget; a separate short
+query timeout must not reboot a running app while that startup budget remains.
 
 The existing-app driver explicitly uses `--no-keep-app-running`, so Flutter
 stops the application and disposes its device log readers after the journey.

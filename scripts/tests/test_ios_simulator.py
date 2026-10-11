@@ -119,16 +119,24 @@ class ProcessRunnerTests(unittest.TestCase):
         events = [json.loads(line) for line in (self.output / 'stages.jsonl').read_text().splitlines()]
         self.assertEqual([event['status'] for event in events], ['started', 'failed'])
 
-    def test_success_drains_output_and_still_cleans_remaining_descendants(self):
+    def test_success_drains_output_without_signaling_completed_native_command(self):
         runner = self.runner(events=[(0, b'one\n'), (0.5, b'two\n')], end=0.5)
         self.assertEqual(runner.run(['command'], 'success', 2), 0)
         self.assertEqual((self.output / 'success.log').read_text(), 'one\ntwo\n')
         self.assertIn('two\n', self.console.getvalue())
-        self.assertEqual(self.child.signals, [signal.SIGTERM, signal.SIGKILL])
+        self.assertEqual(self.child.signals, [])
 
     def test_actual_nonzero_status_is_preserved(self):
         runner = self.runner(end=0, code=17)
         self.assertEqual(runner.run(['command'], 'failed-test', 2), 17)
+        self.assertEqual(self.child.signals, [])
+
+    def test_abort_while_draining_exited_leader_still_cleans_its_group(self):
+        runner = self.runner(events=[(0, b'last output')], end=0)
+        with self.assertRaises(ios.StageTimeout):
+            runner.run(['command'], 'expired-during-drain', 0)
+        self.assertEqual((self.output / 'expired-during-drain.log').read_bytes(), b'last output')
+        self.assertEqual(self.child.signals, [signal.SIGTERM, signal.SIGKILL])
 
     def test_denied_cleanup_after_exit_retains_success_or_failure_without_escalation(self):
         for code in (0, 17):
@@ -144,6 +152,10 @@ class ProcessRunnerTests(unittest.TestCase):
 
                     runner.kill_group = signal_group
                     self.assertEqual(runner.run(['command'], 'completed', 2), code)
+                    self.assertEqual(signals, [])
+                    # An abort can race with leader exit. Directly exercise
+                    # its cleanup path after the command has been reaped.
+                    runner.stop(self.child)
                     expected = ([signal.SIGTERM] if denied_signal == signal.SIGTERM
                                 else [signal.SIGTERM, signal.SIGKILL])
                     self.assertEqual(signals, expected)

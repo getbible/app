@@ -113,3 +113,15 @@ group termination still runs after timeouts or interruptions. Regression tests
 cover both natural completion and aborted-command cleanup. Native CI is needed
 to determine whether this lifecycle correction also resolves the iPad launch
 stall; the recorded iPad evidence alone cannot prove that causal connection.
+
+The next [verification run
+38154773547](https://github.com/getbible/app/actions/runs/38154773547) passed iPad
+acceptance on its first attempt, including all six tests and shutdown. The iPhone
+launched PID 9094 and announced its VM service at 16:25:36.991 UTC. Its first
+retained-log query was then aborted by an independent 30-second query limit,
+while about 90 seconds remained in the shared startup budget. That premature
+timeout triggered a reboot; the second launch stalled before application startup.
+Log discovery now uses the remaining shared budget, just like install and
+launch. The overall three-minute startup bound is unchanged. Regressions cover
+a log query taking more than 30 seconds, shared-deadline exhaustion and the
+shorter overall session deadline.

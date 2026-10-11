@@ -33,9 +33,11 @@ void main() {
       delivered = true;
       tester.view.viewInsets = const FakeViewPadding(bottom: 550);
     });
-    addTearDown(timer.cancel);
-
-    await revealFocusedEditor(tester, field: field, editor: editor);
+    try {
+      await revealFocusedEditor(tester, editor: editor);
+    } finally {
+      timer.cancel();
+    }
 
     expect(delivered, isTrue);
     expect(tester.view.viewInsets.bottom, 550);
@@ -53,7 +55,7 @@ void main() {
     tester,
   ) async {
     final (field, editor) = await mountFocusedEditor(tester);
-    await revealFocusedEditor(tester, field: field, editor: editor);
+    await revealFocusedEditor(tester, editor: editor);
     expect(tester.view.viewInsets.bottom, 0);
     expect(editor.mounted, isTrue);
     expect(editor.widget.focusNode.hasFocus, isTrue);
@@ -63,23 +65,23 @@ void main() {
   testWidgets('unstable keyboard geometry fails within its deadline', (
     tester,
   ) async {
-    final (field, editor) = await mountFocusedEditor(tester);
+    final (_, editor) = await mountFocusedEditor(tester);
     final timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       tester.view.viewInsets = FakeViewPadding(
         bottom: timer.tick.isEven ? 200 : 250,
       );
     });
-    addTearDown(timer.cancel);
     TestFailure? failure;
     try {
       await revealFocusedEditor(
         tester,
-        field: field,
         editor: editor,
         timeout: const Duration(milliseconds: 600),
       );
     } on TestFailure catch (error) {
       failure = error;
+    } finally {
+      timer.cancel();
     }
     expect(failure, isNotNull);
     expect(failure!.message, contains('Last geometry:'));

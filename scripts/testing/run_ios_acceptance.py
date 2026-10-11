@@ -99,10 +99,16 @@ class ProcessRunner:
     """
 
     def __init__(self, output, *, clock=time.monotonic, pause=time.sleep,
-                 popen=subprocess.Popen, kill_group=os.killpg):
+                 popen=subprocess.Popen, kill_group=None):
         self.output = output
         self.output.mkdir(parents=True, exist_ok=True)
         self.clock, self.pause = clock, pause
+        # Keep this module importable by the cross-platform Python test suite.
+        # Actual simulator execution still requires the POSIX/Xcode host.
+        if kill_group is None:
+            kill_group = getattr(os, 'killpg', None)
+            if kill_group is None or not hasattr(signal, 'SIGKILL'):
+                raise RuntimeError('iOS simulator acceptance requires a POSIX host with Xcode.')
         self.popen, self.kill_group = popen, kill_group
         self.deadline = clock() + SESSION_SECONDS
 

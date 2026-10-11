@@ -439,17 +439,25 @@ clipboard. The dedicated emulator is kept awake; failure artifacts include
 window/activity/power state, all-buffer logcat and a native screenshot. Synthetic
 widget focus alone does not establish Android clipboard permission.
 
-The iOS acceptance launcher builds the integration APP once and reuses it for
-bounded launch attempts. It installs and launches the APP paused through
-`simctl`, obtains the launched process ID, and discovers its authenticated Dart
+The iOS acceptance launcher selects an available device as a runtime/model
+template, builds the integration APP once, and creates a separate simulator for
+the job. The new device uses the same runtime and device type. Its UUID must be
+valid and absent from the complete initial device inventory and from earlier
+owned devices before it becomes an execution or cleanup target. The original
+devices are never booted, installed into, shut down or deleted by this runner.
+Template and owned-device metadata are retained with the runtime evidence.
+
+The runner reuses the built integration APP for bounded launch attempts. It
+installs and launches the APP paused through `simctl`, obtains the launched
+process ID, and discovers its authenticated Dart
 VM-service URL from retained unified logs. Discovery checks the current process
 and launch time; an old application instance cannot satisfy it. The URL must be
 local to the simulator host. `flutter drive --use-existing-app` then connects
 the same host driver and resumes the paused integration journey. VM-service
 authentication remains enabled. This avoids depending on a live log listener
 being ready when the app announces its service.
-Log reads share the remaining install/launch/discovery budget; a separate short
-query timeout must not reboot a running app while that startup budget remains.
+Log reads share the remaining five-minute install/launch/discovery budget;
+a separate short query timeout must not abort an otherwise valid startup.
 
 The existing-app driver explicitly uses `--no-keep-app-running`, so Flutter
 stops the application and disposes its device log readers after the journey.
@@ -459,21 +467,32 @@ later stages need. Group termination is reserved for interrupted or timed-out
 commands. If a command exits during that termination and macOS refuses a group
 signal, the runner records the warning without replacing the original failure.
 A denied signal while the command is still running remains fatal. Simulator
-shutdown still runs within the separate cleanup reserve.
+shutdown and deletion still run within the separate cleanup reserve.
 
-One simulator reboot is permitted only for a bounded startup timeout before
-driver attachment. Reported command errors, driver connection failures, failed
+One fresh simulator replacement is permitted only for a bounded startup timeout
+before driver attachment. The timed-out owned device must be deleted successfully
+before a replacement is created; rebooting the same stalled device is not the
+recovery strategy. Reported command errors, driver connection failures, failed
 tests and post-start timeouts are never retried. Build, boot, attachment and test
 phases have separate limits inside a 38-minute session, followed by a bounded
-cleanup reserve. Attempt logs go directly to disk, with flushed stage events
-and simulator diagnostics. This prevents a silent launch from consuming the
-whole 50-minute job and losing its evidence.
-Initial device discovery receives the same three-minute startup allowance as
+90-second cleanup reserve divided between diagnostics, shutdown and deletion.
+Shutdown failure must not prevent an attempted deletion of the owned device.
+Attempt logs go directly to disk, with flushed stage events and simulator
+diagnostics. Failures also capture a bounded host log excerpt for CoreSimulator
+and `simctl`, so host-side launch stalls can be investigated. This prevents a
+silent launch from consuming the whole 50-minute job and losing its evidence.
+Initial device discovery receives the same three-minute allowance as
 boot: its first `simctl` invocation also initializes CoreSimulator on a cold host.
+Install, launch and VM discovery share five minutes because successful native
+runs have shown substantial cold-host variation. Flutter driver attachment
+still has a separate three-minute allowance; tests retain their twelve-minute
+limit. Neither the shared startup deadline nor the overall session deadline is
+reset by log polling.
 `scripts/tests/test_ios_simulator.py` covers timeout boundaries, child-process
-termination, partial output, split/large log markers, one-time recovery and
-failure preservation. These Python checks complement actual iPhone/iPad CI
-execution; they do not establish native runtime acceptance by themselves. See
+termination, partial output, split/large log markers, simulator ownership,
+one-time replacement and failure preservation. These Python checks complement
+actual iPhone/iPad CI execution; they do not establish native runtime acceptance
+by themselves. See
 the [alpha 5 incident](BUILD_INCIDENT_2026-10.md#10-october-ipad-runtime-timeout-blocked-alpha-5-publication)
 and the [post-merge discovery evidence](BUILD_INCIDENT_2026-10.md#11-october-retained-evidence-identifies-missed-vm-service-discovery).
 

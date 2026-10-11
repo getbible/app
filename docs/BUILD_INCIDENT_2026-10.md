@@ -145,5 +145,19 @@ that simulator during teardown. The selected iOS runtime and device type must
 remain unchanged. Only a validated, newly created device ID may establish
 ownership; pre-existing devices must never become cleanup targets. Application
 code, package versions and failed-test retry restrictions remain unchanged.
+The single pre-driver recovery replaces the owned device after successful
+deletion, rather than rebooting that same stalled device. Both attempts reuse
+the built APP, runtime and device type. Final teardown reserves bounded time
+for both shutdown and deletion, even if earlier diagnostics fail.
+Successful stages across the observed runs took up to 123.17 seconds to install,
+89.53 seconds to launch and 43.73 seconds to query retained logs. These were
+separate observations, not one measured startup, but their plausible combination
+exceeds the previous three-minute shared budget. Install/launch/discovery now
+share five minutes; a regression exercises that combination without a recovery.
+Flutter driver attachment retains three minutes, tests retain twelve minutes,
+and the overall execution limit remains 38 minutes. The number of attempts is
+unchanged. Failures also retain a bounded host unified-log excerpt for
+CoreSimulator/simctl, supplementing the simulated device's logs without delaying
+the reserved shutdown and deletion phases.
 Native PR and post-merge verification are still required before this remaining
 launch failure can be considered resolved.

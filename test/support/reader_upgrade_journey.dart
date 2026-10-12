@@ -79,6 +79,49 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
       await tester.pumpAndSettle();
       expect(find.text('My private note'), findsOneWidget);
 
+      // Every native acceptance target exercises the same separate navigation
+      // surfaces without changing the reader or acquiring another Bible.
+      await tester.tap(find.byKey(const ValueKey('reader-passage-selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('passage-book-1')));
+      await _waitForPlatformAction(
+        tester,
+        () => find
+            .byKey(const ValueKey('passage-chapter-1'))
+            .evaluate()
+            .isNotEmpty,
+        'The passage picker must show the selected book’s discovered chapters.',
+      );
+      expect(state.passage, original);
+      await tester.tap(find.byKey(const ValueKey('passage-picker-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('passage-book-1')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('passage-picker-close')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('reader-translation-selector')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('translation-picker-details')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('translation-picker-details')),
+          matching: find.text('English'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('translation-picker-close')));
+      await tester.pumpAndSettle();
+      expect(state.passage, original);
+      final positionAfterBrowsing = await tester.runAsync(
+        state.settings.getLastReadingPosition,
+      );
+      expect(positionAfterBrowsing?.passage, before?.passage);
+      expect(positionAfterBrowsing?.updatedAt, before?.updatedAt);
+
       Future<void> preview() async {
         await tester.tap(find.byTooltip('Reference preview'));
         await tester.pumpAndSettle();

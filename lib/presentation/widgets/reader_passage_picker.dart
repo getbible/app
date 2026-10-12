@@ -127,7 +127,7 @@ class _ReaderPassagePickerState extends State<ReaderPassagePicker> {
   Widget build(BuildContext context) {
     final strings = UiStrings.of(context);
     final book = _book;
-    return PopScope(
+    return PopScope<void>(
       // System Back first returns from chapters to books. An opening reader
       // request may dismiss the route; its caller owns cancellation of that work.
       canPop: book == null || _opening,

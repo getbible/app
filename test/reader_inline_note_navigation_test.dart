@@ -6,7 +6,6 @@ import 'package:getbible/domain/models/annotations.dart';
 import 'package:getbible/domain/models/passage.dart';
 import 'package:getbible/domain/models/preferences.dart';
 import 'package:getbible/main.dart';
-import 'package:getbible/presentation/widgets/reader_translation_field.dart';
 import 'package:provider/provider.dart';
 
 import 'support/reader_api_fixture.dart';
@@ -25,49 +24,57 @@ const Passage _other = Passage(
 );
 
 void main() {
-  testWidgets('Home and drawer preserve an unsaved canonical verse note', (
-    WidgetTester tester,
-  ) async {
-    final ReaderApiFixture fixture = ReaderApiFixture();
-    final AppState state = await _createReader(tester, fixture);
-    await _showReader(tester, state);
-    await _editNote(tester);
-    final List<String> requests = List<String>.of(fixture.paths);
+  testWidgets(
+    'Home, passage and translation controls preserve an unsaved canonical verse note',
+    (WidgetTester tester) async {
+      final ReaderApiFixture fixture = ReaderApiFixture();
+      final AppState state = await _createReader(tester, fixture);
+      await _showReader(tester, state);
+      await _editNote(tester);
+      final List<String> requests = List<String>.of(fixture.paths);
 
-    await tester.tap(find.text('getBible'));
-    await tester.pumpAndSettle();
-    expect(state.passage, _origin);
-    expect(fixture.paths, requests);
-    expect(
-      find.text('Save or close the verse note before opening another passage.'),
-      findsOneWidget,
-    );
-    expect(_draft(tester), 'Retained private draft');
+      await tester.tap(find.text('getBible'));
+      await tester.pumpAndSettle();
+      expect(state.passage, _origin);
+      expect(fixture.paths, requests);
+      expect(
+        find.text(
+          'Save or close the verse note before opening another passage.',
+        ),
+        findsOneWidget,
+      );
+      expect(_draft(tester), 'Retained private draft');
 
-    await tester.tap(find.byTooltip(state.ui('openBibleNavigation')));
-    await tester.pumpAndSettle();
-    _expectDrawerEnabled(tester, false);
-    expect(
-      find.textContaining('Passage controls are temporarily unavailable.'),
-      findsOneWidget,
-    );
-    await tester.tapAt(const Offset(620, 300));
-    await tester.pumpAndSettle();
-    expect(_draft(tester), 'Retained private draft');
+      _expectPassageEnabled(tester, false);
+      await tester.tap(find.byTooltip(state.ui('readerOptions')));
+      await tester.pumpAndSettle();
+      _expectBackupEnabled(tester, false);
+      expect(
+        find.textContaining('Passage controls are temporarily unavailable.'),
+        findsOneWidget,
+      );
+      await tester.tapAt(const Offset(620, 300));
+      await tester.pumpAndSettle();
+      expect(_draft(tester), 'Retained private draft');
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Save note'));
-    await _settle(tester);
-    expect(state.savedNotes.single.passage.canonicalKey, _origin.canonicalKey);
-    expect(state.savedNotes.single.verse, 1);
-    expect(state.savedNotes.single.text, 'Retained private draft');
-    expect(find.byTooltip('Close note editor'), findsNothing);
+      await tester.tap(find.widgetWithText(FilledButton, 'Save note'));
+      await _settle(tester);
+      expect(
+        state.savedNotes.single.passage.canonicalKey,
+        _origin.canonicalKey,
+      );
+      expect(state.savedNotes.single.verse, 1);
+      expect(state.savedNotes.single.text, 'Retained private draft');
+      expect(find.byTooltip('Close note editor'), findsNothing);
 
-    await tester.tap(find.byTooltip(state.ui('openBibleNavigation')));
-    await tester.pumpAndSettle();
-    _expectDrawerEnabled(tester, true);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      _expectPassageEnabled(tester, true);
+      await tester.tap(find.byTooltip(state.ui('readerOptions')));
+      await tester.pumpAndSettle();
+      _expectBackupEnabled(tester, true);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('a retained verse draft cannot save or delete another passage', (
     WidgetTester tester,
@@ -170,29 +177,32 @@ String _savedText(AppState state, Passage passage) => state.savedNotes
     )
     .text;
 
-void _expectDrawerEnabled(WidgetTester tester, bool enabled) {
-  final Finder drawer = find.byType(Drawer);
-  final DropdownButtonFormField<String> translation = tester.widget(
-    find.descendant(
-      of: find.descendant(
-        of: drawer,
-        matching: find.byType(ReaderTranslationField),
-      ),
-      matching: find.byType(DropdownButtonFormField<String>),
-    ),
-  );
-  expect(translation.onChanged != null, enabled);
-  final Iterable<DropdownButtonFormField<int>> passageFields = tester
-      .widgetList<DropdownButtonFormField<int>>(
-        find.descendant(
-          of: drawer,
-          matching: find.byType(DropdownButtonFormField<int>),
-        ),
-      );
-  expect(passageFields, hasLength(2));
-  for (final DropdownButtonFormField<int> field in passageFields) {
-    expect(field.onChanged != null, enabled);
+void _expectPassageEnabled(WidgetTester tester, bool enabled) {
+  for (final key in [
+    'reader-passage-selector',
+    'reader-mobile-passage-selector',
+  ]) {
+    final field = tester.widget<TextButton>(find.byKey(ValueKey(key)));
+    expect(field.onPressed != null, enabled);
   }
+  final translation = tester.widget<OutlinedButton>(
+    find.byKey(const ValueKey('reader-translation-selector')),
+  );
+  expect(translation.onPressed != null, enabled);
+}
+
+void _expectBackupEnabled(WidgetTester tester, bool enabled) {
+  final backup = tester.widget<ListTile>(
+    find.widgetWithText(ListTile, 'Backup and restore'),
+  );
+  expect(backup.onTap != null, enabled);
+  expect(
+    find.descendant(
+      of: find.byType(Drawer),
+      matching: find.byType(DropdownButtonFormField<int>),
+    ),
+    findsNothing,
+  );
 }
 
 Future<void> _settle(WidgetTester tester) async {

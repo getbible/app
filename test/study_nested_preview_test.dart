@@ -234,8 +234,8 @@ void main() {
           ),
           findsNothing,
         );
-        expect(find.text('Previous'), findsOneWidget);
-        expect(find.text('Next'), findsOneWidget);
+        expect(find.byTooltip(state.ui('previousChapter')), findsOneWidget);
+        expect(find.byTooltip(state.ui('nextChapter')), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },

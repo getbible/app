@@ -93,3 +93,27 @@ this increment. Full-suite evidence and hosted platform gates are recorded in
 final PR head establish native package/runtime acceptance. Signing and store
 submission remain separately configured; physical-device and human translation
 review are not implied by automated results.
+
+## Passage navigation refinement (12 October 2026)
+
+The maintainer's bot-mini-app screenshots supersede the earlier combined drawer
+selectors for native passage navigation. The selected translation appears above
+the current book/chapter/verse; each has a distinct action. Translation selection
+is infrequent and independent from the daily book-then-chapter flow. Its chooser
+shows source metadata below the candidate and applies only on **Open in reader**.
+The current chapter is retained across translations when published; unavailable
+coordinates lead to explicit book/chapter selection rather than substitution.
+
+Books use a compact responsive grid and chapter choices use published IDs,
+including introduction node zero and sparse chapter indexes. Full source names
+remain available to assistive technology. Search and chapter arrows move toward
+the left, with the compact passage selector also available in the paging row.
+Reader appearance and sizing remain in the settings drawer. The former chapter
+heading preview action has its own **Reference preview** icon beside the heading.
+
+Both pickers are native, scrollable and bounded by keyboard/safe-area clearance.
+Book previews, candidate translation changes, Back and cancellation preserve the
+active passage, annotations, saved position and selected offline Bible. Loading
+failures retain the old reader and allow retry; an in-flight result cannot apply
+after dismissal. Inline note drafts keep passage-changing controls disabled.
+Validation and target limitations are recorded in [Testing](TESTING.md).

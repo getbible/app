@@ -14,7 +14,7 @@ import 'package:getbible/domain/models/offline_resource.dart';
 import 'package:getbible/domain/models/passage.dart';
 import 'package:getbible/domain/repositories/notebook_repository.dart';
 import 'package:getbible/main.dart';
-import 'package:getbible/presentation/widgets/reader_translation_field.dart';
+import 'package:getbible/presentation/widgets/reader_translation_picker.dart';
 import 'package:getbible/presentation/widgets/study_workspace.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -178,10 +178,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(state.current, same(originalChapter));
       expect(state.passage, originalPassage);
-      await tester.tap(find.byTooltip(state.ui('openBibleNavigation')));
+      await tester.tap(
+        find.byKey(const ValueKey('reader-translation-selector')),
+      );
       await tester.pumpAndSettle();
-      final field = tester.widget<ReaderTranslationField>(
-        find.byType(ReaderTranslationField),
+      final field = tester.widget<ReaderTranslationPicker>(
+        find.byType(ReaderTranslationPicker),
       );
       expect(
         field.translations.map((item) => item.abbreviation),
@@ -217,7 +219,7 @@ Future<void> _openDrawerItem(
     await tester.tap(find.byTooltip('Close Study tools'));
     await _settle(tester);
   }
-  await tester.tap(find.byTooltip(state.ui('openBibleNavigation')));
+  await tester.tap(find.byTooltip(state.ui('readerOptions')));
   await tester.pumpAndSettle();
   await tester.ensureVisible(find.text(label));
   await tester.tap(find.text(label));

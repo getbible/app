@@ -80,7 +80,7 @@ void readerUpgradeJourney({bool nativeClipboard = false}) {
       expect(find.text('My private note'), findsOneWidget);
 
       Future<void> preview() async {
-        await tester.tap(find.widgetWithText(TextButton, 'Fixture 1'));
+        await tester.tap(find.byTooltip('Reference preview'));
         await tester.pumpAndSettle();
         await tester.enterText(
           find.byKey(const ValueKey<String>('reference-preview-input')),

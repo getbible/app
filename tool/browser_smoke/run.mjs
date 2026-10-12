@@ -85,7 +85,7 @@ async function enableSemantics(page) {
 }
 
 async function readerVisible(page) {
-  await page.getByRole('button', { name: 'Genesis 1', exact: true }).waitFor();
+  await page.getByRole('button', { name: /^Genesis 1(?::\d+)? · KJV$/ }).waitFor();
   await page.getByRole('group', { name: `Genesis 1:1. ${firstVerse}`, exact: true }).waitFor();
   await page.getByRole('group', { name: `Genesis 1:2. ${secondVerse}`, exact: true }).waitFor();
 }

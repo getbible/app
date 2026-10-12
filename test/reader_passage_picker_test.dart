@@ -221,8 +221,19 @@ void main() {
         direction: TextDirection.rtl,
       );
       expect(tester.getSize(find.byType(ReaderPassagePicker)).height, 280);
+      Future<void> reveal(Finder target, double delta) =>
+          tester.scrollUntilVisible(
+            target,
+            delta,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const ValueKey('passage-picker-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
       final longBook = find.byKey(const ValueKey('passage-book-2'));
-      await tester.ensureVisible(longBook);
+      await reveal(longBook, 100);
       await tester.pumpAndSettle();
       expect(longBook.hitTestable(), findsOneWidget);
       expect(tester.getSize(longBook).height, greaterThanOrEqualTo(48));
@@ -234,19 +245,19 @@ void main() {
       expect(longName.maxLines, isNull);
       expect(longName.overflow, isNull);
       final extraBook = find.byKey(const ValueKey('passage-book-99'));
-      await tester.ensureVisible(extraBook);
+      await reveal(extraBook, 100);
       await tester.pumpAndSettle();
       expect(extraBook.hitTestable(), findsOneWidget);
       await tester.tap(extraBook);
       await tester.pumpAndSettle();
       final chapter = find.byKey(const ValueKey('passage-chapter-150'));
-      await tester.ensureVisible(chapter);
+      await reveal(chapter, 100);
       await tester.pumpAndSettle();
       expect(chapter.hitTestable(), findsOneWidget);
       expect(tester.getSize(chapter).height, greaterThanOrEqualTo(48));
       expect(tester.getSize(chapter).width, greaterThanOrEqualTo(48));
       final close = find.byKey(const ValueKey('passage-picker-close'));
-      await tester.ensureVisible(close);
+      await reveal(close, -100);
       await tester.pumpAndSettle();
       expect(close.hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);

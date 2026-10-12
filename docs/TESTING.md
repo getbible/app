@@ -1,5 +1,50 @@
 # Testing and manual QA
 
+## Passage navigation refinement (12 October 2026)
+
+The focused navigation checks are:
+
+```bash
+flutter test --no-pub test/reader_passage_picker_test.dart test/reader_translation_picker_test.dart test/reader_passage_navigation_test.dart
+flutter test --no-pub test/reader_inline_note_navigation_test.dart test/reader_upgrade_test.dart
+```
+
+The picker suites pass 23 cases. Seven composed navigation cases cover phone
+and desktop activation, unchanged reader/persistence while browsing or cancelling,
+explicit selection for partial Bibles, sparse/extended source IDs, dismissed
+in-flight navigation, and 320px RTL / 200% text with an on-screen keyboard. The
+640×360 landscape case at 200% text and 180px keyboard clearance exposed a real
+underlying-reader overflow. The reader Scaffold now resizes only for its inline
+note editor; overlay routes manage their own keyboard clearance, including
+keyboard dismissal. The regression verifies that book/chapter controls remain
+reachable and the retained reader does not overflow.
+
+The shared `reader_upgrade_journey.dart` additionally opens the book/chapter
+picker, returns to books and closes, then inspects and closes the translation
+chooser without changing the passage, saved position or private note. Existing
+reference-preview, inline-note, portability and browser journeys use the separate
+preview icon and **Reader options** drawer entry. This shared journey is exercised
+by native platform CI as well as the local widget runner.
+
+Actual widget captures with bundled Roboto and Material icon fonts were inspected
+for phone/desktop reader, book and chapter grids, translation details, and narrow
+RTL/large-text/keyboard layouts. They use deterministic fixture Scripture rather
+than live content. The existing delayed Search Open regression now checks that
+query editing immediately invalidates its old request and that any request started
+later by the 250ms debounce belongs to the new query; settling SQLite must not
+assume the new debounce has not fired.
+
+Local validation uses the pinned Flutter 3.44.6 / Dart 3.12.2 SDK. All 542
+Flutter tests pass. Formatting,
+analyzer, localization inventory (444 templates), branding/product identity,
+fixture embedding, 83 developer-tool tests, 64 release-tool tests and six browser
+harness tests pass. Production Web compilation and both resource workers pass;
+the generated offline application shell contains 194 validated files. Exact PR
+head CI supplies the Linux, Windows, macOS, Android and unsigned iOS build/runtime
+evidence. This Linux editing host lacks the Android SDK and native Linux build
+toolchain and cannot perform Apple or Windows builds. Signed device distribution,
+physical touch/VoiceOver/TalkBack and human language review remain separate gates.
+
 ## Interactive platform testing
 
 Run `flutter devices` to list available targets. Use `flutter run -d chrome` for the quickest browser test, or `flutter run -d <device-id>` for a connected phone, emulator, simulator, or desktop target. Every successful CI run retains versioned packages in its Artifacts section. Successful main runs also promote new versions to [GitHub Releases](https://github.com/getbible/app/releases) without rebuilding; see [installation](INSTALLING.md) and [distribution](DEPLOYMENT.md).
@@ -105,8 +150,8 @@ The application bounds only negative keyboard clearance at zero and retains
 normal positive spacing. The native journey still checks real input, clipboard
 readback and unsaved-draft preservation.
 
-For device/browser QA, open Reference preview from the chapter heading or
-navigation drawer and from a verse context menu. Try a range and multiple
+For device/browser QA, open Reference preview from the icon beside the chapter heading or
+Reader options drawer and from a verse context menu. Try a range and multiple
 references; verify the selected translation and original source label. Close
 with the close control, back/Escape and sheet dismissal, confirming that the
 reader's passage, scroll, focus and private annotations remain unchanged.

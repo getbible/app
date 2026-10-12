@@ -136,6 +136,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
       },
       child: Scaffold(
         key: _scaffoldKey,
+        // Overlay routes manage their own keyboard clearance. Resizing the
+        // covered reader can overflow its header on short landscape screens,
+        // including during the keyboard's dismissal animation. Only the inline
+        // verse editor needs to resize this Scaffold for a keyboard.
+        resizeToAvoidBottomInset: _editingNote != null,
         drawer: _ReaderDrawer(
           state: state,
           onReferencePreview: _showReferencePreview,
@@ -455,7 +460,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         pickerContext.mounted &&
         ModalRoute.of(pickerContext)?.isCurrent == true;
     await state.loadPassage(target, ownsRequest: ownsNavigation);
-    if (!ownsNavigation()) return;
+    if (!mounted || !pickerContext.mounted || !ownsNavigation()) return;
     if (state.passage != target || state.error != null) {
       throw StateError(
         state.error ??
@@ -517,7 +522,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           final chapters = bookAvailable
               ? (await state.bibles.getChapters(translation, passage.book)).data
               : const <ChapterInfo>[];
-          if (!ownsSelection()) return;
+          if (!mounted || !pickerContext.mounted || !ownsSelection()) return;
           if (chapters.any((chapter) => chapter.chapter == passage.chapter)) {
             await _openPickerPassage(
               state,
@@ -1469,12 +1474,14 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
         titleSpacing: 4,
         title: Row(
           children: <Widget>[
-            Image.asset(
-              'assets/branding/getbible_app_icon.png',
-              width: 24,
-              height: 24,
-            ),
-            const SizedBox(width: 8),
+            if (!compact) ...[
+              Image.asset(
+                'assets/branding/getbible_app_icon.png',
+                width: 24,
+                height: 24,
+              ),
+              const SizedBox(width: 8),
+            ],
             Flexible(
               child: InkWell(
                 onTap: onHome,
@@ -1501,6 +1508,9 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
                     child: TextField(
                       decoration: InputDecoration(
                         hintText: UiStrings.of(context).text('Search'),
+                        hintTextDirection: state.ui.isRtl
+                            ? TextDirection.rtl
+                            : TextDirection.ltr,
                         prefixIcon: Icon(Icons.search),
                         isDense: true,
                       ),
@@ -3013,7 +3023,8 @@ class _EdgeChapterNavigation extends StatelessWidget {
     child: IgnorePointer(
       ignoring: false,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        textDirection: TextDirection.ltr,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: <Widget>[
           _EdgeButton(
             tooltip: state.ui('previousChapter'),

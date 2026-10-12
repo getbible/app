@@ -28,6 +28,9 @@ void main() {
       final loader = FontLoader('Roboto')
         ..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
       await loader.load();
+      final icons = FontLoader('MaterialIcons')
+        ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+      await icons.load();
     }
   });
   for (final compact in [true, false]) {
@@ -102,7 +105,8 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final fixture = _NavigationFixture();
-      final state = await _reader(tester, fixture, rtl: true);
+      final initial = _origin.copyWith(verse: 1);
+      final state = await _reader(tester, fixture, rtl: true, initial: initial);
       final passage = find.byKey(const ValueKey('reader-passage-selector'));
       final translation = find.byKey(
         const ValueKey('reader-translation-selector'),
@@ -130,20 +134,76 @@ void main() {
       await tester.pumpAndSettle();
       final search = find.byKey(const ValueKey('passage-picker-search'));
       await tester.ensureVisible(search);
+      await tester.pumpAndSettle();
       await tester.enterText(search, 'Extended');
       await tester.pumpAndSettle();
       final book = find.byKey(const ValueKey('passage-book-$_extendedBook'));
       await tester.ensureVisible(book);
+      await tester.pumpAndSettle();
       expect(book.hitTestable(), findsOneWidget);
       expect(tester.getRect(book).bottom, lessThanOrEqualTo(620));
       await tester.tap(book);
       await _settle(tester);
       final chapter = find.byKey(const ValueKey('passage-chapter-9'));
       await tester.ensureVisible(chapter);
+      await tester.pumpAndSettle();
       expect(chapter.hitTestable(), findsOneWidget);
       expect(tester.getRect(chapter).bottom, lessThanOrEqualTo(620));
       await _capture(tester, 'phone-rtl-large-keyboard');
-      expect(state.passage, _origin);
+      final close = find.byKey(const ValueKey('passage-picker-close'));
+      await tester.ensureVisible(close);
+      await tester.pumpAndSettle();
+      await tester.tap(close);
+      await _settle(tester);
+      await _chooseTranslation(tester, 'alt');
+      final open = find.byKey(const ValueKey('translation-picker-open'));
+      await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
+      expect(open.hitTestable(), findsOneWidget);
+      expect(tester.getRect(open).bottom, lessThanOrEqualTo(620));
+      await _capture(tester, 'phone-rtl-large-translation-keyboard');
+      expect(
+        fixture.paths.where((path) => path.startsWith('/v3/alt')),
+        isEmpty,
+      );
+      expect(state.passage, initial);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'landscape reader and picker remain bounded with 200% text and an open keyboard',
+    (tester) async {
+      _viewport(tester, const Size(640, 360));
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final fixture = _NavigationFixture();
+      final initial = _origin.copyWith(verse: 1);
+      final state = await _reader(tester, fixture, initial: initial);
+      await tester.tap(find.byKey(const ValueKey('reader-passage-selector')));
+      await _settle(tester);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final search = find.byKey(const ValueKey('passage-picker-search'));
+      await _revealPassageControl(tester, search);
+      expect(search.hitTestable(), findsOneWidget);
+      expect(tester.getRect(search).bottom, lessThanOrEqualTo(180));
+      await tester.enterText(search, 'Extended');
+      await tester.pumpAndSettle();
+      final book = find.byKey(const ValueKey('passage-book-$_extendedBook'));
+      await _revealPassageControl(tester, book);
+      expect(book.hitTestable(), findsOneWidget);
+      await tester.tap(book);
+      await _settle(tester);
+      final chapter = find.byKey(const ValueKey('passage-chapter-9'));
+      await _revealPassageControl(tester, chapter);
+      expect(chapter.hitTestable(), findsOneWidget);
+      expect(tester.getRect(chapter).bottom, lessThanOrEqualTo(180));
+      await _capture(tester, 'phone-landscape-large-keyboard');
+      expect(state.passage, initial);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -179,6 +239,7 @@ void main() {
       await _chooseTranslation(tester, 'alt');
       final open = find.byKey(const ValueKey('translation-picker-open'));
       await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
       await tester.tap(open);
       await _settle(tester);
       const selected = Passage(translation: 'alt', book: 1, chapter: 1);
@@ -213,6 +274,7 @@ void main() {
       await _chooseTranslation(tester, 'partial');
       final open = find.byKey(const ValueKey('translation-picker-open'));
       await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
       await tester.tap(open);
       await _settle(tester);
       expect(find.byKey(const ValueKey('passage-book-1')), findsNothing);
@@ -292,6 +354,31 @@ void main() {
   );
 }
 
+Future<void> _revealPassageControl(WidgetTester tester, Finder control) async {
+  final scrollable = tester.state<ScrollableState>(
+    find
+        .descendant(
+          of: find.byKey(const ValueKey('passage-picker-scroll')),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  // Realize lazy children through the viewport's actual scroll position. A
+  // gesture at the viewport center can instead hit the search caret/handles.
+  for (var step = 0; step < 20 && control.evaluate().isEmpty; step++) {
+    final position = scrollable.position;
+    final next = (position.pixels + 80).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (next == position.pixels) break;
+    position.jumpTo(next);
+    await tester.pump();
+  }
+  await tester.ensureVisible(control);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _chooseTranslation(
   WidgetTester tester,
   String abbreviation,
@@ -309,6 +396,7 @@ Future<void> _chooseTranslation(
     ValueKey('translation-picker-option-$abbreviation'),
   );
   await tester.ensureVisible(candidate);
+  await tester.pumpAndSettle();
   await tester.tap(candidate);
   await _settle(tester);
 }
@@ -324,13 +412,14 @@ Future<AppState> _reader(
   WidgetTester tester,
   _NavigationFixture fixture, {
   bool rtl = false,
+  Passage initial = _origin,
 }) async {
   final state = (await tester.runAsync(() async {
     final state = AppState.fromDatabase(
       await LocalDatabase.memory(),
       api: fixture.api,
     );
-    await state.loadPassage(_origin);
+    await state.loadPassage(initial);
     if (_captureScreenshots) await state.setReaderFont('system');
     if (rtl) state.ui = const UiStrings('ar', []);
     return state;
@@ -374,20 +463,23 @@ Future<void> _capture(WidgetTester tester, String name) async {
 }
 
 Future<void> _settle(WidgetTester tester) async {
-  for (var i = 0; i < 3; i++) {
+  // A translation awaiting an explicit passage keeps its progress indicator
+  // below the nested route. Advance finite route/SQLite work without requiring
+  // an unrelated covered animation to become idle.
+  for (var i = 0; i < 5; i++) {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 25)),
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
   }
-  await tester.pumpAndSettle();
 }
 
 Future<void> _until(WidgetTester tester, bool Function() done) async {
   final watch = Stopwatch()..start();
   while (!done()) {
-    if (watch.elapsed > const Duration(seconds: 5))
+    if (watch.elapsed > const Duration(seconds: 5)) {
       fail('Navigation did not reach its expected milestone.');
+    }
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );
@@ -416,8 +508,9 @@ final class _NavigationFixture {
       return _json({for (final id in _titles.keys) id: _translation(id)});
     }
     final match = RegExp(r'^/v3/(tst|alt|partial)/(.*)$').firstMatch(path);
-    if (match == null)
+    if (match == null) {
       return http.Response('Unavailable fixture resource', 404);
+    }
     final id = match[1]!;
     final resource = match[2]!;
     final books = id == 'partial' ? [_extendedBook] : [1, _extendedBook];

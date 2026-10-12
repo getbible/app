@@ -113,12 +113,20 @@ void main() {
       );
       await tester.ensureVisible(query);
       await tester.pump();
+      final previousRequest = state.onlineSearch.request;
+      expect(previousRequest, isNotNull);
       await tester.enterText(query, 'New query');
+      expect(state.onlineSearch.request, isNull);
       fixture.delayedIndex!.complete();
       await _settleIo(tester, state);
       expect(state.passage, origin);
       expect(find.byType(SearchPanel), findsOneWidget);
-      expect(state.onlineSearch.request, isNull);
+      // Settling can cross the debounce deadline and start the replacement
+      // search. It must never restore the request that owned the delayed Open.
+      expect(state.onlineSearch.request, isNot(same(previousRequest)));
+      if (state.onlineSearch.request != null) {
+        expect(state.onlineSearch.request!.text, 'New query');
+      }
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip('Close search'));
       await tester.pumpAndSettle();

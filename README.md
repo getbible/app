@@ -47,6 +47,23 @@ flutter run
 
 The application ID and iOS bundle ID are `life.getbible.mobile`. No API key is required for the public getBible API.
 
+## Choose a Bible passage
+
+The translation button above the chapter heading opens its own searchable
+chooser. Search by translation name, abbreviation or language, inspect the
+selected translation's details, then choose **Open in reader**. The reader keeps
+the current book and chapter when the chosen Bible publishes them. Otherwise,
+it asks you to choose an available book and chapter before changing the reader.
+Browsing or cancelling a choice does not select or download another Bible.
+
+Tap the current passage to open the book grid, grouped by testament with other
+published books retained. Choose a book to see its actual chapter grid, including
+introductions and nonconsecutive chapter numbers when supplied by that Bible.
+Back returns to books; choosing a chapter opens it. Search, passage controls and
+chapter arrows are placed toward the left. Compact screens use keyboard-aware
+sheets; wider windows use dialogs. The left menu retains reader appearance,
+text size, width, backups, downloads and other settings.
+
 ## Scripture and reference previews
 
 The reader discovers translations, books and chapters through
@@ -64,7 +81,7 @@ could not be checked, and links to the [Bible API documentation](https://getbibl
 Translation licensing ends with the book artwork, “The Word for the world!” and
 “Powered by getBible APIs.”, linking to [general documentation](https://getbible.net).
 
-Open **Reference preview** from the chapter heading, navigation drawer or verse
+Open **Reference preview** from its icon beside the chapter heading, the settings drawer or verse
 context menu. Query v3 at `https://query.getbible.net/v3` resolves the chosen
 Bible's citation without installing a translation. The compact sheet or wide
 panel shows the reference, translation and native selectable Scripture, with

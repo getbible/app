@@ -35,7 +35,8 @@ import 'widgets/native_scripture_text.dart';
 import 'widgets/notes_panel.dart';
 import 'widgets/offline_setup_panel.dart';
 import 'widgets/portability_panel.dart';
-import 'widgets/reader_translation_field.dart';
+import 'widgets/reader_passage_picker.dart';
+import 'widgets/reader_translation_picker.dart';
 import 'widgets/reference_preview.dart';
 import 'widgets/scripture_editorial.dart';
 import 'widgets/scripture_paragraph_selection.dart';
@@ -150,7 +151,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 onStudy: () => _openStudy(),
                 onSearch: () => _showSearch(context, state),
                 onHome: () => unawaited(_openDaily(state)),
-                onTurn: (int direction) => unawaited(_turn(state, direction)),
                 onMarkdown: () => _showMarkdown(context, state),
               )
             : null,
@@ -181,6 +181,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   key: ValueKey(chapter.name),
                   state: state,
                   onPreview: () => _showReferencePreview(),
+                  onPassage: _navigationEnabled(state)
+                      ? () => unawaited(_showPassagePicker(state))
+                      : null,
+                  onTranslation: _navigationEnabled(state)
+                      ? () => unawaited(_showTranslationPicker(state))
+                      : null,
+                  onTurn: (direction) => unawaited(_turn(state, direction)),
                 ),
               if (state.legacyScripture)
                 Padding(
@@ -309,7 +316,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ),
               ),
               if (_showChrome)
-                _MobileChapterNavigation(state: state, onTurn: _turn),
+                _MobileChapterNavigation(
+                  state: state,
+                  onTurn: _turn,
+                  onPassage: _navigationEnabled(state)
+                      ? () => unawaited(_showPassagePicker(state))
+                      : null,
+                ),
             ],
           ),
           if (!_showChrome) _EdgeChapterNavigation(state: state, onTurn: _turn),
@@ -382,6 +395,153 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (!mounted) return;
     if (_scrollController.hasClients) _scrollController.jumpTo(0);
     if (!_showChrome) setState(() => _showChrome = true);
+  }
+
+  bool _navigationEnabled(AppState state) =>
+      !state.loading && !_openingDaily && _editingNote == null;
+
+  /// Compact sheets and desktop dialogs share exactly the same native picker.
+  /// Insets shrink the scrollable content instead of hiding controls under IME.
+  Future<void> _showReaderPicker(WidgetBuilder builder) async {
+    final previousFocus = FocusManager.instance.primaryFocus;
+    if (MediaQuery.sizeOf(context).width <= 720) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => KeyboardInsetPadding(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SizedBox(
+              height: constraints.maxHeight * .9,
+              child: builder(sheetContext),
+            ),
+          ),
+        ),
+      );
+    } else {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          clipBehavior: Clip.antiAlias,
+          insetPadding: const EdgeInsets.all(24),
+          child: SizedBox(
+            width: 680,
+            height: MediaQuery.sizeOf(dialogContext).height * .85,
+            child: builder(dialogContext),
+          ),
+        ),
+      );
+    }
+    if (mounted && previousFocus?.context != null) {
+      previousFocus!.requestFocus();
+    }
+  }
+
+  Future<void> _openPickerPassage(
+    AppState state,
+    BuildContext pickerContext,
+    Passage target,
+    BibleChapter? origin,
+  ) async {
+    if (!_navigationEnabled(state) || !identical(state.current, origin)) {
+      throw StateError(
+        UiStrings.of(
+          context,
+        ).text('This passage is unavailable in the selected Bible.'),
+      );
+    }
+    bool ownsNavigation() =>
+        mounted &&
+        pickerContext.mounted &&
+        ModalRoute.of(pickerContext)?.isCurrent == true;
+    await state.loadPassage(target, ownsRequest: ownsNavigation);
+    if (!ownsNavigation()) return;
+    if (state.passage != target || state.error != null) {
+      throw StateError(
+        state.error ??
+            UiStrings.of(
+              context,
+            ).text('This passage is unavailable in the selected Bible.'),
+      );
+    }
+    Navigator.of(pickerContext).pop();
+    if (_studyContext != null) _closeStudy();
+  }
+
+  Future<void> _showPassagePicker(
+    AppState state, {
+    String? translation,
+    List<BibleBook>? books,
+  }) async {
+    if (!_navigationEnabled(state)) return;
+    final origin = state.current;
+    final passage = state.passage.copyWith(translation: translation);
+    await _showReaderPicker(
+      (pickerContext) => ReaderPassagePicker(
+        books: books ?? state.books,
+        passage: passage,
+        loadChapters: (book) async =>
+            (await state.bibles.getChapters(passage.translation, book)).data,
+        onOpen: (target) =>
+            _openPickerPassage(state, pickerContext, target, origin),
+        onClose: () => Navigator.of(pickerContext).pop(),
+      ),
+    );
+  }
+
+  Future<void> _showTranslationPicker(AppState state) async {
+    if (!_navigationEnabled(state)) return;
+    final origin = state.current;
+    final passage = state.passage;
+    await _showReaderPicker(
+      (pickerContext) => ReaderTranslationPicker(
+        translations: state.translations,
+        value: passage.translation,
+        onClose: () => Navigator.of(pickerContext).pop(),
+        onOpen: (translation) async {
+          bool ownsSelection() =>
+              mounted &&
+              pickerContext.mounted &&
+              ModalRoute.of(pickerContext)?.isCurrent == true &&
+              identical(state.current, origin);
+          if (!ownsSelection()) return;
+          if (translation == passage.translation) {
+            Navigator.of(pickerContext).pop();
+            return;
+          }
+          final books = (await state.bibles.getBooks(translation)).data;
+          if (!ownsSelection()) return;
+          final bookAvailable = books.any(
+            (book) => book.number == passage.book,
+          );
+          final chapters = bookAvailable
+              ? (await state.bibles.getChapters(translation, passage.book)).data
+              : const <ChapterInfo>[];
+          if (!ownsSelection()) return;
+          if (chapters.any((chapter) => chapter.chapter == passage.chapter)) {
+            await _openPickerPassage(
+              state,
+              pickerContext,
+              passage.copyWith(translation: translation, clearVerse: true),
+              origin,
+            );
+          } else {
+            // Partial Bibles need an explicit available passage choice. Merely
+            // browsing a different catalogue never activates/downloads that Bible.
+            await _showPassagePicker(
+              state,
+              translation: translation,
+              books: books,
+            );
+            if (mounted &&
+                pickerContext.mounted &&
+                state.passage.translation == translation) {
+              Navigator.of(pickerContext).pop();
+            }
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _openDaily(AppState state) async {
@@ -1267,7 +1427,6 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onStudy,
     required this.onSearch,
     required this.onHome,
-    required this.onTurn,
     required this.onMarkdown,
   });
 
@@ -1276,7 +1435,6 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onStudy;
   final VoidCallback onSearch;
   final VoidCallback onHome;
-  final ValueChanged<int> onTurn;
   final VoidCallback onMarkdown;
 
   @override
@@ -1285,109 +1443,102 @@ class _ReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final bool compact = MediaQuery.sizeOf(context).width <= 720;
-    return AppBar(
-      toolbarHeight: 62,
-      leading: IconButton(
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        tooltip: state.ui('openBibleNavigation'),
-        onPressed: onMenu,
-        icon: const Icon(Icons.menu),
-      ),
-      titleSpacing: 4,
-      title: Row(
-        children: <Widget>[
-          Image.asset(
-            'assets/branding/getbible_app_icon.png',
-            width: 24,
-            height: 24,
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: InkWell(
-              onTap: onHome,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                child: Text(
-                  UiStrings.of(context).text('getBible'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: AppBar(
+        toolbarHeight: 62,
+        leadingWidth: compact ? 104 : 56,
+        leading: Row(
+          textDirection: TextDirection.ltr,
+          children: [
+            IconButton(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              tooltip: state.ui('readerOptions'),
+              onPressed: onMenu,
+              icon: const Icon(Icons.menu),
+            ),
+            if (compact)
+              IconButton(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                tooltip: state.ui('searchThisTranslation'),
+                onPressed: onSearch,
+                icon: const Icon(Icons.search),
+              ),
+          ],
+        ),
+        titleSpacing: 4,
+        title: Row(
+          children: <Widget>[
+            Image.asset(
+              'assets/branding/getbible_app_icon.png',
+              width: 24,
+              height: 24,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: InkWell(
+                onTap: onHome,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                  child: Text(
+                    UiStrings.of(context).text('getBible'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+                  ),
                 ),
               ),
             ),
-          ),
-          if (!compact) ...<Widget>[
-            const SizedBox(width: 18),
-            Expanded(
-              flex: 2,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: onSearch,
-                child: IgnorePointer(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: UiStrings.of(context).text('Search'),
-                      prefixIcon: Icon(Icons.search),
-                      isDense: true,
+            if (!compact) ...<Widget>[
+              const SizedBox(width: 18),
+              Expanded(
+                flex: 2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onSearch,
+                  child: IgnorePointer(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: UiStrings.of(context).text('Search'),
+                        prefixIcon: Icon(Icons.search),
+                        isDense: true,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
+        ),
+        actions: <Widget>[
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            tooltip: state.ui('openAsMarkdown'),
+            onPressed: state.current?.verses.isNotEmpty == true
+                ? onMarkdown
+                : null,
+            icon: const Icon(Icons.menu_book_outlined),
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 10),
+            child: compact
+                ? IconButton(
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    tooltip: state.ui('study'),
+                    onPressed: onStudy,
+                    icon: const Icon(Icons.school_outlined),
+                  )
+                : OutlinedButton(
+                    onPressed: onStudy,
+                    child: Text(state.ui('study')),
+                  ),
+          ),
         ],
       ),
-      actions: <Widget>[
-        if (compact)
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            tooltip: state.ui('searchThisTranslation'),
-            onPressed: onSearch,
-            icon: const Icon(Icons.search),
-          ),
-        // Compact readers already have the persistent chapter navigation row.
-        // Keep this toolbar's actions reachable without duplicating its arrows.
-        if (!compact) ...<Widget>[
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            tooltip: state.ui('previousChapter'),
-            onPressed: state.canGoPrevious ? () => onTurn(-1) : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            tooltip: state.ui('nextChapter'),
-            onPressed: state.canGoNext ? () => onTurn(1) : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-        ],
-        IconButton(
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          tooltip: state.ui('openAsMarkdown'),
-          onPressed: state.current?.verses.isNotEmpty == true
-              ? onMarkdown
-              : null,
-          icon: const Icon(Icons.menu_book_outlined),
-        ),
-        Padding(
-          padding: const EdgeInsetsDirectional.only(end: 10),
-          child: compact
-              ? IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                  tooltip: state.ui('study'),
-                  onPressed: onStudy,
-                  icon: const Icon(Icons.school_outlined),
-                )
-              : OutlinedButton(
-                  onPressed: onStudy,
-                  child: Text(state.ui('study')),
-                ),
-        ),
-      ],
     );
   }
 }
@@ -1397,10 +1548,16 @@ class _ChapterHeading extends StatefulWidget {
     super.key,
     required this.state,
     required this.onPreview,
+    required this.onPassage,
+    required this.onTranslation,
+    required this.onTurn,
   });
 
   final AppState state;
   final VoidCallback onPreview;
+  final VoidCallback? onPassage;
+  final VoidCallback? onTranslation;
+  final ValueChanged<int> onTurn;
 
   @override
   State<_ChapterHeading> createState() => _ChapterHeadingState();
@@ -1411,47 +1568,103 @@ class _ChapterHeadingState extends State<_ChapterHeading> {
 
   @override
   Widget build(BuildContext context) {
-    final AppState state = widget.state;
-    final BibleChapter chapter = state.current!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: TextButton(
-                  style: TextButton.styleFrom(
-                    alignment: AlignmentDirectional.centerStart,
-                  ),
-                  onPressed: widget.onPreview,
-                  child: Text(
-                    chapter.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
+    final state = widget.state;
+    final chapter = state.current!;
+    final ui = UiStrings.of(context);
+    return Directionality(
+      textDirection: ui.isRtl ? TextDirection.rtl : TextDirection.ltr,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const ValueKey('reader-translation-selector'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  alignment: AlignmentDirectional.centerStart,
+                ),
+                onPressed: widget.onTranslation,
+                icon: const Icon(Icons.translate, size: 18),
+                label: Text(
+                  state.currentTranslation?.translation ?? chapter.translation,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 12),
-              Text(
-                chapter.abbreviation.toUpperCase(),
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-              const SizedBox(width: 12),
-              ScriptureVerificationBadge(
-                expanded: _expanded,
-                onPressed: () => setState(() => _expanded = !_expanded),
-                freshness: state.freshness ?? CacheFreshness.cachedUnverified,
-              ),
-            ],
+            ),
           ),
-        ),
-        if (_expanded)
-          ScriptureVerificationNotice(
-            freshness: state.freshness ?? CacheFreshness.cachedUnverified,
-            onClose: () => setState(() => _expanded = false),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Row(
+              // Keep the passage target physically left; source text retains
+              // its independent direction inside the control.
+              textDirection: TextDirection.ltr,
+              children: [
+                if (MediaQuery.sizeOf(context).width > 720) ...[
+                  IconButton(
+                    tooltip: state.ui('previousChapter'),
+                    onPressed: widget.onPassage != null && state.canGoPrevious
+                        ? () => widget.onTurn(-1)
+                        : null,
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  IconButton(
+                    tooltip: state.ui('nextChapter'),
+                    onPressed: widget.onPassage != null && state.canGoNext
+                        ? () => widget.onTurn(1)
+                        : null,
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
+                Expanded(
+                  child: TextButton(
+                    key: const ValueKey('reader-passage-selector'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      alignment: Alignment.centerLeft,
+                    ),
+                    onPressed: widget.onPassage,
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '${chapter.name}${state.passage.verse == null ? '' : ':${state.passage.verse}'} · ${chapter.abbreviation.toUpperCase()}',
+                            textDirection: chapter.isRtl
+                                ? TextDirection.rtl
+                                : TextDirection.ltr,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const Icon(Icons.expand_more),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: ui.text('Reference preview'),
+                  onPressed: widget.onPreview,
+                  icon: const Icon(Icons.find_in_page_outlined),
+                ),
+                ScriptureVerificationBadge(
+                  expanded: _expanded,
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  freshness: state.freshness ?? CacheFreshness.cachedUnverified,
+                ),
+              ],
+            ),
           ),
-      ],
+          if (_expanded)
+            ScriptureVerificationNotice(
+              freshness: state.freshness ?? CacheFreshness.cachedUnverified,
+              onClose: () => setState(() => _expanded = false),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -2509,78 +2722,6 @@ class _ReaderDrawer extends StatelessWidget {
                 ),
               ),
             ),
-          ReaderTranslationField(
-            value: state.passage.translation,
-            translations: state.translations,
-            onChanged: navigationEnabled
-                ? (String? value) {
-                    if (value != null) {
-                      unawaited(
-                        state.loadPassage(
-                          Passage(
-                            translation: value,
-                            book: state.passage.book,
-                            chapter: state.passage.chapter,
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                : null,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            key: ValueKey<int>(state.passage.book),
-            initialValue: state.passage.book,
-            decoration: InputDecoration(labelText: state.ui('book')),
-            items: state.books
-                .map(
-                  (BibleBook item) => DropdownMenuItem(
-                    value: item.number,
-                    child: Text(item.name),
-                  ),
-                )
-                .toList(),
-            onChanged: navigationEnabled
-                ? (int? value) {
-                    if (value != null) unawaited(state.openBook(value));
-                  }
-                : null,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            key: ValueKey<String>(
-              'chapter-${state.passage.book}-${state.passage.chapter}',
-            ),
-            initialValue: state.passage.chapter,
-            decoration: InputDecoration(labelText: state.ui('chapter')),
-            items: state.chapters
-                .map(
-                  (ChapterInfo item) => DropdownMenuItem(
-                    value: item.chapter,
-                    child: Text(
-                      item.isIntroduction
-                          ? UiStrings.of(context).text('Introduction')
-                          : '${item.chapter}',
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: navigationEnabled
-                ? (int? value) {
-                    if (value != null) {
-                      unawaited(
-                        state.loadPassage(
-                          state.passage.copyWith(
-                            chapter: value,
-                            clearVerse: true,
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                : null,
-          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.find_in_page_outlined),
@@ -2807,10 +2948,15 @@ class _ReaderDrawer extends StatelessWidget {
 }
 
 class _MobileChapterNavigation extends StatelessWidget {
-  const _MobileChapterNavigation({required this.state, required this.onTurn});
+  const _MobileChapterNavigation({
+    required this.state,
+    required this.onTurn,
+    required this.onPassage,
+  });
 
   final AppState state;
   final Future<void> Function(AppState, int) onTurn;
+  final VoidCallback? onPassage;
 
   @override
   Widget build(BuildContext context) {
@@ -2818,24 +2964,36 @@ class _MobileChapterNavigation extends StatelessWidget {
     return Material(
       elevation: 3,
       child: Row(
-        children: <Widget>[
-          Expanded(
-            child: TextButton(
-              onPressed: state.canGoPrevious ? () => onTurn(state, -1) : null,
-              child: Text(UiStrings.of(context).text('Previous')),
-            ),
+        textDirection: TextDirection.ltr,
+        children: [
+          IconButton(
+            tooltip: state.ui('previousChapter'),
+            onPressed: onPassage != null && state.canGoPrevious
+                ? () => onTurn(state, -1)
+                : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          IconButton(
+            tooltip: state.ui('nextChapter'),
+            onPressed: onPassage != null && state.canGoNext
+                ? () => onTurn(state, 1)
+                : null,
+            icon: const Icon(Icons.chevron_right),
           ),
           Expanded(
-            child: Text(
-              state.current?.name ?? '',
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Expanded(
-            child: TextButton(
-              onPressed: state.canGoNext ? () => onTurn(state, 1) : null,
-              child: Text(UiStrings.of(context).text('Next')),
+            child: TextButton.icon(
+              key: const ValueKey('reader-mobile-passage-selector'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                alignment: Alignment.centerLeft,
+              ),
+              onPressed: onPassage,
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text(
+                state.current?.name ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],

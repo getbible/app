@@ -91,7 +91,7 @@ async function readerVisible(page) {
 }
 
 async function openDownloads(page) {
-  await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+  await page.getByRole('button', { name: /^Reader options/ }).click();
   await page.getByRole('button', { name: 'Downloads & storage', exact: true }).press('Enter');
 }
 
@@ -330,7 +330,7 @@ async function runJourney(browser, { isolated, browserName }) {
 
     // Download the actual private snapshot, then import an edited copy through
     // the system file picker. The preview must precede any merge confirmation.
-    await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+    await page.getByRole('button', { name: /^Reader options/ }).click();
     await page.getByRole('button', { name: 'Backup and restore', exact: true }).press('Enter');
     await page.getByRole('button', { name: 'Prepare complete backup', exact: true }).click();
     const downloadEvent = page.waitForEvent('download');
@@ -447,7 +447,7 @@ async function runJourney(browser, { isolated, browserName }) {
     await readerVisible(page);
     await page.getByRole('button', { name: restoredNoteText }).waitFor();
     await inspectVerification(page, { verified: true });
-    await page.getByRole('button', { name: /^Open Bible navigation/ }).click();
+    await page.getByRole('button', { name: /^Reader options/ }).click();
     await page.getByRole('button', { name: 'Downloads & storage', exact: true }).press('Enter');
     await installedDictionary(page).waitFor();
     await installedCommentary(page).waitFor();

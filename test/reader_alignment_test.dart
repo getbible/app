@@ -368,7 +368,7 @@ void main() {
       final notice = find.byType(ScriptureVerificationNotice);
       expect(notice, findsOneWidget);
       final heading = tester.getRect(
-        find.widgetWithText(TextButton, 'Fixture 1'),
+        find.byKey(const ValueKey('reader-passage-selector')),
       );
       expect(tester.getRect(notice).top, greaterThanOrEqualTo(heading.bottom));
       await tester.tap(find.text('getBible API'));

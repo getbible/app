@@ -49,6 +49,28 @@ Paths in the reference column refer to `getbible/app.getbible.life`.
 | Daily Scripture | `lib/daily.ts` | Typed resolver and versioned daily cache; alias/range/ownership fixes have regressions awaiting current validation evidence. |
 | Appearance/localization | `lib/appearance.ts`, `lib/i18n.ts`, `public/locales/` | `ReaderPreferences`, scoped `UiStrings`, pinned 282-message upstream catalogue, 69 packs and native extension messages. UI direction is independent of Scripture. High contrast/reduced motion respect preferences; generated language packs still require linguistic review. |
 
+## Maintainer-directed passage navigation
+
+On 12 October 2026, the React reference was inspected at
+`555008554d46e174dfdfb41e3bdc578d2a62a66e`, specifically `app/page.tsx`'s
+`topbar`, reader drawer and `mobile-navigation`. It still combines translation,
+book and chapter dropdowns with reader options. The requested mini-app screenshot
+workflow deliberately supersedes that presentation for the Flutter targets.
+
+`ReaderPassagePicker` now provides searchable book and chapter grids, while
+`ReaderTranslationPicker` independently previews a translation's source details
+before explicit activation. `ReaderScreen` uses left-positioned navigation with
+adaptive sheets/dialogs and retains settings in the drawer. Both operate through
+the existing typed repositories and guarded `AppState.loadPassage`; browsing does
+not change private data, reader position or automatic Bible acquisition. Partial
+translations prompt for an available passage instead of silently substituting
+one. Existing reference preview moves to its own heading icon. The reference
+React repository itself is not changed by this native navigation increment.
+
+The focused picker, composed reader and inline-draft regressions are documented
+in [Testing](TESTING.md). Native platform compilation, real touch/screen-reader
+behavior and physical-device QA remain separate gates from widget coverage.
+
 ## Bookmark preservation rules
 
 The reference's public and private topics share a list while each membership

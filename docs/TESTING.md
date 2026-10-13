@@ -1,5 +1,20 @@
 # Testing and manual QA
 
+## WebKit resource-filter acceptance (13 October 2026)
+
+The browser journey fills the **Find a resource** textbox by its accessible
+name, including after the initial click. It must not use `input:focus` as the
+field locator: WebKit can leave that selector unmatched while catalogue
+responses update Flutter's semantics, even though the named input still exists.
+The journey verifies that the nonmatching catalogue commentary disappears,
+the installed commentary remains, and the filter text survives dictionary
+activation. These checks exercise the compiled application and its real worker
+and database under both hosting configurations in all three browsers.
+
+The six browser-harness unit tests and nine offline-shell tests pass locally.
+The complete browser and native build/runtime matrix remains a required CI gate
+for `1.0.0-alpha.6+7`; see the [incident record](BUILD_INCIDENT_2026-10.md).
+
 ## Passage navigation refinement (12 October 2026)
 
 The focused navigation checks are:

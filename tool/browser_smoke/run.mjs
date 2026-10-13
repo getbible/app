@@ -416,18 +416,26 @@ async function runJourney(browser, { isolated, browserName }) {
     assert.equal(dictionaryDownloads(), dictionaryBeforeExclusion,
       'Clear downloads must preserve per-resource exclusions');
     await page.getByRole('button', { name: 'Browse catalogue', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Find a resource', exact: true }).click();
-    await page.locator('input:focus, textarea:focus').fill('Greek lexicon');
+    const resourceFilter = page.getByRole('textbox', { name: 'Find a resource', exact: true });
+    await resourceFilter.click();
+    // Catalogue responses can update Flutter's semantics after the click.
+    // Resolve the named editor again so fill can acquire focus itself; a
+    // :focus selector cannot recover when WebKit loses that transient state.
+    await resourceFilter.fill('Greek lexicon');
     const dictionaryChoice = page.getByRole('group', {
       name: /^Greek lexicon · en\s+Dictionary[\s\S]*https:\/\/dictionaries\.getbible\.net/,
     });
     await dictionaryChoice.getByRole('checkbox', { name: /^Keep offline/, checked: false }).waitFor();
+    await page.getByRole('group', {
+      name: /^Fixture Commentary · en\s+Commentary[\s\S]*https:\/\/commentaries\.getbible\.net/,
+    }).waitFor({ state: 'hidden' });
+    await installedCommentary(page).waitFor();
     await dictionaryChoice.getByRole('checkbox', { name: /^Keep offline/, checked: false }).click();
     await installedDictionary(page).waitFor();
     assert.ok(dictionaryDownloads() > dictionaryBeforeExclusion,
       'Restoring Keep offline must reactivate the complete dictionary');
     assert.equal(
-      await page.getByRole('textbox', { name: 'Find a resource', exact: true }).inputValue(),
+      await resourceFilter.inputValue(),
       'Greek lexicon',
       'Automatic activation must preserve the visible catalogue filter',
     );

@@ -161,3 +161,33 @@ CoreSimulator/simctl, supplementing the simulated device's logs without delaying
 the reserved shutdown and deletion phases.
 Native PR and post-merge verification are still required before this remaining
 launch failure can be considered resolved.
+
+## 13 October: WebKit catalogue input blocked the next release
+
+[Main CI run 38288406126](https://github.com/getbible/app/actions/runs/38288406126)
+compiled the production Web application successfully. Chromium and Firefox
+passed both hosting modes, and WebKit passed ordinary hosting. In WebKit's
+cross-origin-isolated journey, `run.mjs` timed out after 45 seconds waiting for
+`input:focus, textarea:focus` while filling **Find a resource**. The preceding
+reader, private-note, backup and automatic-installation checks had succeeded.
+This failure identifies the focus-dependent browser interaction, not a Web
+compilation failure or an unavailable public service. The separate live probe
+reported all six public services available with browser CORS.
+
+The browser harness now addresses the intended editable field directly and
+retains the existing filter-value and resource-restoration assertions. All six
+browser/hosting journeys remain required, with no failed-journey retry or
+ignored assertion. Exact-run verification belongs in [Testing](TESTING.md).
+
+All native package builds, native runtime journeys and the main test job passed.
+The six native package archives remain attached to that run. Web packaging is
+after browser acceptance, so the failed run has no Web package; its failed
+conclusion correctly prevents publication of an incomplete release.
+
+That run still used `1.0.0-alpha.5+6`, already published on 11 October from commit
+`b1bc3db21052ce18a7df695aa6af163be19cfc84`. Published assets are immutable, and
+rerunning that version would not distribute the newer reader changes. The next
+candidate is therefore `1.0.0-alpha.6+7`. Its successful main CI must build and
+verify a complete new inventory before automatic publication. Version, source,
+checksum, signing and runtime gates remain unchanged; earlier successful native
+packages do not replace validation of the new candidate.
